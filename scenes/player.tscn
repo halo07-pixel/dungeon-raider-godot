@@ -1,0 +1,35 @@
+[gd_scene format=3 uid="uid://3o6s1t7pjfva"]
+
+[ext_resource type="Script" uid="uid://dby0q2c84eno8" path="res://scripts/player.gd" id="1"]
+[ext_resource type="Script" uid="uid://cg4p2rhjp7pck" path="res://scripts/camera.gd" id="2"]
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_pl"]
+radius = 12.0
+
+[node name="Player" type="CharacterBody2D" unique_id=356242153]
+collision_layer = 2
+script = ExtResource("1")
+
+[node name="Body" type="CollisionShape2D" parent="." unique_id=605170845]
+shape = SubResource("CircleShape2D_pl")
+
+[node name="Camera" type="Camera2D" parent="." unique_id=911960645]
+zoom = Vector2(1.25, 1.25)
+position_smoothing_enabled = true
+position_smoothing_speed = 8.0
+script = ExtResource("2")
+
+[node name="FireTimer" type="Timer" parent="." unique_id=836865423]
+one_shot = true
+
+[node name="DodgeTimer" type="Timer" parent="." unique_id=1313676569]
+wait_time = 0.22
+one_shot = true
+
+[node name="DodgeCooldown" type="Timer" parent="." unique_id=849385000]
+wait_time = 0.9
+one_shot = true
+
+[node name="HurtTimer" type="Timer" parent="." unique_id=1117370607]
+wait_time = 0.7
+one_shot = true

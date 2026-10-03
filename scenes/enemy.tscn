@@ -1,0 +1,55 @@
+[gd_scene load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://scripts/enemy.gd" id="1"]
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_body"]
+radius = 12.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_hit"]
+radius = 16.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_near"]
+radius = 100.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_far"]
+radius = 300.0
+
+[node name="Enemy" type="CharacterBody2D"]
+collision_layer = 4
+collision_mask = 5
+script = ExtResource("1")
+
+[node name="Body" type="CollisionShape2D" parent="."]
+shape = SubResource("CircleShape2D_body")
+
+[node name="Hitbox" type="Area2D" parent="."]
+collision_layer = 0
+collision_mask = 2
+
+[node name="Shape" type="CollisionShape2D" parent="Hitbox"]
+shape = SubResource("CircleShape2D_hit")
+
+[node name="NearZone" type="Area2D" parent="."]
+collision_layer = 0
+collision_mask = 2
+
+[node name="Shape" type="CollisionShape2D" parent="NearZone"]
+shape = SubResource("CircleShape2D_near")
+
+[node name="FarZone" type="Area2D" parent="."]
+collision_layer = 0
+collision_mask = 2
+
+[node name="Shape" type="CollisionShape2D" parent="FarZone"]
+shape = SubResource("CircleShape2D_far")
+
+[node name="LOS" type="RayCast2D" parent="."]
+collision_mask = 1
+
+[node name="ActionTimer" type="Timer" parent="."]
+one_shot = true
+
+[node name="SpawnTimer" type="Timer" parent="."]
+wait_time = 0.7
+one_shot = true
+autostart = true

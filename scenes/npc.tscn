@@ -1,0 +1,18 @@
+[gd_scene format=3 uid="uid://cuk8dvxlf4mnc"]
+
+[ext_resource type="Script" uid="uid://bpla6x5j73grd" path="res://scenes/npc.gd" id="1_nh2m4"]
+[ext_resource type="Texture2D" uid="uid://bmt15ndndpo3b" path="res://scenes/tải xuống.png" id="2_abqhh"]
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_0fpe1"]
+radius = 95.96
+
+[node name="NPC" type="Area2D" unique_id=786387224]
+collision_mask = 15
+script = ExtResource("1_nh2m4")
+
+[node name="Sprite2D" type="Sprite2D" parent="." unique_id=1225862310]
+scale = Vector2(0.15, 0.15)
+texture = ExtResource("2_abqhh")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="." unique_id=1203395021]
+shape = SubResource("CircleShape2D_0fpe1")
