@@ -45,7 +45,9 @@ func setup(hp_mult: float = 1.0) -> void:
 	var floor_scale: float = 1.0 + 0.3 * float(Global.floor_num - 1)
 	max_hp = 700.0 * hp_mult * floor_scale
 	hp = max_hp
-	armor = floor((Global.floor_num - 1) * 1.6) + 2.0
+	# Giáp = % giảm sát thương (có trần 40%, +8% ở pha 3) thay vì trừ thẳng — đồng bộ
+	# với thay đổi cân bằng giáp quái thường, tránh vũ khí yếu gần như vô dụng ở tầng sâu.
+	armor = minf(0.05 + 0.035 * float(Global.floor_num - 1), 0.40)
 	cc_resist = minf(0.3 + (Global.floor_num - 1) * 0.2, 0.9)
 	# ======================================================
 func activate_boss() -> void:
@@ -301,9 +303,9 @@ func take_damage(amount: int, _from_pos: Vector2 = Vector2.ZERO, _knock: float =
 	# === THAY THẾ ĐOẠN TRỪ MÁU GỐC BẰNG ĐOẠN NÀY ===
 	var current_armor = armor
 	if phase == 3:
-		current_armor += 3.0
-		
-	var actual_damage = maxi(1, amount - int(current_armor))
+		current_armor = minf(current_armor + 0.08, 0.48)
+
+	var actual_damage = maxi(1, int(round(float(amount) * (1.0 - current_armor))))
 	hp = maxf(hp - float(actual_damage), 0.0)
 	
 	Global.sfx("hit")

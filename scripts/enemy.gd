@@ -51,7 +51,9 @@ func setup(p_kind: String, hp_mult: float = 1.0) -> void:
 	var floor_scale: float = 1.0 + 0.15 * float(Global.floor_num - 1)
 	max_hp = float(data["hp"]) * hp_mult * floor_scale
 	hp = max_hp
-	armor = floor((Global.floor_num - 1) * 1.2)
+	# Giáp = % giảm sát thương (có trần 35%), không trừ thẳng nữa — tránh vũ khí yếu
+	# (vd Tiểu Liên 5 dmg) bị giáp "nuốt" gần hết sát thương ở tầng sâu.
+	armor = minf(0.04 * float(Global.floor_num - 1), 0.35)
 	cc_resist = minf(0.0 + (Global.floor_num - 1) * 0.15, 0.6)
 
 func _ready() -> void:
@@ -259,7 +261,7 @@ func take_damage(amount: int, from_pos: Vector2 = Vector2.ZERO, knock: float = 2
 	
 	var actual_damage = amount
 	if not true_dmg:
-		actual_damage = maxi(1, amount - int(armor))
+		actual_damage = maxi(1, int(round(float(amount) * (1.0 - armor))))
 	hp -= float(actual_damage)
 	
 	var actual_knock = knock * (1.0 - cc_resist)
