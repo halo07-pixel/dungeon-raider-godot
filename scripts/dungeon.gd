@@ -9,6 +9,7 @@ signal rooms_updated
 const ENEMY = preload("res://scenes/enemy.tscn")
 const BOSS = preload("res://scenes/boss.tscn")
 const PICKUP = preload("res://scenes/pickup.tscn")
+const SpikeTrapScript = preload("res://scripts/spike_trap.gd")
 
 const CELL_W: int = 24
 const CELL_H: int = 16
@@ -244,6 +245,10 @@ func _build_room(cell: Vector2i, room: Dictionary) -> void:
 			for dx in 2:
 				for dy in 2:
 					floor_layer.set_cell(o + spots[i] + Vector2i(dx, dy), 0, T_PILLAR)
+		if randf() < 0.5:
+			_spawn_crate_decor(cell, randi_range(1, 2))
+		if randf() < 0.4:
+			_spawn_spike_traps(cell, randi_range(1, 2))
 	# Vùng kích hoạt phòng (Area2D + signal body_entered), thụt vào 2 tile để người chơi vào hẳn mới khoá cửa
 	var area := Area2D.new()
 	area.collision_layer = 0
@@ -342,7 +347,8 @@ func _enter_room(cell: Vector2i) -> void:
 				rarity = "rare"
 				
 			# Nối ID vũ khí và độ hiếm bằng dấu ":"
-			_spawn_pickup("weapon", chosen_weapon + ":" + rarity, room_center(cell))
+			_spawn_pickup("weapon", chosen_weapon + ":" + rarity, room_center(cell) + Vector2(0.0, -24.0))
+			_spawn_chest_decor(room_center(cell) + Vector2(0.0, 10.0))
 			Global.message.emit("Phòng Kho Báu!", Color(1.0, 0.85, 0.3))
 		_:
 			room["cleared"] = true
@@ -468,6 +474,46 @@ func _room_cleared(cell: Vector2i) -> void:
 		Global.message.emit("Phòng đã dọn sạch!", Color(0.6, 1.0, 0.6))
 		if randf() < 0.35:
 			_spawn_pickup("heal", "", room_center(cell))
+
+
+## Rương trang trí (tĩnh, không va chạm) đặt dưới vũ khí trong phòng Kho báu — chỉ để đẹp,
+## vật phẩm thật vẫn là Pickup "weapon" phía trên, nhặt theo logic cũ không đổi.
+func _spawn_chest_decor(pos: Vector2) -> void:
+	var spr := Sprite2D.new()
+	var img := Image.new()
+	if img.load("res://assets/dungeon/chest_full_open_anim_f0.png") != OK:
+		return
+	spr.texture = ImageTexture.create_from_image(img)
+	spr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	spr.scale = Vector2(2.0, 2.0)
+	entities.add_child(spr)
+	spr.global_position = pos
+
+
+## Thùng gỗ trang trí — chỉ tăng đa dạng hình ảnh cho phòng thường, không va chạm,
+## không ảnh hưởng gameplay (giống rương trang trí, nhưng dùng vị trí sàn trống ngẫu nhiên).
+func _spawn_crate_decor(cell: Vector2i, count: int) -> void:
+	for i in count:
+		var pos: Vector2 = _random_floor_pos(cell, Vector2(-99999.0, -99999.0), 0.0)
+		var spr := Sprite2D.new()
+		var img := Image.new()
+		if img.load("res://assets/dungeon/crate.png") != OK:
+			return
+		spr.texture = ImageTexture.create_from_image(img)
+		spr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		spr.scale = Vector2(1.6, 1.6)
+		entities.add_child(spr)
+		spr.global_position = pos
+
+
+## Bẫy gai sàn — xem scripts/spike_trap.gd để biết chu kỳ an toàn/nguy hiểm và sát thương.
+func _spawn_spike_traps(cell: Vector2i, count: int) -> void:
+	for i in count:
+		var pos: Vector2 = _random_floor_pos(cell, Vector2(-99999.0, -99999.0), 0.0)
+		var trap := Area2D.new()
+		trap.set_script(SpikeTrapScript)
+		entities.add_child(trap)
+		trap.global_position = pos
 
 
 func _spawn_pickup(kind: String, extra: String, pos: Vector2) -> void:

@@ -1,6 +1,8 @@
 extends Area2D
 ## Vật phẩm / cổng: kind = coin | heal | weapon | portal. Nhặt bằng signal body_entered.
 
+@onready var sprite: AnimatedSprite2D = $Sprite
+
 var kind: String = "coin"
 var extra: String = ""
 var weapon_id: String = ""
@@ -26,12 +28,43 @@ func _ready() -> void:
 	if kind == "portal":
 		set_deferred("monitoring", false)
 		get_tree().create_timer(1.0).timeout.connect(_arm)
+	_setup_sprite()
+
+
+## "coin" và "heal" dùng sprite 0x72 thật; "weapon"/"portal" vẫn vẽ bằng code vì
+## cần thể hiện màu độ hiếm / tên vũ khí / hiệu ứng cổng mà asset tĩnh không truyền tải được.
+func _setup_sprite() -> void:
+	match kind:
+		"coin":
+			var frames := SpriteFrames.new()
+			frames.add_animation("spin")
+			frames.set_animation_speed("spin", 8.0)
+			frames.set_animation_loop("spin", true)
+			for i in 4:
+				var img := Image.new()
+				if img.load("res://assets/dungeon/coin_anim_f%d.png" % i) == OK:
+					frames.add_frame("spin", ImageTexture.create_from_image(img))
+			sprite.sprite_frames = frames
+			sprite.scale = Vector2(1.5, 1.5)
+			sprite.play("spin")
+		"heal":
+			var frames := SpriteFrames.new()
+			var img := Image.new()
+			if img.load("res://assets/dungeon/flask_red.png") == OK:
+				frames.add_frame("default", ImageTexture.create_from_image(img))
+			sprite.sprite_frames = frames
+			sprite.scale = Vector2(1.8, 1.8)
+			sprite.play("default")
+		_:
+			sprite.visible = false
 
 func _arm() -> void:
 	monitoring = true
 
 func _process(delta: float) -> void:
 	_t += delta
+	var bob: float = sin(_t * 5.0) * 3.0
+	sprite.position.y = bob
 	queue_redraw()
 
 func _on_body_entered(body: Node) -> void:
@@ -56,13 +89,6 @@ func _on_body_entered(body: Node) -> void:
 func _draw() -> void:
 	var bob: float = sin(_t * 5.0) * 3.0
 	match kind:
-		"coin":
-			draw_circle(Vector2(0.0, bob), 7.0, Color(1.0, 0.85, 0.2))
-			draw_circle(Vector2(0.0, bob), 4.0, Color(1.0, 0.95, 0.5))
-		"heal":
-			draw_circle(Vector2(0.0, bob), 11.0, Color(0.15, 0.5, 0.2))
-			draw_rect(Rect2(-2.5, bob - 7.0, 5.0, 14.0), Color(0.4, 1.0, 0.5))
-			draw_rect(Rect2(-7.0, bob - 2.5, 14.0, 5.0), Color(0.4, 1.0, 0.5))
 		"weapon":
 			var w: Dictionary = Global.weapons[weapon_id]
 			var r_data: Dictionary = Global.rarities[weapon_rarity]

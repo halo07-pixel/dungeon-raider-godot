@@ -24,11 +24,14 @@ func _draw() -> void:
 					known = true
 		if not known:
 			continue
-		var col: Color = Color(0.5, 0.5, 0.55)
+		# Màu đồng bộ tông đá/gỗ ấm của bộ asset pixel-art 0x72 thay vì xám-xanh trung tính cũ.
+		var col: Color = Color(0.55, 0.47, 0.42)
 		if room["type"] == "boss":
-			col = Color(0.9, 0.2, 0.2)
+			col = Color(0.85, 0.25, 0.25)
 		elif room["type"] == "treasure":
-			col = Color(1.0, 0.85, 0.3)
+			col = Color(0.95, 0.8, 0.3)
+		elif room["type"] == "start":
+			col = Color(0.35, 0.75, 0.85)
 		if not room["visited"]:
 			col = col.darkened(0.45)
 		if c == dungeon.current_cell:

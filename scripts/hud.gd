@@ -4,8 +4,10 @@ extends CanvasLayer
 
 const MinimapScript = preload("res://scripts/minimap.gd")
 
-var hp_bar: ProgressBar
-var hp_label: Label
+var hearts_box: HBoxContainer
+var heart_icons: Array = []
+var heart_tex: Dictionary = {}
+var _hearts_max_hp: float = -1.0
 var dodge_bar: ProgressBar
 var info_label: Label
 var boss_box: Control
@@ -33,9 +35,7 @@ func _process(_delta: float) -> void:
 	var p = Global.player
 	if not is_instance_valid(p):
 		return
-	hp_bar.max_value = float(p.max_hp)
-	hp_bar.value = float(p.hp)
-	hp_label.text = "HP %d / %d" % [p.hp, p.max_hp]
+	_update_hearts(float(p.hp), float(p.max_hp))
 	dodge_bar.value = p.dodge_ratio() * 100.0
 	
 	var w_name = "Chưa có"
@@ -95,9 +95,47 @@ func _bar(parent: Node, pos: Vector2, sz: Vector2, fill: Color) -> ProgressBar:
 	parent.add_child(b)
 	return b
 
+## Nạp 3 trạng thái tim (đầy/nửa/rỗng) từ asset 0x72 — dùng chung 1 lần cho mọi icon.
+func _load_heart_tex() -> void:
+	for state in ["full", "half", "empty"]:
+		var img := Image.new()
+		if img.load("res://assets/dungeon/ui_heart_%s.png" % state) == OK:
+			heart_tex[state] = ImageTexture.create_from_image(img)
+
+
+## Mỗi tim đại diện 1/10 máu tối đa — luôn hiện đúng 10 tim bất kể HP gốc bao nhiêu
+## (Xạ Thủ 100 HP hay Đấu Sĩ 200 HP đều hiện 10 tim, chỉ khác "nặng" mỗi tim).
+func _update_hearts(hp: float, max_hp: float) -> void:
+	if max_hp <= 0.0:
+		return
+	if not is_equal_approx(max_hp, _hearts_max_hp):
+		_hearts_max_hp = max_hp
+		for h in heart_icons:
+			h.queue_free()
+		heart_icons.clear()
+		for i in 10:
+			var t := TextureRect.new()
+			t.custom_minimum_size = Vector2(28.0, 28.0)
+			t.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			t.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+			hearts_box.add_child(t)
+			heart_icons.append(t)
+	var per_heart: float = max_hp / 10.0
+	for i in heart_icons.size():
+		var fill: float = clampf((hp - float(i) * per_heart) / per_heart, 0.0, 1.0)
+		var state: String = "empty"
+		if fill >= 0.75: state = "full"
+		elif fill >= 0.25: state = "half"
+		if heart_tex.has(state):
+			heart_icons[i].texture = heart_tex[state]
+
+
 func _build_ui() -> void:
-	hp_bar = _bar(self, Vector2(20.0, 20.0), Vector2(280.0, 24.0), Color(0.85, 0.2, 0.25))
-	hp_label = _label(self, "HP", 16, Vector2(20.0, 20.0), Vector2(280.0, 24.0), HORIZONTAL_ALIGNMENT_CENTER)
+	_load_heart_tex()
+	hearts_box = HBoxContainer.new()
+	hearts_box.position = Vector2(20.0, 16.0)
+	hearts_box.add_theme_constant_override("separation", 2)
+	add_child(hearts_box)
 	dodge_bar = _bar(self, Vector2(20.0, 50.0), Vector2(280.0, 8.0), Color(0.4, 0.8, 1.0))
 	dodge_bar.max_value = 100.0
 	info_label = _label(self, "", 16, Vector2(20.0, 64.0), Vector2(500.0, 26.0))
