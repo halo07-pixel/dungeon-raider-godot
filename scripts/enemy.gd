@@ -35,6 +35,15 @@ var bleed_timer: float = 0.0
 @onready var los: RayCast2D = $LOS
 @onready var action_timer: Timer = $ActionTimer
 @onready var spawn_timer: Timer = $SpawnTimer
+@onready var sprite: AnimatedSprite2D = $Sprite
+
+## Ánh xạ loại quái -> sprite 0x72 (DungeonTilesetII). "single_anim": true nghĩa là
+## chỉ có 1 bộ khung hình dùng chung cho cả idle lẫn di chuyển (vd slug lúc nào cũng trườn).
+const ENEMY_SPRITES: Dictionary = {
+	"slime": {"prefix": "slug", "single_anim": true, "offset_y": -12.0},
+	"archer": {"prefix": "imp", "single_anim": false, "offset_y": -10.0},
+	"brute": {"prefix": "ogre", "single_anim": false, "offset_y": -22.0},
+}
 
 func setup(p_kind: String, hp_mult: float = 1.0) -> void:
 	kind = p_kind
@@ -65,7 +74,56 @@ func _ready() -> void:
 	action_timer.one_shot = (kind != "archer")
 	action_timer.timeout.connect(_on_action_timer_timeout)
 	spawn_timer.timeout.connect(_on_spawn_done)
-	modulate.a = 0.35 
+	modulate.a = 0.35
+	_setup_sprite()
+
+
+func _setup_sprite() -> void:
+	var cfg: Dictionary = ENEMY_SPRITES.get(kind, ENEMY_SPRITES["slime"])
+	sprite.sprite_frames = _build_enemy_frames(cfg)
+	sprite.scale = Vector2(2.0, 2.0)
+	sprite.offset = Vector2(0.0, float(cfg["offset_y"]))
+	sprite.play("idle")
+
+
+func _build_enemy_frames(cfg: Dictionary) -> SpriteFrames:
+	var frames := SpriteFrames.new()
+	var prefix: String = cfg["prefix"]
+	if cfg.get("single_anim", false):
+		_add_enemy_anim(frames, prefix, "idle", "", 4, 5.0, true)
+		_add_enemy_anim(frames, prefix, "run", "", 4, 8.0, true)
+	else:
+		_add_enemy_anim(frames, prefix, "idle", "idle", 4, 6.0, true)
+		_add_enemy_anim(frames, prefix, "run", "run", 4, 10.0, true)
+	return frames
+
+
+func _add_enemy_anim(frames: SpriteFrames, prefix: String, anim_name: String, file_tag: String, count: int, fps: float, loop: bool) -> void:
+	frames.add_animation(anim_name)
+	frames.set_animation_speed(anim_name, fps)
+	frames.set_animation_loop(anim_name, loop)
+	for i in count:
+		var path: String = ("res://assets/dungeon/%s_anim_f%d.png" % [prefix, i]) if file_tag == "" \
+			else ("res://assets/dungeon/%s_%s_anim_f%d.png" % [prefix, file_tag, i])
+		var img := Image.new()
+		if img.load(path) != OK:
+			push_error("Không tải được sprite quái: " + path)
+			continue
+		frames.add_frame(anim_name, ImageTexture.create_from_image(img))
+
+
+func _update_sprite(moving: bool) -> void:
+	if facing.x != 0.0:
+		sprite.flip_h = facing.x < 0.0
+	if stun_timer > 0.0:
+		sprite.modulate = Color.YELLOW
+	elif slow_timer > 0.0:
+		sprite.modulate = Color.AQUA
+	else:
+		sprite.modulate = Color.WHITE
+	var want_anim: String = "run" if moving else "idle"
+	if sprite.animation != want_anim:
+		sprite.play(want_anim)
 
 func _set_circle(node: CollisionShape2D, radius: float) -> void:
 	var s := CircleShape2D.new()
@@ -163,6 +221,7 @@ func _physics_process(delta: float) -> void:
 		velocity = knockback
 		knockback = knockback.move_toward(Vector2.ZERO, 900.0 * delta)
 		move_and_slide()
+		_update_sprite(false)
 		queue_redraw()
 		return
 		
@@ -191,6 +250,7 @@ func _physics_process(delta: float) -> void:
 	velocity = move * float(data["speed"]) + knockback
 	knockback = knockback.move_toward(Vector2.ZERO, 900.0 * delta)
 	move_and_slide()
+	_update_sprite(move.length() > 0.05)
 	queue_redraw()
 
 func take_damage(amount: int, from_pos: Vector2 = Vector2.ZERO, knock: float = 200.0, true_dmg: bool = false) -> void:
@@ -247,27 +307,8 @@ func _spawn_pickup(k: String) -> void:
 	p.global_position = global_position + Vector2(randf_range(-14.0, 14.0), randf_range(-14.0, 14.0))
 
 func _draw() -> void:
+	# Thân quái giờ do $Sprite (AnimatedSprite2D) vẽ; _draw() chỉ còn thanh máu nổi phía trên.
 	var r: float = data["radius"]
-	var c: Color = data["color"]
-	if stun_timer > 0: c = Color.YELLOW # Hiển thị đang bị choáng
-	elif slow_timer > 0: c = Color.AQUA
-	
-	match kind:
-		"slime":
-			draw_circle(Vector2.ZERO, r, c)
-			draw_circle(Vector2(0.0, r * 0.15), r * 0.65, c.lightened(0.25))
-			draw_circle(facing * r * 0.35 + Vector2(-4.0, -3.0), 2.5, Color.BLACK)
-			draw_circle(facing * r * 0.35 + Vector2(4.0, -3.0), 2.5, Color.BLACK)
-		"archer":
-			draw_circle(Vector2.ZERO, r, c)
-			draw_circle(Vector2.ZERO, r * 0.55, c.lightened(0.35))
-			var a: float = facing.angle()
-			draw_arc(facing * r * 0.9, r * 0.9, a - 1.1, a + 1.1, 12, Color.WHITE, 2.5)
-		_:
-			draw_rect(Rect2(-r, -r, r * 2.0, r * 2.0), c)
-			draw_rect(Rect2(-r, -r, r * 2.0, r * 2.0), c.darkened(0.5), false, 3.0)
-			draw_circle(Vector2(-6.0, -4.0), 3.0, Color.BLACK)
-			draw_circle(Vector2(6.0, -4.0), 3.0, Color.BLACK)
 	if hp < max_hp and alive:
 		draw_rect(Rect2(-r, -r - 10.0, r * 2.0, 4.0), Color(0.15, 0.0, 0.0))
 		draw_rect(Rect2(-r, -r - 10.0, r * 2.0 * clampf(hp / max_hp, 0.0, 1.0), 4.0), Color(0.9, 0.2, 0.2))

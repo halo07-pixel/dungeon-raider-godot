@@ -31,6 +31,13 @@ var is_boss: bool = true
 @onready var hitbox: Area2D = $Hitbox
 @onready var slam_area: Area2D = $SlamArea
 @onready var attack_timer: Timer = $AttackTimer
+@onready var sprite: AnimatedSprite2D = $Sprite
+
+const SPRITE_PREFIX: String = "orc_warrior"
+const SPRITE_SCALE: float = 3.0
+const SPRITE_OFFSET_Y: float = -30.0
+## Màu theo pha (khớp bảng palette trong _draw gốc) — tint lên sprite để vẫn báo pha rõ ràng.
+const PHASE_TINT: Array = [Color(0.6, 0.25, 0.8), Color(0.9, 0.5, 0.15), Color(1.0, 0.15, 0.15)]
 
 
 func setup(hp_mult: float = 1.0) -> void:
@@ -57,6 +64,44 @@ func _ready() -> void:
 	attack_timer.timeout.connect(_on_attack_timer_timeout)
 	active = false
 	modulate.a = 0.4
+	sprite.sprite_frames = _build_sprite_frames()
+	sprite.scale = Vector2(SPRITE_SCALE, SPRITE_SCALE)
+	sprite.offset = Vector2(0.0, SPRITE_OFFSET_Y)
+	sprite.modulate = PHASE_TINT[0]
+	sprite.play("idle")
+
+
+func _build_sprite_frames() -> SpriteFrames:
+	var frames := SpriteFrames.new()
+	_add_anim(frames, "idle", 4, 5.0, true)
+	_add_anim(frames, "run", 4, 9.0, true)
+	return frames
+
+
+func _add_anim(frames: SpriteFrames, anim: String, count: int, fps: float, loop: bool) -> void:
+	frames.add_animation(anim)
+	frames.set_animation_speed(anim, fps)
+	frames.set_animation_loop(anim, loop)
+	for i in count:
+		var path: String = "res://assets/dungeon/%s_%s_anim_f%d.png" % [SPRITE_PREFIX, anim, i]
+		var img := Image.new()
+		if img.load(path) != OK:
+			push_error("Không tải được sprite Boss: " + path)
+			continue
+		frames.add_frame(anim, ImageTexture.create_from_image(img))
+
+
+func _update_sprite() -> void:
+	sprite.modulate = PHASE_TINT[phase - 1]
+	var look: Vector2 = Vector2.RIGHT
+	var p = Global.player
+	if is_instance_valid(p):
+		look = (p.global_position - global_position).normalized()
+	if look.x != 0.0:
+		sprite.flip_h = look.x < 0.0
+	var want_anim: String = "run" if velocity.length() > 5.0 else "idle"
+	if sprite.animation != want_anim:
+		sprite.play(want_anim)
 
 
 func _on_intro_done() -> void:
@@ -244,6 +289,7 @@ func _physics_process(delta: float) -> void:
 	if charging and get_slide_collision_count() > 0:
 		Global.shake(0.5, 0.2)
 		_end_charge()
+	_update_sprite()
 	queue_redraw()
 
 
@@ -308,8 +354,8 @@ func _die() -> void:
 
 # ------------------------------------------------------------------ Vẽ + telegraph
 func _draw() -> void:
-	var palette: Array = [Color(0.6, 0.25, 0.8), Color(0.9, 0.5, 0.15), Color(1.0, 0.15, 0.15)]
-	var col: Color = palette[phase - 1]
+	# Thân Boss giờ do $Sprite vẽ (tint theo pha); _draw() chỉ còn giữ nguyên các
+	# hiệu ứng TELEGRAPH báo trước đòn đánh — đây là cơ chế gameplay cốt lõi, không đổi.
 	match tele_mode:
 		"line":
 			var reach: float = 520.0
@@ -321,14 +367,3 @@ func _draw() -> void:
 		"flash":
 			if int(tele_t * 10.0) % 2 == 0:
 				draw_arc(Vector2.ZERO, BODY_RADIUS + 12.0, 0.0, TAU, 32, Color(1.0, 0.9, 0.2), 5.0)
-	var pulse: float = 1.0 + 0.04 * sin(_t * (4.0 + 3.0 * float(phase)))
-	draw_circle(Vector2.ZERO, BODY_RADIUS * pulse, col)
-	draw_circle(Vector2.ZERO, BODY_RADIUS * 0.6 * pulse, col.lightened(0.3))
-	var look: Vector2 = Vector2.RIGHT
-	var p = Global.player
-	if is_instance_valid(p):
-		look = (p.global_position - global_position).normalized()
-	draw_circle(look * 10.0 + Vector2(-9.0, -6.0), 5.0, Color.WHITE)
-	draw_circle(look * 10.0 + Vector2(9.0, -6.0), 5.0, Color.WHITE)
-	draw_circle(look * 14.0 + Vector2(-9.0, -6.0), 2.5, Color.BLACK)
-	draw_circle(look * 14.0 + Vector2(9.0, -6.0), 2.5, Color.BLACK)

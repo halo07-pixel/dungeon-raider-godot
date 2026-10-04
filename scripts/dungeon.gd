@@ -15,9 +15,35 @@ const CELL_H: int = 16
 const GRID_W: int = 5
 const GRID_H: int = 5
 const DIRS = [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]
-const T_FLOOR := Vector2i(0, 0)
-const T_WALL := Vector2i(1, 0)
-const T_DOOR := Vector2i(2, 0)
+
+## Thứ tự file ảnh nạp vào atlas tileset — chỉ số (index) khớp với các hằng T_* bên dưới.
+const TILE_FILES: Array = [
+	"floor_1.png", "floor_2.png", "floor_3.png", "floor_4.png",
+	"floor_5.png", "floor_6.png", "floor_7.png", "floor_8.png",
+	"wall_top_left.png", "wall_top_mid.png", "wall_top_right.png",
+	"wall_left.png", "wall_right.png",
+	"wall_edge_bottom_left.png", "wall_edge_bottom_right.png",
+	"wall_mid.png", "column.png", "doors_leaf_closed.png",
+]
+const T_FLOOR_VARIANTS: Array = [
+	Vector2i(0, 0), Vector2i(1, 0), Vector2i(2, 0), Vector2i(3, 0),
+	Vector2i(4, 0), Vector2i(5, 0), Vector2i(6, 0), Vector2i(7, 0),
+]
+const T_WALL_TOP_LEFT := Vector2i(8, 0)
+const T_WALL_TOP_MID := Vector2i(9, 0)
+const T_WALL_TOP_RIGHT := Vector2i(10, 0)
+const T_WALL_LEFT := Vector2i(11, 0)
+const T_WALL_RIGHT := Vector2i(12, 0)
+const T_WALL_BOTTOM_LEFT := Vector2i(13, 0)
+const T_WALL_BOTTOM_RIGHT := Vector2i(14, 0)
+const T_WALL_MID := Vector2i(15, 0)
+const T_PILLAR := Vector2i(16, 0)
+const T_DOOR := Vector2i(17, 0)
+## Mọi toạ độ atlas được xem là vật cản (có collision) — dùng để lọc vị trí spawn hợp lệ.
+const SOLID_TILES: Array = [
+	T_WALL_TOP_LEFT, T_WALL_TOP_MID, T_WALL_TOP_RIGHT, T_WALL_LEFT, T_WALL_RIGHT,
+	T_WALL_BOTTOM_LEFT, T_WALL_BOTTOM_RIGHT, T_WALL_MID, T_PILLAR, T_DOOR,
+]
 
 var floor_layer: TileMapLayer
 var door_layer: TileMapLayer
@@ -48,7 +74,7 @@ func _ready() -> void:
 	Global.world = entities
 
 
-# ------------------------------------------------------------------ TileSet tạo bằng code (có physics)
+# ------------------------------------------------------------------ TileSet dựng từ asset CC0 (0x72 DungeonTilesetII)
 func _make_tileset() -> TileSet:
 	var t: int = Global.TILE
 	var ts := TileSet.new()
@@ -56,22 +82,30 @@ func _make_tileset() -> TileSet:
 	ts.add_physics_layer()
 	ts.set_physics_layer_collision_layer(0, Global.L_WORLD)
 	ts.set_physics_layer_collision_mask(0, 0)
-	var img := Image.create_empty(t * 3, t, false, Image.FORMAT_RGBA8)
-	img.fill_rect(Rect2i(0, 0, t, t), Color(0.12, 0.12, 0.16))
-	img.fill_rect(Rect2i(1, 1, t - 2, t - 2), Color(0.16, 0.16, 0.21))
-	img.fill_rect(Rect2i(t, 0, t, t), Color(0.40, 0.38, 0.48))
-	img.fill_rect(Rect2i(t + 3, 3, t - 6, t - 6), Color(0.27, 0.25, 0.35))
-	img.fill_rect(Rect2i(t * 2, 0, t, t), Color(0.70, 0.15, 0.15))
-	img.fill_rect(Rect2i(t * 2 + 4, 4, t - 8, t - 8), Color(0.45, 0.08, 0.08))
+
+	var n: int = TILE_FILES.size()
+	var img := Image.create_empty(t * n, t, false, Image.FORMAT_RGBA8)
+	for i in n:
+		var src_img := Image.new()
+		var err := src_img.load("res://assets/dungeon/" + TILE_FILES[i])
+		if err != OK:
+			push_error("Không tải được asset tile: " + TILE_FILES[i])
+			continue
+		src_img.convert(Image.FORMAT_RGBA8)
+		src_img.resize(t, t, Image.INTERPOLATE_NEAREST)
+		img.blit_rect(src_img, Rect2i(Vector2i.ZERO, Vector2i(t, t)), Vector2i(i * t, 0))
+
 	var src := TileSetAtlasSource.new()
 	src.texture = ImageTexture.create_from_image(img)
 	src.texture_region_size = Vector2i(t, t)
 	ts.add_source(src, 0)
-	for i in 3:
+	for i in n:
 		src.create_tile(Vector2i(i, 0))
+
+	# Mọi tile từ index 8 trở đi (tường/trụ/cửa) đều đặc — gắn collision hình vuông đầy ô
 	var h: float = float(t) / 2.0
 	var poly := PackedVector2Array([Vector2(-h, -h), Vector2(h, -h), Vector2(h, h), Vector2(-h, h)])
-	for i in [1, 2]:
+	for i in range(8, n):
 		var td: TileData = src.get_tile_data(Vector2i(i, 0), 0)
 		td.add_collision_polygon(0)
 		td.set_collision_polygon_points(0, 0, poly)
@@ -178,11 +212,30 @@ func _build_room(cell: Vector2i, room: Dictionary) -> void:
 	var o := Vector2i(cell.x * CELL_W, cell.y * CELL_H)
 	for x in CELL_W:
 		for y in CELL_H:
-			var edge: bool = x == 0 or y == 0 or x == CELL_W - 1 or y == CELL_H - 1
-			floor_layer.set_cell(o + Vector2i(x, y), 0, T_WALL if edge else T_FLOOR)
+			var pos: Vector2i = o + Vector2i(x, y)
+			var coord: Vector2i
+			if x == 0 and y == 0:
+				coord = T_WALL_TOP_LEFT
+			elif x == CELL_W - 1 and y == 0:
+				coord = T_WALL_TOP_RIGHT
+			elif x == 0 and y == CELL_H - 1:
+				coord = T_WALL_BOTTOM_LEFT
+			elif x == CELL_W - 1 and y == CELL_H - 1:
+				coord = T_WALL_BOTTOM_RIGHT
+			elif y == 0:
+				coord = T_WALL_TOP_MID
+			elif y == CELL_H - 1:
+				coord = T_WALL_MID
+			elif x == 0:
+				coord = T_WALL_LEFT
+			elif x == CELL_W - 1:
+				coord = T_WALL_RIGHT
+			else:
+				coord = T_FLOOR_VARIANTS.pick_random()
+			floor_layer.set_cell(pos, 0, coord)
 	for d in room["doors"]:
 		for t in _door_tiles(cell, d):
-			floor_layer.set_cell(t, 0, T_FLOOR)
+			floor_layer.set_cell(t, 0, T_FLOOR_VARIANTS.pick_random())
 			room["door_tiles"].append(t)
 	if room["type"] == "normal":
 		var spots: Array = [Vector2i(5, 3), Vector2i(17, 3), Vector2i(5, 11), Vector2i(17, 11)]
@@ -190,7 +243,7 @@ func _build_room(cell: Vector2i, room: Dictionary) -> void:
 		for i in randi_range(0, 3):
 			for dx in 2:
 				for dy in 2:
-					floor_layer.set_cell(o + spots[i] + Vector2i(dx, dy), 0, T_WALL)
+					floor_layer.set_cell(o + spots[i] + Vector2i(dx, dy), 0, T_PILLAR)
 	# Vùng kích hoạt phòng (Area2D + signal body_entered), thụt vào 2 tile để người chơi vào hẳn mới khoá cửa
 	var area := Area2D.new()
 	area.collision_layer = 0
@@ -339,7 +392,7 @@ func _random_floor_pos(cell: Vector2i, avoid: Vector2, min_dist: float) -> Vecto
 	for i in 40:
 		var cand := Vector2(randf_range(r.position.x, r.end.x), randf_range(r.position.y, r.end.y))
 		var tile: Vector2i = floor_layer.local_to_map(cand)
-		if floor_layer.get_cell_atlas_coords(tile) == T_WALL:
+		if SOLID_TILES.has(floor_layer.get_cell_atlas_coords(tile)):
 			continue
 		if cand.distance_to(avoid) < min_dist:
 			continue

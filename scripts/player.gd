@@ -29,20 +29,72 @@ var dagger_timer: float = 0.0
 @onready var dodge_timer: Timer = $DodgeTimer
 @onready var dodge_cooldown: Timer = $DodgeCooldown
 @onready var hurt_timer: Timer = $HurtTimer
+@onready var sprite: AnimatedSprite2D = $Sprite
+
+## Ánh xạ lớp nhân vật -> bộ sprite 0x72 (DungeonTilesetII) dùng làm thân người.
+const SPRITE_SET: Dictionary = {
+	"ranger": "elf_m",
+	"brawler": "knight_m",
+}
+const SPRITE_SCALE: float = 2.0
+const SPRITE_OFFSET_Y: float = -20.0
 
 func _ready() -> void:
 	motion_mode = CharacterBody2D.MOTION_MODE_FLOATING
 	add_to_group("player")
 	Global.player = self
-	
+
 	var cls: Dictionary = Global.classes[Global.current_class]
-	
+
 	# ÁP DỤNG KỸ NĂNG: Tăng HP tối đa
 	max_hp = cls["max_hp"] + (Global.upgrades["hp_boost"] * 10)
 	hp = max_hp
-	
+
 	set_weapon_with_rarity(cls["default_weapon"], "common")
 	dodge_timer.timeout.connect(_on_dodge_finished)
+
+	sprite.sprite_frames = _build_sprite_frames()
+	sprite.scale = Vector2(SPRITE_SCALE, SPRITE_SCALE)
+	sprite.offset = Vector2(0.0, SPRITE_OFFSET_Y)
+	sprite.play("idle")
+
+
+func _build_sprite_frames() -> SpriteFrames:
+	var prefix: String = SPRITE_SET.get(Global.current_class, "knight_m")
+	var frames := SpriteFrames.new()
+	_add_sprite_anim(frames, prefix, "idle", 4, 6.0, true)
+	_add_sprite_anim(frames, prefix, "run", 4, 10.0, true)
+	_add_sprite_anim(frames, prefix, "hit", 1, 1.0, false)
+	return frames
+
+
+func _add_sprite_anim(frames: SpriteFrames, prefix: String, anim: String, count: int, fps: float, loop: bool) -> void:
+	frames.add_animation(anim)
+	frames.set_animation_speed(anim, fps)
+	frames.set_animation_loop(anim, loop)
+	for i in count:
+		var path: String = "res://assets/dungeon/%s_%s_anim_f%d.png" % [prefix, anim, i]
+		var img := Image.new()
+		if img.load(path) != OK:
+			push_error("Không tải được sprite người chơi: " + path)
+			continue
+		frames.add_frame(anim, ImageTexture.create_from_image(img))
+
+
+func _update_sprite() -> void:
+	sprite.flip_h = aim_dir.x < 0.0
+	if not hurt_timer.is_stopped():
+		if sprite.animation != "hit":
+			sprite.play("hit")
+		sprite.modulate = Color(2.2, 1.2, 1.2) if int(float(Time.get_ticks_msec()) / 70.0) % 2 == 0 else Color.WHITE
+		return
+	sprite.modulate = Color(1.0, 1.0, 1.0, 0.6) if rolling else Color.WHITE
+	if rolling or velocity.length() > 5.0:
+		if sprite.animation != "run":
+			sprite.play("run")
+	else:
+		if sprite.animation != "idle":
+			sprite.play("idle")
 
 func is_invulnerable() -> bool:
 	return rolling or not hurt_timer.is_stopped()
@@ -75,6 +127,7 @@ func _physics_process(delta: float) -> void:
 	if Input.is_action_pressed("shoot") and not rolling and fire_timer.is_stopped() and not swinging:
 		if weapon.get("is_melee", false): _swing()
 		else: _shoot()
+	_update_sprite()
 	queue_redraw()
 
 func _start_roll(dir: Vector2) -> void:
@@ -308,12 +361,6 @@ func _die() -> void:
 	Global.player_died.emit()
 
 func _draw() -> void:
-	var c: Color = Color(0.35, 0.65, 1.0)
-	if rolling: c.a = 0.55
-	elif not hurt_timer.is_stopped() and int(float(Time.get_ticks_msec()) / 70.0) % 2 == 0: c.a = 0.35
-	draw_circle(Vector2.ZERO, 13.0, c)
-	draw_circle(Vector2.ZERO, 8.0, c.lightened(0.3))
-
 	var gun_c: Color = weapon.get("color", Color.WHITE)
 	if rarity_data.has("color"): gun_c = rarity_data["color"].lerp(gun_c, 0.5)
 
