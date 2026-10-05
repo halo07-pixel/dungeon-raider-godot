@@ -37,7 +37,7 @@ const SPRITE_SET: Dictionary = {
 	"brawler": "knight_m",
 }
 const SPRITE_SCALE: float = 2.0
-const SPRITE_OFFSET_Y: float = -20.0
+const SPRITE_OFFSET_Y: float = -11.0
 
 func _ready() -> void:
 	motion_mode = CharacterBody2D.MOTION_MODE_FLOATING

@@ -34,8 +34,8 @@ var is_boss: bool = true
 @onready var sprite: AnimatedSprite2D = $Sprite
 
 const SPRITE_PREFIX: String = "orc_warrior"
-const SPRITE_SCALE: float = 3.0
-const SPRITE_OFFSET_Y: float = -30.0
+const SPRITE_SCALE: float = 4.3
+const SPRITE_OFFSET_Y: float = -15.0
 ## Màu theo pha (khớp bảng palette trong _draw gốc) — tint lên sprite để vẫn báo pha rõ ràng.
 const PHASE_TINT: Array = [Color(0.6, 0.25, 0.8), Color(0.9, 0.5, 0.15), Color(1.0, 0.15, 0.15)]
 
