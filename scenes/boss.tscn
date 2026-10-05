@@ -2,8 +2,9 @@
 
 [ext_resource type="Script" uid="uid://b4f4jh3obat35" path="res://scripts/boss.gd" id="1"]
 
-[sub_resource type="CircleShape2D" id="CircleShape2D_bb"]
-radius = 34.0
+[sub_resource type="CapsuleShape2D" id="CapsuleShape2D_bb"]
+radius = 22.0
+height = 56.0
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_bh"]
 radius = 44.0
@@ -16,7 +17,8 @@ collision_layer = 4
 script = ExtResource("1")
 
 [node name="Body" type="CollisionShape2D" parent="." unique_id=779663812]
-shape = SubResource("CircleShape2D_bb")
+position = Vector2(0, -43)
+shape = SubResource("CapsuleShape2D_bb")
 
 [node name="Sprite" type="AnimatedSprite2D" parent="." unique_id=1519758085]
 texture_filter = 1
