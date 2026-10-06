@@ -40,7 +40,7 @@ func _ready() -> void:
 	if is_loading_save:
 		_restore_player_state()
 		
-	Global.message.emit("Tầng %d" % Global.floor_num, Color.WHITE)
+	Global.message.emit("Floor %d" % Global.floor_num, Color.WHITE)
 	_spawn_npc_if_needed()
 
 	# 3. KHỞI TẠO UI TẠM DỪNG
@@ -96,7 +96,7 @@ func _next_floor() -> void:
 		var gems_earned = int(Global.floor_num / 5)
 		Global.purple_gems += gems_earned
 		Global.save_game() 
-		Global.message.emit("Tuyệt vời! Vượt mốc Tầng %d: +%d Ngọc Tím!" % [Global.floor_num, gems_earned], Color(0.8, 0.3, 0.9))
+		Global.message.emit("Great! Floor %d milestone reached: +%d Purple Gems!" % [Global.floor_num, gems_earned], Color(0.8, 0.3, 0.9))
 	# ====================================================
 
 	Global.floor_num += 1
@@ -115,7 +115,7 @@ func _next_floor() -> void:
 	
 	player.knockback = Vector2.ZERO
 	player.heal(int(float(player.max_hp) * 0.3))
-	Global.message.emit("Tầng %d" % Global.floor_num, Color.WHITE)
+	Global.message.emit("Floor %d" % Global.floor_num, Color.WHITE)
 	_changing = false
 
 
@@ -135,16 +135,16 @@ func _build_pause_menu() -> void:
 	for c in pause_ui.get_children(): c.queue_free()
 	
 	var title = Label.new()
-	title.text = "TẠM DỪNG"
+	title.text = "PAUSED"
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title.add_theme_font_size_override("font_size", 40)
 	pause_ui.add_child(title)
-	
-	_add_btn("Tiếp Tục", func():
+
+	_add_btn("Resume", func():
 		get_tree().paused = false
 		pause_layer.hide()
 	)
-	_add_btn("Lưu Tiến Độ & Về Menu", _save_and_quit)
+	_add_btn("Save & Return to Menu", _save_and_quit)
 
 func _add_btn(text: String, action: Callable) -> void:
 	var btn = Button.new()
@@ -191,11 +191,11 @@ func _build_game_over_menu() -> void:
 	var c_coin = Global.run_stats.get("coins", 0) if Global.get("run_stats") else 0
 	
 	var info = Label.new()
-	info.text = "Tầng vượt qua: %d\nTiêu diệt: %d quái\nThu thập: %d Xu" % [f, k, c_coin]
+	info.text = "Floors cleared: %d\nEnemies defeated: %d\nGold collected: %d" % [f, k, c_coin]
 	info.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	pause_ui.add_child(info)
-	
-	_add_btn("Về Menu Chính", func():
+
+	_add_btn("Return to Main Menu", func():
 		get_tree().paused = false
 		get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
 	)

@@ -349,7 +349,7 @@ func _enter_room(cell: Vector2i) -> void:
 			# Nối ID vũ khí và độ hiếm bằng dấu ":"
 			_spawn_pickup("weapon", chosen_weapon + ":" + rarity, room_center(cell) + Vector2(0.0, -24.0))
 			_spawn_chest_decor(room_center(cell) + Vector2(0.0, 10.0))
-			Global.message.emit("Phòng Kho Báu!", Color(1.0, 0.85, 0.3))
+			Global.message.emit("Treasure Room!", Color(1.0, 0.85, 0.3))
 		_:
 			room["cleared"] = true
 
@@ -417,7 +417,7 @@ func _spawn_boss(cell: Vector2i) -> void:
 		b.activate_boss()
 	boss_alive = true
 	Global.boss_spawned.emit(b)
-	Global.message.emit("PHÒNG TRÙM!", Color(1.0, 0.3, 0.3))
+	Global.message.emit("BOSS ROOM!", Color(1.0, 0.3, 0.3))
 
 
 func _on_summon(kind: String, pos: Vector2, cell: Vector2i) -> void:
@@ -469,9 +469,9 @@ func _room_cleared(cell: Vector2i) -> void:
 	rooms_updated.emit()
 	if room["type"] == "boss":
 		_spawn_pickup("portal", "", room_center(cell))
-		Global.message.emit("Cổng xuống tầng đã mở!", Color(0.6, 0.6, 1.0))
+		Global.message.emit("The stairs down have opened!", Color(0.6, 0.6, 1.0))
 	else:
-		Global.message.emit("Phòng đã dọn sạch!", Color(0.6, 1.0, 0.6))
+		Global.message.emit("Room cleared!", Color(0.6, 1.0, 0.6))
 		if randf() < 0.35:
 			_spawn_pickup("heal", "", room_center(cell))
 

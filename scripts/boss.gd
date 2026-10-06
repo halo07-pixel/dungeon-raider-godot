@@ -9,7 +9,7 @@ signal died
 signal summon_requested(kind: String, pos: Vector2)
 
 const BULLET = preload("res://scenes/bullet.tscn")
-const BOSS_NAME: String = "Vệ Binh Hầm Ngục"
+const BOSS_NAME: String = "Dungeon Warden"
 const SLAM_RADIUS: float = 150.0
 const BODY_RADIUS: float = 34.0
 
@@ -354,7 +354,7 @@ func _die() -> void:
 	Global.shake(1.0, 0.7)
 	Global.burst(global_position, Color(1.0, 0.8, 0.3), 60, 380.0, 3.0)
 	Global.hitstop(0.2)
-	Global.message.emit("Đã hạ gục %s!" % BOSS_NAME, Color(1.0, 0.9, 0.3))
+	Global.message.emit("%s defeated!" % BOSS_NAME, Color(1.0, 0.9, 0.3))
 	Global.boss_defeated.emit()
 	died.emit()
 	create_tween().tween_property(self, "modulate:a", 0.0, 1.2)
