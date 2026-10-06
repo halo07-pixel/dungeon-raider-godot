@@ -304,7 +304,7 @@ func set_weapon_with_rarity(id: String, rarity: String) -> void:
 	weapon = Global.weapons[id]
 	rarity_data = Global.rarities[rarity]
 	var display_name = weapon["name"] + " (" + rarity_data["name"] + ")"
-	Global.message.emit("Nhặt được: " + display_name, rarity_data["color"])
+	Global.message.emit("Picked up: " + display_name, rarity_data["color"])
 
 func take_damage(amount: int, from_pos: Vector2 = Vector2.ZERO, knock: float = 300.0) -> void:
 	if not alive or is_invulnerable(): return
@@ -340,7 +340,7 @@ func _trigger_revive() -> void:
 	Global.burst(global_position, Color(1.0, 0.8, 0.2), 30, 200.0, 2.0)
 	
 	# Chữ bay lên
-	Global.float_text(global_position + Vector2(0, -40), "PHƯỢNG HOÀNG LỬA!", Color(1.0, 0.5, 0.1), 24)
+	Global.float_text(global_position + Vector2(0, -40), "PHOENIX REBIRTH!", Color(1.0, 0.5, 0.1), 24)
 	
 	# Hiệu ứng chớp nháy liên tục báo hiệu đang trong khung hình bất tử (i-frames)
 	var tw = create_tween().set_loops(10)

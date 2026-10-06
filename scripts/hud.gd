@@ -38,10 +38,10 @@ func _process(_delta: float) -> void:
 	_update_hearts(float(p.hp), float(p.max_hp))
 	dodge_bar.value = p.dodge_ratio() * 100.0
 	
-	var w_name = "Chưa có"
+	var w_name = "None"
 	if p.get("weapon") and p.weapon.has("name"):
 		w_name = p.weapon["name"]
-	info_label.text = "Tầng %d   ·   %s   ·   Xu: %d" % [Global.floor_num, w_name, Global.coins]
+	info_label.text = "Floor %d   ·   %s   ·   Gold: %d" % [Global.floor_num, w_name, Global.coins]
 
 # ------------------------------------------------------------------ Sự kiện
 func _on_boss_spawned(boss) -> void:

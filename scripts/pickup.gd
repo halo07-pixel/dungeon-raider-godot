@@ -107,4 +107,4 @@ func _draw() -> void:
 			draw_circle(Vector2.ZERO, 28.0 * pulse, Color(0.3, 0.2, 0.9, 0.35))
 			draw_circle(Vector2.ZERO, 18.0 * pulse, Color(0.5, 0.4, 1.0, 0.6))
 			draw_circle(Vector2.ZERO, 8.0, Color.WHITE)
-			draw_string(ThemeDB.fallback_font, Vector2(-60.0, -38.0), "XUỐNG TẦNG", HORIZONTAL_ALIGNMENT_CENTER, 120.0, 14, Color.WHITE)
+			draw_string(ThemeDB.fallback_font, Vector2(-60.0, -38.0), "GO DOWN", HORIZONTAL_ALIGNMENT_CENTER, 120.0, 14, Color.WHITE)
