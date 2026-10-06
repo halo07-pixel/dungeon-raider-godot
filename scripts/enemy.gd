@@ -42,7 +42,7 @@ var bleed_timer: float = 0.0
 const ENEMY_SPRITES: Dictionary = {
 	"slime": {"prefix": "slug", "single_anim": true, "offset_y": -12.0},
 	"archer": {"prefix": "imp", "single_anim": false, "offset_y": -10.0},
-	"brute": {"prefix": "ogre", "single_anim": false, "offset_y": -22.0},
+	"brute": {"prefix": "ogre", "single_anim": false, "offset_y": 2.0},
 }
 
 ## Tâm hitbox thật — enemy không lệch offset nên bằng global_position, nhưng vẫn

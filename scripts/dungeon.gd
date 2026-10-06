@@ -478,10 +478,12 @@ func _room_cleared(cell: Vector2i) -> void:
 
 ## Rương trang trí (tĩnh, không va chạm) đặt dưới vũ khí trong phòng Kho báu — chỉ để đẹp,
 ## vật phẩm thật vẫn là Pickup "weapon" phía trên, nhặt theo logic cũ không đổi.
+## Dùng frame f2 (rương đã mở nắp) thay vì f0 (đóng) vì không có cơ chế "mở rương" —
+## vật phẩm đã nổi sẵn bên trên nên hiển thị rương đóng sẽ gây hiểu lầm là cần mở khoá.
 func _spawn_chest_decor(pos: Vector2) -> void:
 	var spr := Sprite2D.new()
 	var img := Image.new()
-	if img.load("res://assets/dungeon/chest_full_open_anim_f0.png") != OK:
+	if img.load("res://assets/dungeon/chest_full_open_anim_f2.png") != OK:
 		return
 	spr.texture = ImageTexture.create_from_image(img)
 	spr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
