@@ -265,7 +265,8 @@ func _swing() -> void:
 	# CHÉM QUÁI VÀ BOSS
 	for e in get_tree().get_nodes_in_group("enemies"):
 		if e.has_method("kill") and e.alive:
-			var to_e = e.global_position - global_position
+			var e_center = e.hurt_center() if e.has_method("hurt_center") else e.global_position
+			var to_e = e_center - global_position
 			if to_e.length() <= aoe_range + float(e.data["radius"]):
 				if absf(aim_dir.angle_to(to_e)) <= rad_angle * 0.5:
 					e.take_damage(dmg, global_position, knock)
@@ -278,7 +279,8 @@ func _swing() -> void:
 						
 	for b in get_tree().get_nodes_in_group("boss"):
 		if b.has_method("take_damage") and b.alive:
-			var to_b = b.global_position - global_position
+			var b_center = b.hurt_center() if b.has_method("hurt_center") else b.global_position
+			var to_b = b_center - global_position
 			if to_b.length() <= aoe_range + 34.0:
 				if absf(aim_dir.angle_to(to_b)) <= rad_angle * 0.5:
 					b.take_damage(dmg, global_position, knock)
@@ -346,6 +348,11 @@ func _trigger_revive() -> void:
 	var tw = create_tween().set_loops(10)
 	tw.tween_property(self, "modulate:a", 0.2, 0.1)
 	tw.tween_property(self, "modulate:a", 1.0, 0.1)
+
+## Tâm hitbox thật (capsule Body) — dùng để tính trúng đòn/ngắm bắn chính xác,
+## khác với global_position (gốc chân, dùng cho AI/di chuyển).
+func hurt_center() -> Vector2:
+	return $Body.global_position
 
 func heal(amount: int) -> void:
 	if hp >= max_hp: return

@@ -36,9 +36,18 @@ var is_boss: bool = true
 const SPRITE_PREFIX: String = "orc_warrior"
 const SPRITE_SCALE: float = 4.3
 const SPRITE_OFFSET_Y: float = -15.0
+## Khớp với position của node Body/Hitbox trong boss.tscn — dùng để vẽ telegraph
+## đúng ngay thân Boss thay vì ở gốc chân (Vector2.ZERO).
+const BODY_CENTER_OFFSET: Vector2 = Vector2(0, -43)
 ## Màu theo pha (khớp bảng palette trong _draw gốc) — tint lên sprite để vẫn báo pha rõ ràng.
 const PHASE_TINT: Array = [Color(0.6, 0.25, 0.8), Color(0.9, 0.5, 0.15), Color(1.0, 0.15, 0.15)]
 
+
+## Tâm hitbox thật (capsule Body, đã lệch lên BODY_CENTER_OFFSET) — dùng để tính
+## trúng đòn cận chiến của Player và khoảng cách chống ôm, thay vì global_position
+## (gốc chân) vốn gây lệch "đánh từ trên xuống dễ hụt, dưới lên dễ trúng".
+func hurt_center() -> Vector2:
+	return $Body.global_position
 
 func setup(hp_mult: float = 1.0) -> void:
 	# === THAY THẾ LOGIC TÍNH HP GỐC BẰNG THUẬT TOÁN NÀY ===
@@ -271,7 +280,8 @@ func _physics_process(delta: float) -> void:
 	
 	# === CƠ CHẾ CHỐNG ÔM BOSS ===
 	if active and is_instance_valid(p) and p.alive:
-		var dist_to_player = global_position.distance_to(p.global_position)
+		var p_center = p.hurt_center() if p.has_method("hurt_center") else p.global_position
+		var dist_to_player = hurt_center().distance_to(p_center)
 		if dist_to_player < BODY_RADIUS + 5.0: # Cộng thêm 5 pixel sai số
 			var dmg = 26 if charging else 15
 			var knock = 600.0 if charging else 350.0
@@ -358,12 +368,14 @@ func _draw() -> void:
 	# hiệu ứng TELEGRAPH báo trước đòn đánh — đây là cơ chế gameplay cốt lõi, không đổi.
 	match tele_mode:
 		"line":
-			var reach: float = 520.0
-			draw_line(Vector2.ZERO, charge_dir * reach, Color(1.0, 0.1, 0.1, 0.15 + 0.45 * tele_t), 72.0)
-			draw_line(Vector2.ZERO, charge_dir * reach, Color(1.0, 0.3, 0.3, 0.9), 3.0)
+			# Vạch báo lao thẳng: xuất phát từ tâm thân thật, không phải gốc chân.
+			draw_line(BODY_CENTER_OFFSET, BODY_CENTER_OFFSET + charge_dir * 520.0, Color(1.0, 0.1, 0.1, 0.15 + 0.45 * tele_t), 72.0)
+			draw_line(BODY_CENTER_OFFSET, BODY_CENTER_OFFSET + charge_dir * 520.0, Color(1.0, 0.3, 0.3, 0.9), 3.0)
 		"ring":
+			# Hiệu ứng dộng đất — đúng ra phải ở gốc chân/mặt đất, giữ nguyên Vector2.ZERO.
 			draw_arc(Vector2.ZERO, SLAM_RADIUS, 0.0, TAU, 64, Color(1.0, 0.6, 0.1, 0.85), 3.0)
 			draw_circle(Vector2.ZERO, SLAM_RADIUS * tele_t, Color(1.0, 0.5, 0.1, 0.28))
 		"flash":
+			# Viền cảnh báo quanh THÂN Boss (trước đòn bắn toả tròn) — neo theo tâm thân thật.
 			if int(tele_t * 10.0) % 2 == 0:
-				draw_arc(Vector2.ZERO, BODY_RADIUS + 12.0, 0.0, TAU, 32, Color(1.0, 0.9, 0.2), 5.0)
+				draw_arc(BODY_CENTER_OFFSET, BODY_RADIUS + 12.0, 0.0, TAU, 32, Color(1.0, 0.9, 0.2), 5.0)

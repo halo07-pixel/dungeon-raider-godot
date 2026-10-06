@@ -45,6 +45,11 @@ const ENEMY_SPRITES: Dictionary = {
 	"brute": {"prefix": "ogre", "single_anim": false, "offset_y": -22.0},
 }
 
+## Tâm hitbox thật — enemy không lệch offset nên bằng global_position, nhưng vẫn
+## expose hàm này để player/enemy khác gọi đồng nhất (không ngoại lệ con quái nào).
+func hurt_center() -> Vector2:
+	return $Body.global_position
+
 func setup(p_kind: String, hp_mult: float = 1.0) -> void:
 	kind = p_kind
 	data = Global.enemies[p_kind]
@@ -184,7 +189,8 @@ func _shoot() -> void:
 	var p = Global.player
 	if not is_instance_valid(p) or not p.alive:
 		return
-	var dir: Vector2 = (p.global_position - global_position).normalized()
+	var p_center = p.hurt_center() if p.has_method("hurt_center") else p.global_position
+	var dir: Vector2 = (p_center - global_position).normalized()
 	var b = BULLET.instantiate()
 	b.setup(false, dir, int(data["bullet_damage"]), float(data["bullet_speed"]), 2.5, data["color"], 6.0)
 	Global.world.add_child(b)
