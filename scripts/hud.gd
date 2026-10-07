@@ -98,9 +98,9 @@ func _bar(parent: Node, pos: Vector2, sz: Vector2, fill: Color) -> ProgressBar:
 ## Nạp 3 trạng thái tim (đầy/nửa/rỗng) từ asset 0x72 — dùng chung 1 lần cho mọi icon.
 func _load_heart_tex() -> void:
 	for state in ["full", "half", "empty"]:
-		var img := Image.new()
-		if img.load("res://assets/dungeon/ui_heart_%s.png" % state) == OK:
-			heart_tex[state] = ImageTexture.create_from_image(img)
+		var tex := Global.load_tex("res://assets/dungeon/ui_heart_%s.png" % state)
+		if tex:
+			heart_tex[state] = tex
 
 
 ## Mỗi tim đại diện 1/10 máu tối đa — luôn hiện đúng 10 tim bất kể HP gốc bao nhiêu

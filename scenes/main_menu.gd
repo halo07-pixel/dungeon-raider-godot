@@ -4,7 +4,6 @@ extends Control
 ## Có nút Tiếp Tục khi có file lưu, màn hình chọn lớp nhân vật, cẩm nang tra cứu,
 ## và cây kỹ năng vĩnh viễn.
 
-const PIXEL_FONT_PATH: String = "res://assets/fonts/PressStart2P-Regular.ttf"
 const BG_SCALE: float = 2.0 # 32px gốc -> 64px trên màn hình
 
 ## Ánh xạ lớp nhân vật -> bộ sprite 0x72 dùng làm thân người (khớp với player.gd).
@@ -18,8 +17,6 @@ var main_node: CenterContainer
 var index_node: MarginContainer
 var class_node: CenterContainer
 var upgrade_node: MarginContainer # Node cho Cây Kỹ Năng
-var pixel_font: FontFile
-var _tile_tex_cache: Dictionary = {}
 
 # --- Dữ liệu hệ thống Kỹ năng ---
 var upg_data = {
@@ -38,8 +35,6 @@ func _ready() -> void:
 	ui_layer = CanvasLayer.new()
 	add_child(ui_layer)
 
-	pixel_font = _load_pixel_font()
-
 	_build_background()
 	_build_main_menu()
 	_build_index_menu()
@@ -49,36 +44,13 @@ func _ready() -> void:
 	show_main_menu()
 
 
-## Nạp font .ttf trực tiếp từ byte (giống cách project nạp ảnh bằng Image.load),
-## tránh phụ thuộc file .import khi chạy headless/test.
-func _load_pixel_font() -> FontFile:
-	var f := FontFile.new()
-	var bytes := FileAccess.get_file_as_bytes(PIXEL_FONT_PATH)
-	if bytes.is_empty():
-		push_error("Không tải được pixel font: " + PIXEL_FONT_PATH)
-		return f
-	f.data = bytes
-	return f
-
-
 func _apply_font(ctrl: Control, size: int) -> void:
-	ctrl.add_theme_font_override("font", pixel_font)
+	ctrl.add_theme_font_override("font", Global.pixel_font())
 	ctrl.add_theme_font_size_override("font_size", size)
 
 
-func _get_tile_tex(filename: String) -> ImageTexture:
-	if _tile_tex_cache.has(filename):
-		return _tile_tex_cache[filename]
-	var img := Image.new()
-	var tex: ImageTexture = null
-	if img.load("res://assets/dungeon/" + filename) == OK:
-		tex = ImageTexture.create_from_image(img)
-	_tile_tex_cache[filename] = tex
-	return tex
-
-
 func _add_tile(parent: Node2D, filename: String, grid_x: int, grid_y: int) -> void:
-	var tex := _get_tile_tex(filename)
+	var tex := Global.load_tex("res://assets/dungeon/" + filename)
 	if tex == null:
 		return
 	var s := Sprite2D.new()
@@ -136,9 +108,9 @@ func _build_idle_frames(prefix: String) -> SpriteFrames:
 	frames.set_animation_loop("idle", true)
 	for i in 4:
 		var path: String = "res://assets/dungeon/%s_idle_anim_f%d.png" % [prefix, i]
-		var img := Image.new()
-		if img.load(path) == OK:
-			frames.add_frame("idle", ImageTexture.create_from_image(img))
+		var tex := Global.load_tex(path)
+		if tex:
+			frames.add_frame("idle", tex)
 	return frames
 
 
@@ -397,8 +369,8 @@ func _build_index_menu() -> void:
 	rich_text.bbcode_enabled = true
 	rich_text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	rich_text.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	rich_text.add_theme_font_override("normal_font", pixel_font)
-	rich_text.add_theme_font_override("bold_font", pixel_font)
+	rich_text.add_theme_font_override("normal_font", Global.pixel_font())
+	rich_text.add_theme_font_override("bold_font", Global.pixel_font())
 	rich_text.add_theme_font_size_override("normal_font_size", 14)
 	rich_text.add_theme_font_size_override("bold_font_size", 14)
 	rich_text.text = _get_index_content()

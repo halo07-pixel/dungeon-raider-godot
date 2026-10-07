@@ -33,26 +33,33 @@ func _ready() -> void:
 
 ## "coin" và "heal" dùng sprite 0x72 thật; "weapon"/"portal" vẫn vẽ bằng code vì
 ## cần thể hiện màu độ hiếm / tên vũ khí / hiệu ứng cổng mà asset tĩnh không truyền tải được.
+## Coin là pickup rơi ra nhiều nhất trong game (gần như mỗi quái chết đều rơi) nên
+## cache SpriteFrames dùng chung, tránh load lại 4 ảnh từ đĩa mỗi lần rơi 1 đồng xu.
+static var _coin_frames: SpriteFrames
+static var _heal_frames: SpriteFrames
+
 func _setup_sprite() -> void:
 	match kind:
 		"coin":
-			var frames := SpriteFrames.new()
-			frames.add_animation("spin")
-			frames.set_animation_speed("spin", 8.0)
-			frames.set_animation_loop("spin", true)
-			for i in 4:
-				var img := Image.new()
-				if img.load("res://assets/dungeon/coin_anim_f%d.png" % i) == OK:
-					frames.add_frame("spin", ImageTexture.create_from_image(img))
-			sprite.sprite_frames = frames
+			if _coin_frames == null:
+				_coin_frames = SpriteFrames.new()
+				_coin_frames.add_animation("spin")
+				_coin_frames.set_animation_speed("spin", 8.0)
+				_coin_frames.set_animation_loop("spin", true)
+				for i in 4:
+					var tex := Global.load_tex("res://assets/dungeon/coin_anim_f%d.png" % i)
+					if tex:
+						_coin_frames.add_frame("spin", tex)
+			sprite.sprite_frames = _coin_frames
 			sprite.scale = Vector2(1.5, 1.5)
 			sprite.play("spin")
 		"heal":
-			var frames := SpriteFrames.new()
-			var img := Image.new()
-			if img.load("res://assets/dungeon/flask_red.png") == OK:
-				frames.add_frame("default", ImageTexture.create_from_image(img))
-			sprite.sprite_frames = frames
+			if _heal_frames == null:
+				_heal_frames = SpriteFrames.new()
+				var tex := Global.load_tex("res://assets/dungeon/flask_red.png")
+				if tex:
+					_heal_frames.add_frame("default", tex)
+			sprite.sprite_frames = _heal_frames
 			sprite.scale = Vector2(1.8, 1.8)
 			sprite.play("default")
 		_:

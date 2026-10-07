@@ -1,10 +1,7 @@
 extends Area2D
 
-const PIXEL_FONT_PATH: String = "res://assets/fonts/PressStart2P-Regular.ttf"
-
 var player_in_range: bool = false
 var shop_ui: CanvasLayer
-var pixel_font: FontFile
 
 # Các UI Container
 var main_container: VBoxContainer
@@ -23,8 +20,6 @@ func _ready() -> void:
 	# Bắt sự kiện người chơi bước vào/ra khỏi vòng tròn (Dùng to_lower để không phân biệt hoa thường)
 	body_entered.connect(_on_body_entered)
 	body_exited.connect(_on_body_exited)
-	
-	pixel_font = _load_pixel_font()
 
 	# Tạo dòng chữ nhắc nhở
 	interact_label = Label.new()
@@ -40,17 +35,8 @@ func _ready() -> void:
 	_build_shop_ui()
 
 
-## Nạp font .ttf trực tiếp từ byte, giống main_menu.gd, tránh phụ thuộc .import khi headless.
-func _load_pixel_font() -> FontFile:
-	var f := FontFile.new()
-	var bytes := FileAccess.get_file_as_bytes(PIXEL_FONT_PATH)
-	if not bytes.is_empty():
-		f.data = bytes
-	return f
-
-
 func _apply_font(ctrl: Control, size: int) -> void:
-	ctrl.add_theme_font_override("font", pixel_font)
+	ctrl.add_theme_font_override("font", Global.pixel_font())
 	ctrl.add_theme_font_size_override("font_size", size)
 
 

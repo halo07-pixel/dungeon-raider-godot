@@ -74,11 +74,9 @@ func _add_sprite_anim(frames: SpriteFrames, prefix: String, anim: String, count:
 	frames.set_animation_loop(anim, loop)
 	for i in count:
 		var path: String = "res://assets/dungeon/%s_%s_anim_f%d.png" % [prefix, anim, i]
-		var img := Image.new()
-		if img.load(path) != OK:
-			push_error("Không tải được sprite người chơi: " + path)
-			continue
-		frames.add_frame(anim, ImageTexture.create_from_image(img))
+		var tex := Global.load_tex(path)
+		if tex:
+			frames.add_frame(anim, tex)
 
 
 func _update_sprite() -> void:

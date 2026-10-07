@@ -481,11 +481,11 @@ func _room_cleared(cell: Vector2i) -> void:
 ## Dùng frame f2 (rương đã mở nắp) thay vì f0 (đóng) vì không có cơ chế "mở rương" —
 ## vật phẩm đã nổi sẵn bên trên nên hiển thị rương đóng sẽ gây hiểu lầm là cần mở khoá.
 func _spawn_chest_decor(pos: Vector2) -> void:
-	var spr := Sprite2D.new()
-	var img := Image.new()
-	if img.load("res://assets/dungeon/chest_full_open_anim_f2.png") != OK:
+	var tex := Global.load_tex("res://assets/dungeon/chest_full_open_anim_f2.png")
+	if tex == null:
 		return
-	spr.texture = ImageTexture.create_from_image(img)
+	var spr := Sprite2D.new()
+	spr.texture = tex
 	spr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	spr.scale = Vector2(2.0, 2.0)
 	entities.add_child(spr)
@@ -495,13 +495,13 @@ func _spawn_chest_decor(pos: Vector2) -> void:
 ## Thùng gỗ trang trí — chỉ tăng đa dạng hình ảnh cho phòng thường, không va chạm,
 ## không ảnh hưởng gameplay (giống rương trang trí, nhưng dùng vị trí sàn trống ngẫu nhiên).
 func _spawn_crate_decor(cell: Vector2i, count: int) -> void:
+	var tex := Global.load_tex("res://assets/dungeon/crate.png")
+	if tex == null:
+		return
 	for i in count:
 		var pos: Vector2 = _random_floor_pos(cell, Vector2(-99999.0, -99999.0), 0.0)
 		var spr := Sprite2D.new()
-		var img := Image.new()
-		if img.load("res://assets/dungeon/crate.png") != OK:
-			return
-		spr.texture = ImageTexture.create_from_image(img)
+		spr.texture = tex
 		spr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		spr.scale = Vector2(1.6, 1.6)
 		entities.add_child(spr)

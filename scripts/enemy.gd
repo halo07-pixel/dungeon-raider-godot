@@ -83,9 +83,18 @@ func _ready() -> void:
 	_setup_sprite()
 
 
+## Cache SpriteFrames theo "kind" — dựng 1 lần duy nhất cho mỗi loại quái rồi
+## dùng chung cho mọi instance (SpriteFrames chỉ chứa dữ liệu khung hình/tốc độ,
+## không có trạng thái riêng từng con, nên chia sẻ an toàn). Trước đây mỗi lần
+## spawn quái đều load lại ~8 ảnh từ đĩa + tạo ImageTexture mới, khá tốn khi một
+## đợt wave sinh tới 10 quái cùng lúc và lặp lại ở mọi phòng/mọi tầng.
+static var _frames_cache: Dictionary = {}
+
 func _setup_sprite() -> void:
 	var cfg: Dictionary = ENEMY_SPRITES.get(kind, ENEMY_SPRITES["slime"])
-	sprite.sprite_frames = _build_enemy_frames(cfg)
+	if not _frames_cache.has(kind):
+		_frames_cache[kind] = _build_enemy_frames(cfg)
+	sprite.sprite_frames = _frames_cache[kind]
 	sprite.scale = Vector2(2.0, 2.0)
 	sprite.offset = Vector2(0.0, float(cfg["offset_y"]))
 	sprite.play("idle")
@@ -110,11 +119,9 @@ func _add_enemy_anim(frames: SpriteFrames, prefix: String, anim_name: String, fi
 	for i in count:
 		var path: String = ("res://assets/dungeon/%s_anim_f%d.png" % [prefix, i]) if file_tag == "" \
 			else ("res://assets/dungeon/%s_%s_anim_f%d.png" % [prefix, file_tag, i])
-		var img := Image.new()
-		if img.load(path) != OK:
-			push_error("Không tải được sprite quái: " + path)
-			continue
-		frames.add_frame(anim_name, ImageTexture.create_from_image(img))
+		var tex := Global.load_tex(path)
+		if tex:
+			frames.add_frame(anim_name, tex)
 
 
 func _update_sprite(moving: bool) -> void:

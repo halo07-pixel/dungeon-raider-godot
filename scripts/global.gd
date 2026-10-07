@@ -59,6 +59,40 @@ var _sfx: Dictionary = {}
 var _dot_tex: ImageTexture
 var _hitstop_active: bool = false
 
+## Cache dùng chung cho toàn bộ ảnh nạp từ res://assets — nhiều script (enemy,
+## player, boss, pickup, dungeon, menu...) từng tự viết lại 3 dòng Image.load() +
+## ImageTexture.create_from_image() giống hệt nhau, vừa trùng lặp code vừa tốn
+## I/O đĩa + cấp phát lại mỗi lần gọi. Gom về 1 chỗ, load 1 lần/path rồi tái sử dụng.
+var _tex_cache: Dictionary = {}
+
+func load_tex(path: String) -> ImageTexture:
+	if _tex_cache.has(path):
+		return _tex_cache[path]
+	var img := Image.new()
+	var tex: ImageTexture = null
+	if img.load(path) == OK:
+		tex = ImageTexture.create_from_image(img)
+	else:
+		push_error("Không tải được ảnh: " + path)
+	_tex_cache[path] = tex
+	return tex
+
+## Pixel font "Press Start 2P" dùng chung cho Main Menu + cửa hàng Gacha — nạp 1
+## lần từ byte (giống cách nạp ảnh ở trên) để không phụ thuộc file .import khi
+## chạy headless, rồi tái sử dụng thay vì mỗi màn hình tự đọc file riêng.
+const PIXEL_FONT_PATH: String = "res://assets/fonts/PressStart2P-Regular.ttf"
+var _pixel_font: FontFile
+
+func pixel_font() -> FontFile:
+	if _pixel_font == null:
+		_pixel_font = FontFile.new()
+		var bytes := FileAccess.get_file_as_bytes(PIXEL_FONT_PATH)
+		if bytes.is_empty():
+			push_error("Không tải được pixel font: " + PIXEL_FONT_PATH)
+		else:
+			_pixel_font.data = bytes
+	return _pixel_font
+
 
 func _ready() -> void:
 	load_game()
