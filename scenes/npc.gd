@@ -1,5 +1,14 @@
 extends Area2D
 
+## Thân người thương gia dùng sprite "elf_f" (nữ yêu tinh) từ bộ asset 0x72 -
+## bộ chưa được dùng cho nhân vật nào khác, giữ phong cách đồng bộ pixel art.
+const SPRITE_PREFIX: String = "elf_f"
+const SPRITE_SCALE: float = 2.0
+const SPRITE_OFFSET_Y: float = -11.0
+static var _frames_cache: SpriteFrames
+
+@onready var sprite: AnimatedSprite2D = $Sprite2D
+
 var player_in_range: bool = false
 var shop_ui: CanvasLayer
 
@@ -17,6 +26,8 @@ var win_id: String = ""
 var win_rarity: String = ""
 
 func _ready() -> void:
+	_setup_sprite()
+
 	# Bắt sự kiện người chơi bước vào/ra khỏi vòng tròn (Dùng to_lower để không phân biệt hoa thường)
 	body_entered.connect(_on_body_entered)
 	body_exited.connect(_on_body_exited)
@@ -33,6 +44,25 @@ func _ready() -> void:
 	add_child(interact_label)
 
 	_build_shop_ui()
+
+
+## Nạp sprite idle "elf_f" (dùng chung cache tĩnh vì chỉ có 1 NPC thương gia,
+## nhưng theo cùng pattern cache per-kind đã áp dụng cho enemy/pickup).
+func _setup_sprite() -> void:
+	if _frames_cache == null:
+		_frames_cache = SpriteFrames.new()
+		_frames_cache.add_animation("idle")
+		_frames_cache.set_animation_speed("idle", 6.0)
+		_frames_cache.set_animation_loop("idle", true)
+		for i in 4:
+			var path: String = "res://assets/dungeon/%s_idle_anim_f%d.png" % [SPRITE_PREFIX, i]
+			var tex := Global.load_tex(path)
+			if tex:
+				_frames_cache.add_frame("idle", tex)
+	sprite.sprite_frames = _frames_cache
+	sprite.scale = Vector2(SPRITE_SCALE, SPRITE_SCALE)
+	sprite.offset = Vector2(0.0, SPRITE_OFFSET_Y)
+	sprite.play("idle")
 
 
 func _apply_font(ctrl: Control, size: int) -> void:
