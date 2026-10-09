@@ -19,6 +19,7 @@ var rolling: bool = false
 var roll_dir: Vector2 = Vector2.RIGHT
 var aim_dir: Vector2 = Vector2.RIGHT
 var knockback: Vector2 = Vector2.ZERO
+var slow_timer: float = 0.0 # Bị làm chậm bởi hào quang băng / hiệu ứng boss
 
 var swinging: bool = false
 var swing_progress: float = 0.0
@@ -101,13 +102,21 @@ func dodge_ratio() -> float:
 	if dodge_cooldown.is_stopped(): return 1.0
 	return 1.0 - dodge_cooldown.time_left / dodge_cooldown.wait_time
 
+## Boss có thể áp trạng thái lên Player (hiện chỉ dùng "slow" - Hào Quang Băng).
+## Giữ cùng chữ ký với enemy.gd::apply_status() để code gọi dùng chung được.
+func apply_status(type: String, duration: float) -> void:
+	if type == "slow":
+		slow_timer = maxf(slow_timer, duration)
+
 func _physics_process(delta: float) -> void:
 	if not alive: return
-	
+
 	if dagger_timer > 0:
 		dagger_timer -= delta
 		if dagger_timer <= 0: dagger_combo = 0 # Trôi combo dao găm
-		
+	if slow_timer > 0.0:
+		slow_timer = maxf(0.0, slow_timer - delta)
+
 	var input_dir: Vector2 = Input.get_vector("move_left", "move_right", "move_up", "move_down")
 	aim_dir = (get_global_mouse_position() - global_position).normalized()
 	if aim_dir == Vector2.ZERO: aim_dir = Vector2.RIGHT
@@ -115,9 +124,10 @@ func _physics_process(delta: float) -> void:
 	if Input.is_action_just_pressed("dodge") and not rolling and dodge_cooldown.is_stopped():
 		_start_roll(input_dir if input_dir != Vector2.ZERO else aim_dir)
 
+	var speed_mult: float = 0.55 if slow_timer > 0.0 else 1.0
 	if rolling: velocity = roll_dir * ROLL_SPEED
-	else: velocity = input_dir * SPEED
-	
+	else: velocity = input_dir * SPEED * speed_mult
+
 	velocity += knockback
 	knockback = knockback.move_toward(Vector2.ZERO, KNOCK_DECAY * delta)
 	move_and_slide()

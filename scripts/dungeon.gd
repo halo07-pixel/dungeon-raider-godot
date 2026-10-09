@@ -406,9 +406,21 @@ func _random_floor_pos(cell: Vector2i, avoid: Vector2, min_dist: float) -> Vecto
 	return r.get_center()
 
 
+## Biome 1 (tầng 1-3): Dungeon Warden · Biome 2 (4-6): Dark Necromancer ·
+## Biome 3 (7-9): Frozen Horror · Tầng 10 trở lên: Dungeon Lord (boss cuối).
+func _boss_kind_for_floor(floor_num: int) -> String:
+	if floor_num <= 3:
+		return "warden"
+	elif floor_num <= 6:
+		return "necromancer"
+	elif floor_num <= 9:
+		return "frost"
+	return "lord"
+
+
 func _spawn_boss(cell: Vector2i) -> void:
 	var b = BOSS.instantiate()
-	b.setup(1.0 + 0.3 * float(Global.floor_num - 1))
+	b.setup(1.0 + 0.3 * float(Global.floor_num - 1), _boss_kind_for_floor(Global.floor_num))
 	b.died.connect(_on_boss_died.bind(cell))
 	b.summon_requested.connect(_on_summon.bind(cell))
 	entities.add_child(b)

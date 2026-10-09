@@ -12,6 +12,9 @@ var from_player: bool = true
 var knock: float = 140.0
 var effect: String = ""
 var _hit: Array = []
+var homing: bool = false # Đạn Dark Bolt của Necromancer: bẻ hướng dần về phía mục tiêu
+var homing_target: Node = null
+const HOMING_TURN_RATE: float = 2.2 # rad/s - bẻ hướng từ từ, không phải dính chắc chắn
 
 @onready var life_timer: Timer = $Life
 
@@ -45,6 +48,11 @@ func _ready() -> void:
 	life_timer.start(life)
 
 func _physics_process(delta: float) -> void:
+	if homing and is_instance_valid(homing_target):
+		var target_pos = homing_target.hurt_center() if homing_target.has_method("hurt_center") else homing_target.global_position
+		var want_dir: Vector2 = (target_pos - global_position).normalized()
+		dir = dir.slerp(want_dir, minf(1.0, HOMING_TURN_RATE * delta))
+		rotation = dir.angle()
 	position += dir * speed * delta
 
 func _on_body_entered(body: Node) -> void:
