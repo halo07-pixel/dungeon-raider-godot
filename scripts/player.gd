@@ -20,6 +20,9 @@ var roll_dir: Vector2 = Vector2.RIGHT
 var aim_dir: Vector2 = Vector2.RIGHT
 var knockback: Vector2 = Vector2.ZERO
 var slow_timer: float = 0.0 # Bị làm chậm bởi hào quang băng / hiệu ứng boss
+var slide_timer: float = 0.0 # Bị trượt mất kiểm soát hướng đi (Ô Băng - biome Frost)
+var slide_dir: Vector2 = Vector2.RIGHT
+var last_move_dir: Vector2 = Vector2.RIGHT # Hướng di chuyển gần nhất, dùng để xác định hướng trượt
 
 var swinging: bool = false
 var swing_progress: float = 0.0
@@ -102,11 +105,15 @@ func dodge_ratio() -> float:
 	if dodge_cooldown.is_stopped(): return 1.0
 	return 1.0 - dodge_cooldown.time_left / dodge_cooldown.wait_time
 
-## Boss có thể áp trạng thái lên Player (hiện chỉ dùng "slow" - Hào Quang Băng).
+## Boss/hazard có thể áp trạng thái lên Player ("slow" - Hào Quang Băng,
+## "slide" - Ô Băng biome Frost khiến trượt mất kiểm soát hướng đi).
 ## Giữ cùng chữ ký với enemy.gd::apply_status() để code gọi dùng chung được.
 func apply_status(type: String, duration: float) -> void:
 	if type == "slow":
 		slow_timer = maxf(slow_timer, duration)
+	elif type == "slide":
+		slide_timer = maxf(slide_timer, duration)
+		slide_dir = last_move_dir
 
 func _physics_process(delta: float) -> void:
 	if not alive: return
@@ -116,8 +123,12 @@ func _physics_process(delta: float) -> void:
 		if dagger_timer <= 0: dagger_combo = 0 # Trôi combo dao găm
 	if slow_timer > 0.0:
 		slow_timer = maxf(0.0, slow_timer - delta)
+	if slide_timer > 0.0:
+		slide_timer = maxf(0.0, slide_timer - delta)
 
 	var input_dir: Vector2 = Input.get_vector("move_left", "move_right", "move_up", "move_down")
+	if input_dir != Vector2.ZERO:
+		last_move_dir = input_dir.normalized()
 	aim_dir = (get_global_mouse_position() - global_position).normalized()
 	if aim_dir == Vector2.ZERO: aim_dir = Vector2.RIGHT
 
@@ -126,6 +137,7 @@ func _physics_process(delta: float) -> void:
 
 	var speed_mult: float = 0.55 if slow_timer > 0.0 else 1.0
 	if rolling: velocity = roll_dir * ROLL_SPEED
+	elif slide_timer > 0.0: velocity = slide_dir * SPEED # Trượt: giữ nguyên hướng cũ, bỏ qua input mới
 	else: velocity = input_dir * SPEED * speed_mult
 
 	velocity += knockback

@@ -10,6 +10,8 @@ const ENEMY = preload("res://scenes/enemy.tscn")
 const BOSS = preload("res://scenes/boss.tscn")
 const PICKUP = preload("res://scenes/pickup.tscn")
 const SpikeTrapScript = preload("res://scripts/spike_trap.gd")
+const PoisonTileScript = preload("res://scripts/poison_tile.gd")
+const IceTileScript = preload("res://scripts/ice_tile.gd")
 
 const CELL_W: int = 24
 const CELL_H: int = 16
@@ -17,15 +19,42 @@ const GRID_W: int = 5
 const GRID_H: int = 5
 const DIRS = [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]
 
-## Thứ tự file ảnh nạp vào atlas tileset — chỉ số (index) khớp với các hằng T_* bên dưới.
-const TILE_FILES: Array = [
-	"floor_1.png", "floor_2.png", "floor_3.png", "floor_4.png",
-	"floor_5.png", "floor_6.png", "floor_7.png", "floor_8.png",
-	"wall_top_left.png", "wall_top_mid.png", "wall_top_right.png",
-	"wall_left.png", "wall_right.png",
-	"wall_edge_bottom_left.png", "wall_edge_bottom_right.png",
-	"wall_mid.png", "column.png", "doors_leaf_closed.png",
+## Tên tile nền/tường DÙNG CHUNG cho mọi biome (chưa gồm hậu tố) — thứ tự khớp
+## chính xác với các hằng T_* bên dưới (index 0-7 = floor, 8-15 = tường, 16 = trụ, 17 = cửa).
+## Biome 1 (đá, tầng 1-3) dùng file gốc không hậu tố; Biome 2 (đầm lầy, tầng 4-6) thêm
+## hậu tố "_swamp"; Biome 3 + tầng Lord (băng, tầng 7+) thêm hậu tố "_ice".
+const TILE_BASE_NAMES: Array = [
+	"floor_1", "floor_2", "floor_3", "floor_4",
+	"floor_5", "floor_6", "floor_7", "floor_8",
+	"wall_top_left", "wall_top_mid", "wall_top_right",
+	"wall_left", "wall_right",
+	"wall_edge_bottom_left", "wall_edge_bottom_right", "wall_mid",
 ]
+## 2 tile dùng chung, KHÔNG đổi theo biome (trụ đá + cửa gỗ, chi tiết nhỏ không ảnh hưởng cảm giác biome).
+const TILE_SHARED_NAMES: Array = ["column", "doors_leaf_closed"]
+
+
+## Trả về danh sách tên file ảnh (đã gồm .png) cho 1 biome, giữ ĐÚNG thứ tự TILE_BASE_NAMES
+## để các hằng T_* (toạ độ atlas cố định) luôn khớp bất kể đang ở biome nào.
+func _tile_files_for_biome(biome: String) -> Array:
+	var suf: String = "" if biome == "stone" else "_" + biome
+	var files: Array = []
+	for n in TILE_BASE_NAMES:
+		files.append(n + suf + ".png")
+	for n in TILE_SHARED_NAMES:
+		files.append(n + ".png")
+	return files
+
+
+## Biome 1 (Warden, tầng 1-3): đá · Biome 2 (Necromancer, tầng 4-6): đầm lầy ·
+## Biome 3 (Frost, tầng 7-9) + tầng Lord (10+): băng giá.
+func _biome_for_floor(floor_num: int) -> String:
+	var k: String = _boss_kind_for_floor(floor_num)
+	if k == "necromancer":
+		return "swamp"
+	elif k == "frost" or k == "lord":
+		return "ice"
+	return "stone"
 const T_FLOOR_VARIANTS: Array = [
 	Vector2i(0, 0), Vector2i(1, 0), Vector2i(2, 0), Vector2i(3, 0),
 	Vector2i(4, 0), Vector2i(5, 0), Vector2i(6, 0), Vector2i(7, 0),
@@ -56,16 +85,14 @@ var boss_cell: Vector2i = Vector2i(2, 2)
 var current_cell: Vector2i = Vector2i(2, 2)
 var alive_enemies: int = 0
 var boss_alive: bool = false
+var current_biome: String = "" # "" = chưa dựng tileset lần nào -> generate() đầu tiên sẽ ép dựng lại
 
 
 func _ready() -> void:
 	add_to_group("dungeon")
-	var ts: TileSet = _make_tileset()
 	floor_layer = TileMapLayer.new()
-	floor_layer.tile_set = ts
 	add_child(floor_layer)
 	door_layer = TileMapLayer.new()
-	door_layer.tile_set = ts
 	add_child(door_layer)
 	triggers = Node2D.new()
 	add_child(triggers)
@@ -75,8 +102,20 @@ func _ready() -> void:
 	Global.world = entities
 
 
+## Chỉ dựng lại atlas tileset khi ĐỔI biome (giữa các tầng cùng biome thì giữ nguyên,
+## tránh dựng lại ảnh atlas mỗi lần sinh tầng mới không cần thiết).
+func _ensure_tileset_for_biome(biome: String) -> void:
+	if biome == current_biome:
+		return
+	current_biome = biome
+	var ts: TileSet = _make_tileset(biome)
+	floor_layer.tile_set = ts
+	door_layer.tile_set = ts
+
+
 # ------------------------------------------------------------------ TileSet dựng từ asset CC0 (0x72 DungeonTilesetII)
-func _make_tileset() -> TileSet:
+# + 2 bộ biome tự vẽ thêm (đầm lầy "_swamp", băng giá "_ice") qua palette-remap + chi tiết tay.
+func _make_tileset(biome: String = "stone") -> TileSet:
 	var t: int = Global.TILE
 	var ts := TileSet.new()
 	ts.tile_size = Vector2i(t, t)
@@ -84,13 +123,14 @@ func _make_tileset() -> TileSet:
 	ts.set_physics_layer_collision_layer(0, Global.L_WORLD)
 	ts.set_physics_layer_collision_mask(0, 0)
 
-	var n: int = TILE_FILES.size()
+	var tile_files: Array = _tile_files_for_biome(biome)
+	var n: int = tile_files.size()
 	var img := Image.create_empty(t * n, t, false, Image.FORMAT_RGBA8)
 	for i in n:
 		var src_img := Image.new()
-		var err := src_img.load("res://assets/dungeon/" + TILE_FILES[i])
+		var err := src_img.load("res://assets/dungeon/" + tile_files[i])
 		if err != OK:
-			push_error("Không tải được asset tile: " + TILE_FILES[i])
+			push_error("Không tải được asset tile: " + tile_files[i])
 			continue
 		src_img.convert(Image.FORMAT_RGBA8)
 		src_img.resize(t, t, Image.INTERPOLATE_NEAREST)
@@ -116,6 +156,7 @@ func _make_tileset() -> TileSet:
 # ------------------------------------------------------------------ Sinh tầng
 func generate(floor_number: int) -> void:
 	_clear()
+	_ensure_tileset_for_biome(_biome_for_floor(floor_number))
 	var target: int = mini(5 + floor_number, 11)
 	var cur: Vector2i = Vector2i(2, 2)
 	start_cell = cur
@@ -248,7 +289,7 @@ func _build_room(cell: Vector2i, room: Dictionary) -> void:
 		if randf() < 0.5:
 			_spawn_crate_decor(cell, randi_range(1, 2))
 		if randf() < 0.4:
-			_spawn_spike_traps(cell, randi_range(1, 2))
+			_spawn_hazard_tiles(cell, randi_range(1, 2))
 	# Vùng kích hoạt phòng (Area2D + signal body_entered), thụt vào 2 tile để người chơi vào hẳn mới khoá cửa
 	var area := Area2D.new()
 	area.collision_layer = 0
@@ -520,12 +561,19 @@ func _spawn_crate_decor(cell: Vector2i, count: int) -> void:
 		spr.global_position = pos
 
 
-## Bẫy gai sàn — xem scripts/spike_trap.gd để biết chu kỳ an toàn/nguy hiểm và sát thương.
-func _spawn_spike_traps(cell: Vector2i, count: int) -> void:
+## Sinh bẫy sàn ĐÚNG LOẠI theo biome hiện tại: đá -> bẫy gai (chu kỳ an toàn/nguy hiểm,
+## xem spike_trap.gd), đầm lầy -> Ô Độc (sát thương liên tục, xem poison_tile.gd),
+## băng giá -> Ô Băng (sát thương nhẹ + trượt mất kiểm soát, xem ice_tile.gd).
+func _spawn_hazard_tiles(cell: Vector2i, count: int) -> void:
+	var script: Script = SpikeTrapScript
+	if current_biome == "swamp":
+		script = PoisonTileScript
+	elif current_biome == "ice":
+		script = IceTileScript
 	for i in count:
 		var pos: Vector2 = _random_floor_pos(cell, Vector2(-99999.0, -99999.0), 0.0)
 		var trap := Area2D.new()
-		trap.set_script(SpikeTrapScript)
+		trap.set_script(script)
 		entities.add_child(trap)
 		trap.global_position = pos
 
