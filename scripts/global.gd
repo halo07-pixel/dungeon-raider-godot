@@ -55,6 +55,17 @@ var player = null
 var camera = null
 var world: Node2D = null
 
+## Hệ số khó THÊM áp dụng cho tầng > 10 (Chế Độ Vô Hạn, sau khi hạ Dungeon Lord tầng 10):
+## nhân thêm vào công thức scale máu/giáp vốn có của boss.gd/enemy.gd, khiến độ khó tăng
+## NHANH HƠN hẳn so với tốc độ tăng đều 1-10 — đúng như phần thưởng/thử thách của Vô Hạn.
+const ENDLESS_START_FLOOR: int = 10
+const ENDLESS_RATE: float = 0.12
+
+func endless_difficulty_mult(for_floor_num: int) -> float:
+	if for_floor_num <= ENDLESS_START_FLOOR:
+		return 1.0
+	return 1.0 + ENDLESS_RATE * float(for_floor_num - ENDLESS_START_FLOOR)
+
 var _sfx: Dictionary = {}
 var _dot_tex: ImageTexture
 var _hitstop_active: bool = false

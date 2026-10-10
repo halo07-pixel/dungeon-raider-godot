@@ -88,9 +88,10 @@ func setup(hp_mult: float = 1.0, p_kind: String = "warden") -> void:
 	var cfg: Dictionary = BOSS_DATA[kind]
 	BOSS_NAME = cfg["name"]
 	var floor_scale: float = 1.0 + 0.3 * float(Global.floor_num - 1)
-	max_hp = float(cfg["base_hp"]) * hp_mult * floor_scale
+	var endless_mult: float = Global.endless_difficulty_mult(Global.floor_num) # >1.0 chỉ khi tầng > 10 (Vô Hạn)
+	max_hp = float(cfg["base_hp"]) * hp_mult * floor_scale * endless_mult
 	hp = max_hp
-	armor = floor((Global.floor_num - 1) * 1.6) + 2.0
+	armor = floor((Global.floor_num - 1) * 1.6) + 2.0 + floor((endless_mult - 1.0) * 10.0)
 	cc_resist = minf(0.3 + (Global.floor_num - 1) * 0.2, 0.9)
 	BODY_RADIUS = BODY_RADIUS_BASE * float(cfg["body_mult"])
 	BODY_CENTER_OFFSET = BODY_CENTER_OFFSET_BASE * float(cfg["body_mult"])

@@ -54,9 +54,10 @@ func setup(p_kind: String, hp_mult: float = 1.0) -> void:
 	kind = p_kind
 	data = Global.enemies[p_kind]
 	var floor_scale: float = 1.0 + 0.15 * float(Global.floor_num - 1)
-	max_hp = float(data["hp"]) * hp_mult * floor_scale
+	var endless_mult: float = Global.endless_difficulty_mult(Global.floor_num) # >1.0 chỉ khi tầng > 10 (Vô Hạn)
+	max_hp = float(data["hp"]) * hp_mult * floor_scale * endless_mult
 	hp = max_hp
-	armor = floor((Global.floor_num - 1) * 1.2)
+	armor = floor((Global.floor_num - 1) * 1.2) + floor((endless_mult - 1.0) * 8.0)
 	cc_resist = minf(0.0 + (Global.floor_num - 1) * 0.15, 0.6)
 
 func _ready() -> void:

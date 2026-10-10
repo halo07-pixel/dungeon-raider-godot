@@ -10,6 +10,9 @@ var _changing: bool = false
 var pause_layer: CanvasLayer
 var pause_ui: VBoxContainer
 var is_game_over: bool = false
+var is_victory_screen: bool = false
+## Thưởng Ngọc Tím một lần duy nhất khi lần đầu hạ Dungeon Lord (tầng 10) trong ván này.
+const VICTORY_GEM_BONUS: int = 20
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS 
@@ -40,7 +43,7 @@ func _ready() -> void:
 	if is_loading_save:
 		_restore_player_state()
 		
-	Global.message.emit("Floor %d" % Global.floor_num, Color.WHITE)
+	Global.message.emit(_floor_label(Global.floor_num), Color(1.0, 0.85, 0.2) if Global.floor_num > 10 else Color.WHITE)
 	_spawn_npc_if_needed()
 
 	# 3. KHỞI TẠO UI TẠM DỪNG
@@ -66,6 +69,14 @@ func _ready() -> void:
 	pause_layer.hide()
 
 
+## Tầng > 10 là phần Vô Hạn (sau khi đã hạ Dungeon Lord) - gắn nhãn "Endless" cho rõ,
+## giữ "Floor %d" như cũ cho các tầng 1-10 của hành trình chính.
+func _floor_label(f: int) -> String:
+	if f > 10:
+		return "Endless - Floor %d" % f
+	return "Floor %d" % f
+
+
 func _restore_player_state() -> void:
 	if is_instance_valid(player):
 		var w_id = Global.saved_run.get("weapon_id", "pistol")
@@ -87,6 +98,12 @@ func _restore_player_state() -> void:
 # ==========================================
 func _on_portal_entered() -> void:
 	if _changing: return
+	# Tầng 10 = phòng Boss cuối (Dungeon Lord) -> bước qua cổng này hiện màn VICTORY
+	# thay vì sang tầng như bình thường. Chỉ xảy ra đúng 1 lần/ván vì floor_num chỉ tăng dần.
+	if Global.floor_num == 10 and not is_victory_screen:
+		_changing = true
+		_show_victory.call_deferred()
+		return
 	_changing = true
 	_next_floor.call_deferred()
 
@@ -115,7 +132,7 @@ func _next_floor() -> void:
 	
 	player.knockback = Vector2.ZERO
 	player.heal(int(float(player.max_hp) * 0.3))
-	Global.message.emit("Floor %d" % Global.floor_num, Color.WHITE)
+	Global.message.emit(_floor_label(Global.floor_num), Color(1.0, 0.85, 0.2) if Global.floor_num > 10 else Color.WHITE)
 	_changing = false
 
 
@@ -123,7 +140,7 @@ func _next_floor() -> void:
 # CƠ CHẾ TẠM DỪNG (ESC) VÀ GAME OVER
 # ==========================================
 func _input(event: InputEvent) -> void:
-	if event.is_action_pressed("ui_cancel") and not is_game_over:
+	if event.is_action_pressed("ui_cancel") and not is_game_over and not is_victory_screen:
 		get_tree().paused = !get_tree().paused
 		if get_tree().paused:
 			_build_pause_menu()
@@ -200,6 +217,53 @@ func _build_game_over_menu() -> void:
 		get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
 	)
 		
+# ==========================================
+# MÀN VICTORY (hạ Dungeon Lord, tầng 10) - đi tiếp Vô Hạn hoặc về Menu
+# ==========================================
+func _show_victory() -> void:
+	is_victory_screen = true
+	Global.purple_gems += VICTORY_GEM_BONUS
+	Global.save_game()
+
+	get_tree().paused = true
+	_build_victory_menu()
+	pause_layer.show()
+
+func _build_victory_menu() -> void:
+	for c in pause_ui.get_children(): c.queue_free()
+
+	var title = Label.new()
+	title.text = "VICTORY!"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 50)
+	title.add_theme_color_override("font_color", Color(1.0, 0.85, 0.2))
+	pause_ui.add_child(title)
+
+	var sub = Label.new()
+	sub.text = "You defeated the Dungeon Lord!"
+	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	pause_ui.add_child(sub)
+
+	var k = Global.run_stats.get("kills", 0) if Global.get("run_stats") else 0
+	var c_coin = Global.run_stats.get("coins", 0) if Global.get("run_stats") else 0
+
+	var info = Label.new()
+	info.text = "Floors cleared: %d\nEnemies defeated: %d\nGold collected: %d\n+%d Purple Gems (first-clear bonus)" % [Global.floor_num, k, c_coin, VICTORY_GEM_BONUS]
+	info.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	pause_ui.add_child(info)
+
+	_add_btn("Continue to Endless Mode", func():
+		is_victory_screen = false # Mở lại ESC tạm dừng bình thường khi đã đi tiếp
+		get_tree().paused = false
+		pause_layer.hide()
+		_next_floor.call_deferred()
+	)
+	_add_btn("Return to Main Menu", func():
+		get_tree().paused = false
+		get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
+	)
+
+
 func _spawn_npc_if_needed() -> void:
 	if is_instance_valid(current_npc):
 		current_npc.queue_free()
