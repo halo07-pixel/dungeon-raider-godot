@@ -65,13 +65,17 @@ func _on_body_entered(body: Node) -> void:
 			_hit.append(body)
 			
 		body.take_damage(damage, global_position - dir * 8.0, knock)
-		
-		# Kích hoạt trạng thái lên quái (Sử thi / Huyền thoại)
-		if from_player and body.has_method("apply_status"):
-			if effect == "slow":
-				body.apply_status("slow", 2.0)
-			elif effect == "chain": # Xích sét laser Huyền thoại
-				_chain_lightning(body)
+
+		if body.has_method("apply_status"):
+			if from_player:
+				# Kích hoạt trạng thái lên quái (Sử thi / Huyền thoại)
+				if effect == "slow":
+					body.apply_status("slow", 2.0)
+				elif effect == "chain": # Xích sét laser Huyền thoại
+					_chain_lightning(body)
+			elif effect == "poison":
+				# Độc Trượng (Orc Shaman, biome Đầm Lầy): 3 nhịp x 4 dmg lên Player
+				body.apply_status("poison", 3, 4)
 				
 		if not pierce:
 			_impact()

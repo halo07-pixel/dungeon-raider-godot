@@ -43,6 +43,14 @@ const ENEMY_SPRITES: Dictionary = {
 	"slime": {"prefix": "slug", "single_anim": true, "offset_y": -12.0},
 	"archer": {"prefix": "imp", "single_anim": false, "offset_y": -10.0},
 	"brute": {"prefix": "ogre", "single_anim": false, "offset_y": 2.0},
+	# Biome 2 (Đầm Lầy) — sprite chỉ có khung "idle" (không có "run" riêng) nên single_anim=true.
+	"shaman": {"prefix": "orc_shaman", "single_anim": true, "offset_y": -10.0},
+	"chort": {"prefix": "chort", "single_anim": true, "offset_y": -12.0},
+	"masked_orc": {"prefix": "masked_orc", "single_anim": true, "offset_y": -6.0},
+	# Biome 3 (Băng Giá) — bản nhuộm băng (palette-remap) của bộ sprite zombie, prefix "frost_*".
+	"frost_zombie": {"prefix": "frost_zombie", "single_anim": true, "offset_y": -6.0},
+	"frost_big_zombie": {"prefix": "frost_big_zombie", "single_anim": true, "offset_y": 0.0},
+	"frost_tiny": {"prefix": "frost_tiny", "single_anim": true, "offset_y": -6.0},
 }
 
 ## Tâm hitbox thật — enemy không lệch offset nên bằng global_position, nhưng vẫn
@@ -77,7 +85,7 @@ func _ready() -> void:
 	near_zone.body_exited.connect(_on_near_exited)
 	far_zone.body_entered.connect(_on_far_entered)
 	far_zone.body_exited.connect(_on_far_exited)
-	action_timer.one_shot = (kind != "archer")
+	action_timer.one_shot = not (kind == "archer" or kind == "shaman" or kind == "frost_big_zombie")
 	action_timer.timeout.connect(_on_action_timer_timeout)
 	spawn_timer.timeout.connect(_on_spawn_done)
 	modulate.a = 0.35
@@ -168,17 +176,21 @@ func _on_far_exited(body: Node) -> void:
 func _on_spawn_done() -> void:
 	active = true
 	create_tween().tween_property(self, "modulate:a", 1.0, 0.15)
-	if kind == "archer":
+	if kind == "archer" or kind == "shaman":
 		action_timer.start(float(data["shoot_cd"]))
+	elif kind == "frost_big_zombie":
+		action_timer.start(float(data.get("slam_cd", 2.2)))
 	elif player_in_touch:
 		_touch_attack()
 
 func _on_action_timer_timeout() -> void:
 	if not active or not alive or stun_timer > 0:
 		return
-	if kind == "archer":
+	if kind == "archer" or kind == "shaman":
 		if player_in_range and has_los:
 			_shoot()
+	elif kind == "frost_big_zombie":
+		_frost_slam()
 	elif player_in_touch:
 		_touch_attack()
 
@@ -191,7 +203,24 @@ func _touch_attack() -> void:
 	if not is_instance_valid(p) or not p.alive:
 		return
 	p.take_damage(int(data["touch"]), global_position, float(data["touch_knock"]))
+	_apply_touch_effect(p)
+	if kind == "frost_tiny":
+		kill() # Vỡ Băng: lao tới, chạm 1 phát rồi tự huỷ, không trụ lại đánh dai dẳng
+		return
 	action_timer.start(float(data["touch_cd"]))
+
+## Hiệu ứng ĐẶC TRƯNG BIOME gắn kèm đòn chạm — chỉ đúng 1 nhánh khớp "kind" hiện tại,
+## các loại quái không có nhánh riêng (slime/archer/brute/frost_zombie base...) thì bỏ qua.
+func _apply_touch_effect(p) -> void:
+	if not p.has_method("apply_status"):
+		return
+	match kind:
+		"chort":
+			p.apply_status("poison", 2, 3) # Cắn Độc: độc nhẹ, cộng dồn được với Shaman
+		"masked_orc":
+			p.apply_status("slow", 1.0) # Trì Trệ Đầm Lầy: ghì chân để Shaman/Chort dồn độc
+		"frost_zombie":
+			p.apply_status("slide", 0.5) # Chạm Giá: mất lái, nguy hiểm gần bẫy/Ô Băng
 
 func _shoot() -> void:
 	var p = Global.player
@@ -200,10 +229,26 @@ func _shoot() -> void:
 	var p_center = p.hurt_center() if p.has_method("hurt_center") else p.global_position
 	var dir: Vector2 = (p_center - global_position).normalized()
 	var b = BULLET.instantiate()
-	b.setup(false, dir, int(data["bullet_damage"]), float(data["bullet_speed"]), 2.5, data["color"], 6.0)
+	b.setup(false, dir, int(data["bullet_damage"]), float(data["bullet_speed"]), 2.5, data["color"], 6.0, false, String(data.get("bullet_effect", "")))
 	Global.world.add_child(b)
 	b.global_position = global_position + dir * 18.0
 	Global.sfx("enemy_shoot")
+
+## Băng Giáng (Frost Big Zombie) — dộng đất định kỳ (action_timer lặp, xem
+## _on_action_timer_timeout), gây SLOW nếu người chơi đang đứng gần thay vì đánh cận trực tiếp.
+func _frost_slam() -> void:
+	var p = Global.player
+	if not is_instance_valid(p) or not p.alive:
+		return
+	var slam_r: float = float(data.get("slam_radius", 70.0))
+	var p_center: Vector2 = p.hurt_center() if p.has_method("hurt_center") else p.global_position
+	if global_position.distance_to(p_center) > slam_r:
+		return
+	if p.has_method("apply_status"):
+		p.apply_status("slow", 1.0)
+	Global.burst(global_position, Color(0.6, 0.85, 1.0), 14, 160.0, 1.6)
+	Global.shake(0.25, 0.15)
+	Global.sfx("slam")
 
 # --- HÀM NHẬN TRẠNG THÁI TỪ VŨ KHÍ ---
 func apply_status(type: String, duration: float) -> void:
@@ -249,7 +294,7 @@ func _physics_process(delta: float) -> void:
 		var dir: Vector2 = to_p.normalized()
 		facing = dir
 		match kind:
-			"archer":
+			"archer", "shaman":
 				if player_too_close: move = -dir
 				elif player_in_range and has_los: move = dir.orthogonal() * strafe_sign * 0.5
 				else: move = dir

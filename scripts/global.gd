@@ -46,6 +46,18 @@ var enemies: Dictionary = {
 	"slime": {"hp": 30, "speed": 95.0, "touch": 10, "touch_cd": 0.8, "touch_knock": 260.0, "radius": 13.0, "coins": 1, "weight": 1.0, "color": Color(0.35, 0.85, 0.35)},
 	"archer": {"hp": 22, "speed": 85.0, "touch": 0, "touch_cd": 1.0, "touch_knock": 200.0, "radius": 12.0, "coins": 2, "weight": 1.0, "color": Color(0.4, 0.6, 1.0), "shoot_cd": 1.5, "bullet_damage": 8, "bullet_speed": 280.0, "keep_away": 170.0, "range": 380.0},
 	"brute": {"hp": 120, "speed": 62.0, "touch": 20, "touch_cd": 1.0, "touch_knock": 430.0, "radius": 20.0, "coins": 3, "weight": 2.5, "color": Color(0.8, 0.35, 0.25)},
+
+	# --- BIOME 2 (Đầm Lầy) — bộ quái RIÊNG, không lặp với biome khác. Chủ đề Độc & Tiêu Hao:
+	# phối hợp giữ chân (Masked Orc) + dồn độc (Shaman tầm xa + Chort cận chiến) ---
+	"shaman": {"hp": 20, "speed": 80.0, "touch": 0, "touch_cd": 1.0, "touch_knock": 180.0, "radius": 12.0, "coins": 2, "weight": 1.0, "color": Color(0.55, 0.85, 0.35), "shoot_cd": 1.8, "bullet_damage": 4, "bullet_speed": 260.0, "keep_away": 170.0, "range": 380.0, "bullet_effect": "poison"},
+	"chort": {"hp": 18, "speed": 128.0, "touch": 6, "touch_cd": 0.5, "touch_knock": 150.0, "radius": 11.0, "coins": 2, "weight": 0.9, "color": Color(0.85, 0.25, 0.2)},
+	"masked_orc": {"hp": 140, "speed": 58.0, "touch": 16, "touch_cd": 1.1, "touch_knock": 350.0, "radius": 20.0, "coins": 3, "weight": 2.6, "color": Color(0.5, 0.65, 0.4)},
+
+	# --- BIOME 3 (Băng Giá) — bộ quái RIÊNG. Chủ đề Mất Kiểm Soát: không có vai tầm xa
+	# (hết quái CC0 phù hợp) nhưng bù lại dày CC — slide + slow — khớp với Ô Băng ---
+	"frost_zombie": {"hp": 35, "speed": 90.0, "touch": 8, "touch_cd": 0.9, "touch_knock": 220.0, "radius": 13.0, "coins": 2, "weight": 1.0, "color": Color(0.55, 0.8, 0.95)},
+	"frost_big_zombie": {"hp": 150, "speed": 50.0, "touch": 22, "touch_cd": 1.2, "touch_knock": 400.0, "radius": 21.0, "coins": 3, "weight": 2.8, "color": Color(0.6, 0.85, 1.0), "slam_cd": 2.2, "slam_radius": 70.0},
+	"frost_tiny": {"hp": 12, "speed": 150.0, "touch": 14, "touch_cd": 999.0, "touch_knock": 260.0, "radius": 9.0, "coins": 1, "weight": 0.6, "color": Color(0.75, 0.92, 1.0)},
 }
 # ==============================================================================
 

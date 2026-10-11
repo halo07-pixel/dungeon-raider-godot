@@ -23,6 +23,9 @@ var slow_timer: float = 0.0 # Bị làm chậm bởi hào quang băng / hiệu �
 var slide_timer: float = 0.0 # Bị trượt mất kiểm soát hướng đi (Ô Băng - biome Frost)
 var slide_dir: Vector2 = Vector2.RIGHT
 var last_move_dir: Vector2 = Vector2.RIGHT # Hướng di chuyển gần nhất, dùng để xác định hướng trượt
+var poison_ticks: int = 0 # Số nhịp độc còn lại (Orc Shaman / Chort - biome Đầm Lầy)
+var poison_timer: float = 0.0
+var poison_dmg: int = 0
 
 var swinging: bool = false
 var swing_progress: float = 0.0
@@ -105,15 +108,23 @@ func dodge_ratio() -> float:
 	if dodge_cooldown.is_stopped(): return 1.0
 	return 1.0 - dodge_cooldown.time_left / dodge_cooldown.wait_time
 
-## Boss/hazard có thể áp trạng thái lên Player ("slow" - Hào Quang Băng,
-## "slide" - Ô Băng biome Frost khiến trượt mất kiểm soát hướng đi).
-## Giữ cùng chữ ký với enemy.gd::apply_status() để code gọi dùng chung được.
-func apply_status(type: String, duration: float) -> void:
+## Boss/hazard/quái có thể áp trạng thái lên Player ("slow" - Hào Quang Băng,
+## "slide" - Ô Băng biome Frost khiến trượt mất kiểm soát hướng đi, "poison" -
+## Orc Shaman/Chort biome Đầm Lầy gây sát thương liên tục theo nhịp).
+## Tham số thứ 3 (amount) CHỈ dùng cho "poison": duration lúc này mang nghĩa
+## SỐ NHỊP độc (không phải giây) để khớp timer tick cố định 0.5s bên dưới.
+## Giữ cùng chữ ký (type, duration) với enemy.gd::apply_status() để code gọi dùng chung được.
+func apply_status(type: String, duration: float, amount: float = 0.0) -> void:
 	if type == "slow":
 		slow_timer = maxf(slow_timer, duration)
 	elif type == "slide":
 		slide_timer = maxf(slide_timer, duration)
 		slide_dir = last_move_dir
+	elif type == "poison":
+		poison_ticks = maxi(poison_ticks, int(duration))
+		poison_dmg = maxi(poison_dmg, int(amount))
+		if poison_timer <= 0.0:
+			poison_timer = 0.5
 
 func _physics_process(delta: float) -> void:
 	if not alive: return
@@ -125,6 +136,14 @@ func _physics_process(delta: float) -> void:
 		slow_timer = maxf(0.0, slow_timer - delta)
 	if slide_timer > 0.0:
 		slide_timer = maxf(0.0, slide_timer - delta)
+	if poison_ticks > 0:
+		poison_timer -= delta
+		if poison_timer <= 0.0:
+			poison_timer = 0.5
+			poison_ticks -= 1
+			# Độc BỎ QUA khung bất tử vật lý (hurt_timer) — venom không quan tâm bạn vừa
+			# trúng đòn thường hay chưa, khác hẳn sát thương tiếp xúc thông thường.
+			take_damage(poison_dmg, global_position, 0.0, true)
 
 	var input_dir: Vector2 = Input.get_vector("move_left", "move_right", "move_up", "move_down")
 	if input_dir != Vector2.ZERO:
@@ -328,10 +347,12 @@ func set_weapon_with_rarity(id: String, rarity: String) -> void:
 	var display_name = weapon["name"] + " (" + rarity_data["name"] + ")"
 	Global.message.emit("Picked up: " + display_name, rarity_data["color"])
 
-func take_damage(amount: int, from_pos: Vector2 = Vector2.ZERO, knock: float = 300.0) -> void:
-	if not alive or is_invulnerable(): return
+func take_damage(amount: int, from_pos: Vector2 = Vector2.ZERO, knock: float = 300.0, ignore_invuln: bool = false) -> void:
+	if not alive: return
+	if not ignore_invuln and is_invulnerable(): return
 	hp = maxi(hp - amount, 0)
-	hurt_timer.start()
+	if not ignore_invuln:
+		hurt_timer.start()
 	knockback += (global_position - from_pos).normalized() * knock
 	Global.shake(0.5, 0.25)
 	Global.sfx("hurt")

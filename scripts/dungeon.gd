@@ -407,7 +407,16 @@ func _unlock_doors(room: Dictionary) -> void:
 	Global.sfx("door")
 
 
+## Chọn loại quái thường sẽ spawn — tách theo current_biome để 3 biome KHÔNG BAO GIỜ
+## lẫn quái của nhau (mỗi biome một bộ quái riêng, yêu cầu rõ từ người chơi).
 func _pick_kind() -> String:
+	match current_biome:
+		"swamp": return _pick_kind_swamp()
+		"ice": return _pick_kind_ice()
+		_: return _pick_kind_stone()
+
+
+func _pick_kind_stone() -> String:
 	var r: float = randf()
 	var brute_p: float = 0.0 if Global.floor_num < 2 else 0.18
 	var archer_p: float = 0.25
@@ -416,6 +425,31 @@ func _pick_kind() -> String:
 	if r < brute_p + archer_p:
 		return "archer"
 	return "slime"
+
+
+## Biome 2 (Đầm Lầy): Masked Orc (tank) · Orc Shaman (tầm xa) · Chort (phần còn lại, nhanh nhẹn).
+func _pick_kind_swamp() -> String:
+	var r: float = randf()
+	var tank_p: float = 0.18
+	var ranged_p: float = 0.22
+	if r < tank_p:
+		return "masked_orc"
+	if r < tank_p + ranged_p:
+		return "shaman"
+	return "chort"
+
+
+## Biome 3 (Băng Giá): Frost Big Zombie (tank) · Frost Tinyling (nhanh, tự nổ) ·
+## Frost Zombie (phần còn lại, vai cơ bản).
+func _pick_kind_ice() -> String:
+	var r: float = randf()
+	var tank_p: float = 0.16
+	var tiny_p: float = 0.30
+	if r < tank_p:
+		return "frost_big_zombie"
+	if r < tank_p + tiny_p:
+		return "frost_tiny"
+	return "frost_zombie"
 
 
 func _spawn_wave(cell: Vector2i) -> void:

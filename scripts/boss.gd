@@ -377,7 +377,9 @@ func _atk_necro_summon() -> void:
 	var n: int = 2
 	for i in n:
 		var ang: float = TAU * float(i) / float(n) + randf() * 0.5
-		summon_requested.emit("archer", global_position + Vector2.from_angle(ang) * 90.0)
+		# Necromancer ở biome Đầm Lầy -> triệu hồi "shaman" (KHÔNG dùng "archer", vốn
+		# là quái tầm xa độc quyền biome 1, để không phá quy tắc không lẫn quái giữa biome).
+		summon_requested.emit("shaman", global_position + Vector2.from_angle(ang) * 90.0)
 	await get_tree().create_timer(0.4).timeout
 
 
@@ -487,7 +489,9 @@ func _atk_blizzard() -> void:
 	var n: int = 2
 	for i in n:
 		var ang: float = TAU * float(i) / float(n) + randf() * 0.6
-		summon_requested.emit("slime", global_position + Vector2.from_angle(ang) * 100.0)
+		# Frost ở biome Băng Giá -> triệu hồi "frost_zombie" (KHÔNG dùng "slime", vốn là
+		# quái cơ bản độc quyền biome 1, để không phá quy tắc không lẫn quái giữa biome).
+		summon_requested.emit("frost_zombie", global_position + Vector2.from_angle(ang) * 100.0)
 	await get_tree().create_timer(0.5).timeout
 
 
