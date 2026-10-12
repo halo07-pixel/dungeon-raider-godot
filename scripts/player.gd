@@ -37,6 +37,7 @@ var dagger_timer: float = 0.0
 @onready var dodge_cooldown: Timer = $DodgeCooldown
 @onready var hurt_timer: Timer = $HurtTimer
 @onready var sprite: AnimatedSprite2D = $Sprite
+@onready var weapon_sprite: Sprite2D = $WeaponSprite
 
 ## Ánh xạ lớp nhân vật -> bộ sprite 0x72 (DungeonTilesetII) dùng làm thân người.
 const SPRITE_SET: Dictionary = {
@@ -167,6 +168,7 @@ func _physics_process(delta: float) -> void:
 		if weapon.get("is_melee", false): _swing()
 		else: _shoot()
 	_update_sprite()
+	_update_weapon_visual()
 	queue_redraw()
 
 func _start_roll(dir: Vector2) -> void:
@@ -344,6 +346,7 @@ func set_weapon_with_rarity(id: String, rarity: String) -> void:
 	weapon_rarity = rarity
 	weapon = Global.weapons[id]
 	rarity_data = Global.rarities[rarity]
+	weapon_sprite.texture = Global.load_tex("res://assets/dungeon/weapon_%s.png" % id)
 	var display_name = weapon["name"] + " (" + rarity_data["name"] + ")"
 	Global.message.emit("Picked up: " + display_name, rarity_data["color"])
 
@@ -408,22 +411,35 @@ func _die() -> void:
 	died.emit()
 	Global.player_died.emit()
 
-func _draw() -> void:
-	var gun_c: Color = weapon.get("color", Color.WHITE)
-	if rarity_data.has("color"): gun_c = rarity_data["color"].lerp(gun_c, 0.5)
+## Nửa góc quạt chém hiện tại (tuỳ vũ khí/độ hiếm) — dùng chung bởi _draw() (vệt
+## chém) và _update_weapon_visual() (xoay icon) để khỏi lặp logic 2 nơi.
+func _melee_half_angle() -> float:
+	var half_angle = deg_to_rad(float(weapon["cleave_angle"])) * 0.5
+	if weapon_id == "broadsword" and weapon_rarity == "legendary": half_angle = deg_to_rad(300.0) * 0.5
+	return half_angle
 
-	if weapon.get("is_melee", false):
-		if swinging:
-			var r = float(weapon["range"])
-			var half_angle = deg_to_rad(float(weapon["cleave_angle"])) * 0.5
-			if weapon_id == "broadsword" and weapon_rarity == "legendary": half_angle = deg_to_rad(300.0) * 0.5
-			var start_ang = aim_dir.angle() - half_angle
-			var end_ang = aim_dir.angle() + half_angle
-			var cur_ang = lerp(start_ang, end_ang, swing_progress)
-			
-			draw_arc(Vector2.ZERO, r, start_ang, end_ang, 16, Color(gun_c, 0.25), 16.0)
-			draw_line(Vector2.ZERO, Vector2.from_angle(cur_ang) * r, gun_c, 6.0)
-		else:
-			draw_line(aim_dir * 10.0, aim_dir * 18.0, gun_c, 4.0)
-	else:
-		draw_line(aim_dir * 8.0, aim_dir * 26.0, gun_c, 6.0)
+## Icon vũ khí thật (WeaponSprite, res://assets/dungeon/weapon_<id>.png) được xoay/lật
+## theo hướng ngắm mỗi khung hình tại đây. Vẽ chếch phải lúc 0 độ nên chỉ cần rotation =
+## góc ngắm; flip_v khi hướng ngả sang trái (cos < 0) để báng/chuôi không bị lộn ngược.
+func _update_weapon_visual() -> void:
+	var ang: float = aim_dir.angle()
+	if weapon.get("is_melee", false) and swinging:
+		var half_angle = _melee_half_angle()
+		var start_ang = aim_dir.angle() - half_angle
+		var end_ang = aim_dir.angle() + half_angle
+		ang = lerp(start_ang, end_ang, swing_progress)
+	weapon_sprite.rotation = ang
+	weapon_sprite.flip_v = cos(ang) < 0.0
+	var offset: float = 14.0 if weapon.get("is_melee", false) else 17.0
+	weapon_sprite.position = Vector2.from_angle(ang) * offset
+
+func _draw() -> void:
+	if weapon.get("is_melee", false) and swinging:
+		var gun_c: Color = weapon.get("color", Color.WHITE)
+		if rarity_data.has("color"): gun_c = rarity_data["color"].lerp(gun_c, 0.5)
+		var r = float(weapon["range"])
+		var half_angle = _melee_half_angle()
+		var start_ang = aim_dir.angle() - half_angle
+		var end_ang = aim_dir.angle() + half_angle
+		# Cung tròn mờ = vệt chém (hiệu ứng), icon lưỡi thật đã nằm trên WeaponSprite.
+		draw_arc(Vector2.ZERO, r, start_ang, end_ang, 16, Color(gun_c, 0.25), 16.0)

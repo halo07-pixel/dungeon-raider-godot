@@ -8,6 +8,7 @@ var extra: String = ""
 var weapon_id: String = ""
 var weapon_rarity: String = "common"
 var _t: float = 0.0
+var _icon_tex: Texture2D
 
 func setup(p_kind: String, p_extra: String = "") -> void:
 	kind = p_kind
@@ -17,6 +18,7 @@ func setup(p_kind: String, p_extra: String = "") -> void:
 		weapon_id = parts[0]
 		if parts.size() > 1:
 			weapon_rarity = parts[1]
+		_icon_tex = Global.load_tex("res://assets/dungeon/weapon_%s.png" % weapon_id)
 
 func _ready() -> void:
 	collision_layer = Global.L_PICKUP
@@ -31,8 +33,10 @@ func _ready() -> void:
 	_setup_sprite()
 
 
-## "coin" và "heal" dùng sprite 0x72 thật; "weapon"/"portal" vẫn vẽ bằng code vì
-## cần thể hiện màu độ hiếm / tên vũ khí / hiệu ứng cổng mà asset tĩnh không truyền tải được.
+## "coin" và "heal" dùng sprite 0x72 thật. "portal" vẫn vẽ hẳn bằng code (hiệu ứng
+## cổng không có asset tĩnh tương ứng). "weapon" giờ dùng icon pixel-art thật
+## (weapon_<id>.png, vẽ bằng draw_texture_rect trong _draw() bên dưới) nhưng vòng màu
+## độ hiếm + tên vũ khí vẫn phải vẽ đè bằng code vì asset tĩnh không mang được thông tin đó.
 ## Coin là pickup rơi ra nhiều nhất trong game (gần như mỗi quái chết đều rơi) nên
 ## cache SpriteFrames dùng chung, tránh load lại 4 ảnh từ đĩa mỗi lần rơi 1 đồng xu.
 static var _coin_frames: SpriteFrames
@@ -105,8 +109,11 @@ func _draw() -> void:
 			draw_circle(Vector2(0.0, bob), 13.0, Color(0.1, 0.1, 0.15))
 			# Vòng sáng mang màu của độ hiếm
 			draw_arc(Vector2(0.0, bob), 13.0, 0.0, TAU, 24, r_color, 3.0)
-			# Hình dạng đại diện vũ khí
-			draw_line(Vector2(-6.0, bob), Vector2(8.0, bob), r_color, 5.0)
+			# Icon pixel-art thật của vũ khí, phóng to 1.6x cho rõ, căn giữa viên pickup
+			if _icon_tex:
+				var icon_size: Vector2 = Vector2(_icon_tex.get_width(), _icon_tex.get_height()) * 1.6
+				var icon_pos: Vector2 = Vector2(-icon_size.x * 0.5, bob - icon_size.y * 0.5)
+				draw_texture_rect(_icon_tex, Rect2(icon_pos, icon_size), false)
 			# Text hiển thị Tên Vũ khí + Độ Hiếm
 			draw_string(ThemeDB.fallback_font, Vector2(-100.0, bob - 22.0), display_name, HORIZONTAL_ALIGNMENT_CENTER, 200.0, 14, r_color)
 		"portal":
