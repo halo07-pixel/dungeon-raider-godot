@@ -12,6 +12,10 @@ const DANGER_START: float = 1.2
 const DANGER_END: float = 2.0
 const DAMAGE: int = 8
 
+## Mỗi phòng thường có thể sinh vài bẫy gai, lặp lại ở mọi tầng — cache chung 1
+## bộ SpriteFrames thay vì load lại 4 ảnh cho từng bẫy.
+static var _frames_cache: SpriteFrames
+
 func _ready() -> void:
 	collision_layer = 0
 	collision_mask = Global.L_PLAYER
@@ -25,14 +29,15 @@ func _ready() -> void:
 	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	sprite.scale = Vector2(2.0, 2.0)   # texture gốc 16px, khớp Global.TILE=32px
 	add_child(sprite)
-	var frames := SpriteFrames.new()
-	frames.add_animation("cycle")
-	frames.set_animation_loop("cycle", false)
-	for i in 4:
-		var img := Image.new()
-		if img.load("res://assets/dungeon/floor_spikes_anim_f%d.png" % i) == OK:
-			frames.add_frame("cycle", ImageTexture.create_from_image(img))
-	sprite.sprite_frames = frames
+	if _frames_cache == null:
+		_frames_cache = SpriteFrames.new()
+		_frames_cache.add_animation("cycle")
+		_frames_cache.set_animation_loop("cycle", false)
+		for i in 4:
+			var tex := Global.load_tex("res://assets/dungeon/floor_spikes_anim_f%d.png" % i)
+			if tex:
+				_frames_cache.add_frame("cycle", tex)
+	sprite.sprite_frames = _frames_cache
 	sprite.animation = "cycle"
 	sprite.frame = 0
 

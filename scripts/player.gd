@@ -19,6 +19,13 @@ var rolling: bool = false
 var roll_dir: Vector2 = Vector2.RIGHT
 var aim_dir: Vector2 = Vector2.RIGHT
 var knockback: Vector2 = Vector2.ZERO
+var slow_timer: float = 0.0 # Bị làm chậm bởi hào quang băng / hiệu ứng boss
+var slide_timer: float = 0.0 # Bị trượt mất kiểm soát hướng đi (Ô Băng - biome Frost)
+var slide_dir: Vector2 = Vector2.RIGHT
+var last_move_dir: Vector2 = Vector2.RIGHT # Hướng di chuyển gần nhất, dùng để xác định hướng trượt
+var poison_ticks: int = 0 # Số nhịp độc còn lại (Orc Shaman / Chort - biome Đầm Lầy)
+var poison_timer: float = 0.0
+var poison_dmg: int = 0
 
 var swinging: bool = false
 var swing_progress: float = 0.0
@@ -37,7 +44,7 @@ const SPRITE_SET: Dictionary = {
 	"brawler": "knight_m",
 }
 const SPRITE_SCALE: float = 2.0
-const SPRITE_OFFSET_Y: float = -20.0
+const SPRITE_OFFSET_Y: float = -11.0
 
 func _ready() -> void:
 	motion_mode = CharacterBody2D.MOTION_MODE_FLOATING
@@ -74,11 +81,9 @@ func _add_sprite_anim(frames: SpriteFrames, prefix: String, anim: String, count:
 	frames.set_animation_loop(anim, loop)
 	for i in count:
 		var path: String = "res://assets/dungeon/%s_%s_anim_f%d.png" % [prefix, anim, i]
-		var img := Image.new()
-		if img.load(path) != OK:
-			push_error("Không tải được sprite người chơi: " + path)
-			continue
-		frames.add_frame(anim, ImageTexture.create_from_image(img))
+		var tex := Global.load_tex(path)
+		if tex:
+			frames.add_frame(anim, tex)
 
 
 func _update_sprite() -> void:
@@ -103,23 +108,57 @@ func dodge_ratio() -> float:
 	if dodge_cooldown.is_stopped(): return 1.0
 	return 1.0 - dodge_cooldown.time_left / dodge_cooldown.wait_time
 
+## Boss/hazard/quái có thể áp trạng thái lên Player ("slow" - Hào Quang Băng,
+## "slide" - Ô Băng biome Frost khiến trượt mất kiểm soát hướng đi, "poison" -
+## Orc Shaman/Chort biome Đầm Lầy gây sát thương liên tục theo nhịp).
+## Tham số thứ 3 (amount) CHỈ dùng cho "poison": duration lúc này mang nghĩa
+## SỐ NHỊP độc (không phải giây) để khớp timer tick cố định 0.5s bên dưới.
+## Giữ cùng chữ ký (type, duration) với enemy.gd::apply_status() để code gọi dùng chung được.
+func apply_status(type: String, duration: float, amount: float = 0.0) -> void:
+	if type == "slow":
+		slow_timer = maxf(slow_timer, duration)
+	elif type == "slide":
+		slide_timer = maxf(slide_timer, duration)
+		slide_dir = last_move_dir
+	elif type == "poison":
+		poison_ticks = maxi(poison_ticks, int(duration))
+		poison_dmg = maxi(poison_dmg, int(amount))
+		if poison_timer <= 0.0:
+			poison_timer = 0.5
+
 func _physics_process(delta: float) -> void:
 	if not alive: return
-	
+
 	if dagger_timer > 0:
 		dagger_timer -= delta
 		if dagger_timer <= 0: dagger_combo = 0 # Trôi combo dao găm
-		
+	if slow_timer > 0.0:
+		slow_timer = maxf(0.0, slow_timer - delta)
+	if slide_timer > 0.0:
+		slide_timer = maxf(0.0, slide_timer - delta)
+	if poison_ticks > 0:
+		poison_timer -= delta
+		if poison_timer <= 0.0:
+			poison_timer = 0.5
+			poison_ticks -= 1
+			# Độc BỎ QUA khung bất tử vật lý (hurt_timer) — venom không quan tâm bạn vừa
+			# trúng đòn thường hay chưa, khác hẳn sát thương tiếp xúc thông thường.
+			take_damage(poison_dmg, global_position, 0.0, true)
+
 	var input_dir: Vector2 = Input.get_vector("move_left", "move_right", "move_up", "move_down")
+	if input_dir != Vector2.ZERO:
+		last_move_dir = input_dir.normalized()
 	aim_dir = (get_global_mouse_position() - global_position).normalized()
 	if aim_dir == Vector2.ZERO: aim_dir = Vector2.RIGHT
 
 	if Input.is_action_just_pressed("dodge") and not rolling and dodge_cooldown.is_stopped():
 		_start_roll(input_dir if input_dir != Vector2.ZERO else aim_dir)
 
+	var speed_mult: float = 0.55 if slow_timer > 0.0 else 1.0
 	if rolling: velocity = roll_dir * ROLL_SPEED
-	else: velocity = input_dir * SPEED
-	
+	elif slide_timer > 0.0: velocity = slide_dir * SPEED # Trượt: giữ nguyên hướng cũ, bỏ qua input mới
+	else: velocity = input_dir * SPEED * speed_mult
+
 	velocity += knockback
 	knockback = knockback.move_toward(Vector2.ZERO, KNOCK_DECAY * delta)
 	move_and_slide()
@@ -265,7 +304,8 @@ func _swing() -> void:
 	# CHÉM QUÁI VÀ BOSS
 	for e in get_tree().get_nodes_in_group("enemies"):
 		if e.has_method("kill") and e.alive:
-			var to_e = e.global_position - global_position
+			var e_center = e.hurt_center() if e.has_method("hurt_center") else e.global_position
+			var to_e = e_center - global_position
 			if to_e.length() <= aoe_range + float(e.data["radius"]):
 				if absf(aim_dir.angle_to(to_e)) <= rad_angle * 0.5:
 					e.take_damage(dmg, global_position, knock)
@@ -278,7 +318,8 @@ func _swing() -> void:
 						
 	for b in get_tree().get_nodes_in_group("boss"):
 		if b.has_method("take_damage") and b.alive:
-			var to_b = b.global_position - global_position
+			var b_center = b.hurt_center() if b.has_method("hurt_center") else b.global_position
+			var to_b = b_center - global_position
 			if to_b.length() <= aoe_range + 34.0:
 				if absf(aim_dir.angle_to(to_b)) <= rad_angle * 0.5:
 					b.take_damage(dmg, global_position, knock)
@@ -304,12 +345,14 @@ func set_weapon_with_rarity(id: String, rarity: String) -> void:
 	weapon = Global.weapons[id]
 	rarity_data = Global.rarities[rarity]
 	var display_name = weapon["name"] + " (" + rarity_data["name"] + ")"
-	Global.message.emit("Nhặt được: " + display_name, rarity_data["color"])
+	Global.message.emit("Picked up: " + display_name, rarity_data["color"])
 
-func take_damage(amount: int, from_pos: Vector2 = Vector2.ZERO, knock: float = 300.0) -> void:
-	if not alive or is_invulnerable(): return
+func take_damage(amount: int, from_pos: Vector2 = Vector2.ZERO, knock: float = 300.0, ignore_invuln: bool = false) -> void:
+	if not alive: return
+	if not ignore_invuln and is_invulnerable(): return
 	hp = maxi(hp - amount, 0)
-	hurt_timer.start()
+	if not ignore_invuln:
+		hurt_timer.start()
 	knockback += (global_position - from_pos).normalized() * knock
 	Global.shake(0.5, 0.25)
 	Global.sfx("hurt")
@@ -340,12 +383,17 @@ func _trigger_revive() -> void:
 	Global.burst(global_position, Color(1.0, 0.8, 0.2), 30, 200.0, 2.0)
 	
 	# Chữ bay lên
-	Global.float_text(global_position + Vector2(0, -40), "PHƯỢNG HOÀNG LỬA!", Color(1.0, 0.5, 0.1), 24)
+	Global.float_text(global_position + Vector2(0, -40), "PHOENIX REBIRTH!", Color(1.0, 0.5, 0.1), 24)
 	
 	# Hiệu ứng chớp nháy liên tục báo hiệu đang trong khung hình bất tử (i-frames)
 	var tw = create_tween().set_loops(10)
 	tw.tween_property(self, "modulate:a", 0.2, 0.1)
 	tw.tween_property(self, "modulate:a", 1.0, 0.1)
+
+## Tâm hitbox thật (capsule Body) — dùng để tính trúng đòn/ngắm bắn chính xác,
+## khác với global_position (gốc chân, dùng cho AI/di chuyển).
+func hurt_center() -> Vector2:
+	return $Body.global_position
 
 func heal(amount: int) -> void:
 	if hp >= max_hp: return

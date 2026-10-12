@@ -38,10 +38,10 @@ func _process(_delta: float) -> void:
 	_update_hearts(float(p.hp), float(p.max_hp))
 	dodge_bar.value = p.dodge_ratio() * 100.0
 	
-	var w_name = "Chưa có"
+	var w_name = "None"
 	if p.get("weapon") and p.weapon.has("name"):
 		w_name = p.weapon["name"]
-	info_label.text = "Tầng %d   ·   %s   ·   Xu: %d" % [Global.floor_num, w_name, Global.coins]
+	info_label.text = "Floor %d   ·   %s   ·   Gold: %d" % [Global.floor_num, w_name, Global.coins]
 
 # ------------------------------------------------------------------ Sự kiện
 func _on_boss_spawned(boss) -> void:
@@ -98,9 +98,9 @@ func _bar(parent: Node, pos: Vector2, sz: Vector2, fill: Color) -> ProgressBar:
 ## Nạp 3 trạng thái tim (đầy/nửa/rỗng) từ asset 0x72 — dùng chung 1 lần cho mọi icon.
 func _load_heart_tex() -> void:
 	for state in ["full", "half", "empty"]:
-		var img := Image.new()
-		if img.load("res://assets/dungeon/ui_heart_%s.png" % state) == OK:
-			heart_tex[state] = ImageTexture.create_from_image(img)
+		var tex := Global.load_tex("res://assets/dungeon/ui_heart_%s.png" % state)
+		if tex:
+			heart_tex[state] = tex
 
 
 ## Mỗi tim đại diện 1/10 máu tối đa — luôn hiện đúng 10 tim bất kể HP gốc bao nhiêu

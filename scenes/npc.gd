@@ -1,5 +1,14 @@
 extends Area2D
 
+## Thân người thương gia dùng sprite "elf_f" (nữ yêu tinh) từ bộ asset 0x72 -
+## bộ chưa được dùng cho nhân vật nào khác, giữ phong cách đồng bộ pixel art.
+const SPRITE_PREFIX: String = "elf_f"
+const SPRITE_SCALE: float = 2.0
+const SPRITE_OFFSET_Y: float = -11.0
+static var _frames_cache: SpriteFrames
+
+@onready var sprite: AnimatedSprite2D = $Sprite2D
+
 var player_in_range: bool = false
 var shop_ui: CanvasLayer
 
@@ -17,22 +26,48 @@ var win_id: String = ""
 var win_rarity: String = ""
 
 func _ready() -> void:
+	_setup_sprite()
+
 	# Bắt sự kiện người chơi bước vào/ra khỏi vòng tròn (Dùng to_lower để không phân biệt hoa thường)
 	body_entered.connect(_on_body_entered)
 	body_exited.connect(_on_body_exited)
-	
+
 	# Tạo dòng chữ nhắc nhở
 	interact_label = Label.new()
-	interact_label.text = "[ENTER] Mở Cửa Hàng"
+	interact_label.text = "[ENTER] Open Shop"
 	interact_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	interact_label.position = Vector2(-75, -60)
-	interact_label.add_theme_font_size_override("font_size", 18)
+	_apply_font(interact_label, 14)
 	interact_label.add_theme_color_override("font_outline_color", Color.BLACK)
 	interact_label.add_theme_constant_override("outline_size", 4)
 	interact_label.hide()
 	add_child(interact_label)
-	
+
 	_build_shop_ui()
+
+
+## Nạp sprite idle "elf_f" (dùng chung cache tĩnh vì chỉ có 1 NPC thương gia,
+## nhưng theo cùng pattern cache per-kind đã áp dụng cho enemy/pickup).
+func _setup_sprite() -> void:
+	if _frames_cache == null:
+		_frames_cache = SpriteFrames.new()
+		_frames_cache.add_animation("idle")
+		_frames_cache.set_animation_speed("idle", 6.0)
+		_frames_cache.set_animation_loop("idle", true)
+		for i in 4:
+			var path: String = "res://assets/dungeon/%s_idle_anim_f%d.png" % [SPRITE_PREFIX, i]
+			var tex := Global.load_tex(path)
+			if tex:
+				_frames_cache.add_frame("idle", tex)
+	sprite.sprite_frames = _frames_cache
+	sprite.scale = Vector2(SPRITE_SCALE, SPRITE_SCALE)
+	sprite.offset = Vector2(0.0, SPRITE_OFFSET_Y)
+	sprite.play("idle")
+
+
+func _apply_font(ctrl: Control, size: int) -> void:
+	ctrl.add_theme_font_override("font", Global.pixel_font())
+	ctrl.add_theme_font_size_override("font_size", size)
 
 
 # ==========================================
@@ -110,7 +145,7 @@ func _create_btn(text_val: String, action: Callable, min_size: Vector2, custom_c
 	var btn = Button.new()
 	btn.text = text_val
 	btn.custom_minimum_size = min_size
-	btn.add_theme_font_size_override("font_size", 22)
+	_apply_font(btn, 14)
 	
 	var style_normal = StyleBoxFlat.new()
 	style_normal.bg_color = custom_color
@@ -155,11 +190,11 @@ func _create_item_panel(w_id: String, r_str: String) -> Control:
 	
 	var lbl = Label.new()
 	lbl.set_anchors_preset(Control.PRESET_FULL_RECT)
-	lbl.text = w_data["name"] + "\n\n(" + r_data["name"] + ")"
+	lbl.text = w_data["name"] + "\n\n" + r_data["name"]
 	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	lbl.add_theme_color_override("font_color", r_data["color"])
-	lbl.add_theme_font_size_override("font_size", 18)
+	_apply_font(lbl, 13)
 	lbl.autowrap_mode = TextServer.AUTOWRAP_WORD
 	panel.add_child(lbl)
 	
@@ -199,27 +234,27 @@ func _refresh_shop() -> void:
 	for c in main_container.get_children(): c.queue_free()
 		
 	title = Label.new()
-	title.text = "THƯƠNG GIA GACHA\n(Đang có: %d Xu)" % Global.coins
+	title.text = "GACHA MERCHANT\nGold: %d" % Global.coins
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override("font_size", 45)
+	_apply_font(title, 24)
 	title.add_theme_color_override("font_color", Color(1.0, 0.8, 0.2))
 	main_container.add_child(title)
-	
+
 	var sep = Control.new()
 	sep.custom_minimum_size = Vector2(0, 15)
 	main_container.add_child(sep)
-	
-	main_container.add_child(_create_btn("Gacha Tiêu Chuẩn (25 Xu)\n(50% Trắng, 30% Xanh, 15% Tím, 5% Vàng)", func(): _roll_gacha(25, false), Vector2(650, 85), Color(0.2, 0.4, 0.6)))
-	main_container.add_child(_create_btn("Gacha Cao Cấp (50 Xu)\n(Loại bỏ Trắng. 60% Xanh, 30% Tím, 10% Vàng)", func(): _roll_gacha(50, true), Vector2(650, 85), Color(0.6, 0.3, 0.6)))
-	main_container.add_child(_create_btn("Bình Hồi Huyết (15 Xu)\n(Hồi ngay lập tức 50% Max HP)", _buy_heal, Vector2(650, 85), Color(0.2, 0.6, 0.3)))
-	main_container.add_child(_create_btn("Rời Khỏi (Hoặc nhấn ESC)", _close_shop, Vector2(650, 60), Color(0.5, 0.2, 0.2)))
+
+	main_container.add_child(_create_btn("Standard Gacha - 25 Gold\n50% Common / 30% Rare / 15% Epic / 5% Legendary", func(): _roll_gacha(25, false), Vector2(650, 85), Color(0.2, 0.4, 0.6)))
+	main_container.add_child(_create_btn("Premium Gacha - 50 Gold\nNo Common. 60% Rare / 30% Epic / 10% Legendary", func(): _roll_gacha(50, true), Vector2(650, 85), Color(0.6, 0.3, 0.6)))
+	main_container.add_child(_create_btn("Health Potion - 15 Gold\nInstantly restores 50% Max HP", _buy_heal, Vector2(650, 85), Color(0.2, 0.6, 0.3)))
+	main_container.add_child(_create_btn("Leave Shop", _close_shop, Vector2(650, 60), Color(0.5, 0.2, 0.2)))
 
 # ==========================================
 # THUẬT TOÁN GACHA & VÒNG QUAY CS:GO
 # ==========================================
 func _roll_gacha(cost: int, is_premium: bool) -> void:
 	if Global.coins < cost:
-		title.text = "Không đủ Xu! Hãy cày thêm!"
+		title.text = "Not enough gold! Keep grinding!"
 		_refresh_ui_delayed()
 		return
 		
@@ -288,9 +323,9 @@ func _on_spin_finished() -> void:
 	for c in confirm_box.get_children(): c.queue_free()
 		
 	var lbl = Label.new()
-	lbl.text = "KẾT QUẢ GACHA!"
+	lbl.text = "GACHA RESULT!"
 	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	lbl.add_theme_font_size_override("font_size", 35)
+	_apply_font(lbl, 20)
 	confirm_box.add_child(lbl)
 	
 	var hbox = HBoxContainer.new()
@@ -307,8 +342,9 @@ func _on_spin_finished() -> void:
 		
 	var v_old = VBoxContainer.new()
 	var l_old = Label.new()
-	l_old.text = "ĐANG TRANG BỊ"
+	l_old.text = "CURRENTLY EQUIPPED"
 	l_old.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_apply_font(l_old, 12)
 	v_old.add_child(l_old)
 	v_old.add_child(_create_item_panel(cur_id, cur_r))
 	hbox.add_child(v_old)
@@ -323,8 +359,9 @@ func _on_spin_finished() -> void:
 	# 3. Thông số súng Mới
 	var v_new = VBoxContainer.new()
 	var l_new = Label.new()
-	l_new.text = "VỪA QUAY TRÚNG"
+	l_new.text = "NEWLY WON"
 	l_new.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_apply_font(l_new, 12)
 	l_new.add_theme_color_override("font_color", Color(1.0, 0.8, 0.2))
 	v_new.add_child(l_new)
 	v_new.add_child(_create_item_panel(win_id, win_rarity))
@@ -336,8 +373,8 @@ func _on_spin_finished() -> void:
 	btn_box.add_theme_constant_override("separation", 40)
 	confirm_box.add_child(btn_box)
 	
-	btn_box.add_child(_create_btn("TRANG BỊ MỚI", _equip_new, Vector2(250, 60), Color(0.2, 0.6, 0.3)))
-	btn_box.add_child(_create_btn("BỎ QUA (Giữ cũ)", _discard_new, Vector2(250, 60), Color(0.7, 0.2, 0.2)))
+	btn_box.add_child(_create_btn("EQUIP NEW", _equip_new, Vector2(250, 60), Color(0.2, 0.6, 0.3)))
+	btn_box.add_child(_create_btn("KEEP CURRENT", _discard_new, Vector2(250, 60), Color(0.7, 0.2, 0.2)))
 
 
 func _equip_new() -> void:
@@ -359,18 +396,18 @@ func _reset_to_shop() -> void:
 # ==========================================
 func _buy_heal() -> void:
 	if Global.coins < 15:
-		title.text = "Không đủ Xu!"
+		title.text = "Not enough gold!"
 		_refresh_ui_delayed()
 		return
 	if is_instance_valid(Global.player):
 		if Global.player.hp >= Global.player.max_hp:
-			title.text = "Máu bạn đang đầy, không cần mua!"
+			title.text = "Your HP is already full!"
 			_refresh_ui_delayed()
 			return
 		Global.coins -= 15
 		var heal_amount = int(float(Global.player.max_hp) * 0.5)
-		Global.player.heal(heal_amount) 
-		title.text = "Đã uống Bình Hồi Huyết! Hồi %d HP!" % heal_amount
+		Global.player.heal(heal_amount)
+		title.text = "Potion used! Restored %d HP!" % heal_amount
 		_refresh_ui_delayed()
 
 func _refresh_ui_delayed() -> void:

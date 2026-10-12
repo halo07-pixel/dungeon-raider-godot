@@ -19,26 +19,26 @@ const L_PBULLET: int = 8
 const L_EBULLET: int = 16
 const L_PICKUP: int = 32
 var rarities: Dictionary = {
-	"common": {"name": "Thường", "mult": 1.0, "lifesteal": 0.0, "color": Color(0.8, 0.8, 0.8), "weight": 50},
-	"rare": {"name": "Hiếm", "mult": 1.25, "lifesteal": 0.02, "color": Color(0.2, 0.8, 0.3), "weight": 30},
-	"epic": {"name": "Sử Thi", "mult": 1.5, "lifesteal": 0.05, "color": Color(0.6, 0.2, 0.8), "weight": 15},
-	"legendary": {"name": "Huyền Thoại", "mult": 2.0, "lifesteal": 0.10, "color": Color(1.0, 0.8, 0.1), "weight": 5}
+	"common": {"name": "Common", "mult": 1.0, "lifesteal": 0.0, "color": Color(0.8, 0.8, 0.8), "weight": 50},
+	"rare": {"name": "Rare", "mult": 1.25, "lifesteal": 0.02, "color": Color(0.2, 0.8, 0.3), "weight": 30},
+	"epic": {"name": "Epic", "mult": 1.5, "lifesteal": 0.05, "color": Color(0.6, 0.2, 0.8), "weight": 15},
+	"legendary": {"name": "Legendary", "mult": 2.0, "lifesteal": 0.10, "color": Color(1.0, 0.8, 0.1), "weight": 5}
 }
 
 var weapons: Dictionary = {
-	"pistol": {"name": "Súng Lục", "damage": 10, "cooldown": 0.30, "speed": 640.0, "pellets": 1, "spread": 3.0, "pierce": false, "life": 1.1, "recoil": 45.0, "radius": 5.0, "color": Color(1.0, 0.9, 0.4), "sfx": "shoot", "is_melee": false},
-	"smg": {"name": "Tiểu Liên", "damage": 5, "cooldown": 0.085, "speed": 700.0, "pellets": 1, "spread": 9.0, "pierce": false, "life": 1.0, "recoil": 18.0, "radius": 4.0, "color": Color(1.0, 0.65, 0.25), "sfx": "shoot", "is_melee": false},
-	"shotgun": {"name": "Súng Săn", "damage": 7, "cooldown": 0.75, "speed": 560.0, "pellets": 6, "spread": 36.0, "pierce": false, "life": 0.45, "recoil": 150.0, "radius": 4.0, "color": Color(1.0, 0.5, 0.3), "sfx": "shotgun", "is_melee": false},
-	"laser": {"name": "Súng Laser", "damage": 14, "cooldown": 0.50, "speed": 1100.0, "pellets": 1, "spread": 0.0, "pierce": true, "life": 0.9, "recoil": 60.0, "radius": 4.0, "color": Color(0.4, 1.0, 1.0), "sfx": "laser", "is_melee": false},
-	
-	"broadsword": {"name": "Kiếm Dài", "damage": 25, "cooldown": 0.45, "is_melee": true, "range": 55.0, "cleave_angle": 180.0, "knock": 280.0, "color": Color(0.9, 0.9, 0.9), "sfx": "dodge"},
-	"daggers": {"name": "Dao Găm", "damage": 17, "cooldown": 0.22, "is_melee": true, "range": 40.0, "cleave_angle": 80.0, "knock": 120.0, "color": Color(0.6, 0.9, 0.6), "sfx": "dodge"},
-	"hammer": {"name": "Búa Chiến", "damage": 40, "cooldown": 0.90, "is_melee": true, "range": 65.0, "cleave_angle": 160.0, "knock": 550.0, "color": Color(1.0, 0.5, 0.2), "sfx": "slam"}
+	"pistol": {"name": "Pistol", "damage": 10, "cooldown": 0.30, "speed": 640.0, "pellets": 1, "spread": 3.0, "pierce": false, "life": 1.1, "recoil": 45.0, "radius": 5.0, "color": Color(1.0, 0.9, 0.4), "sfx": "shoot", "is_melee": false},
+	"smg": {"name": "SMG", "damage": 5, "cooldown": 0.085, "speed": 700.0, "pellets": 1, "spread": 9.0, "pierce": false, "life": 1.0, "recoil": 18.0, "radius": 4.0, "color": Color(1.0, 0.65, 0.25), "sfx": "shoot", "is_melee": false},
+	"shotgun": {"name": "Shotgun", "damage": 7, "cooldown": 0.75, "speed": 560.0, "pellets": 6, "spread": 36.0, "pierce": false, "life": 0.45, "recoil": 150.0, "radius": 4.0, "color": Color(1.0, 0.5, 0.3), "sfx": "shotgun", "is_melee": false},
+	"laser": {"name": "Laser Gun", "damage": 14, "cooldown": 0.50, "speed": 1100.0, "pellets": 1, "spread": 0.0, "pierce": true, "life": 0.9, "recoil": 60.0, "radius": 4.0, "color": Color(0.4, 1.0, 1.0), "sfx": "laser", "is_melee": false},
+
+	"broadsword": {"name": "Longsword", "damage": 25, "cooldown": 0.45, "is_melee": true, "range": 55.0, "cleave_angle": 180.0, "knock": 280.0, "color": Color(0.9, 0.9, 0.9), "sfx": "dodge"},
+	"daggers": {"name": "Daggers", "damage": 17, "cooldown": 0.22, "is_melee": true, "range": 40.0, "cleave_angle": 80.0, "knock": 120.0, "color": Color(0.6, 0.9, 0.6), "sfx": "dodge"},
+	"hammer": {"name": "War Hammer", "damage": 40, "cooldown": 0.90, "is_melee": true, "range": 65.0, "cleave_angle": 160.0, "knock": 550.0, "color": Color(1.0, 0.5, 0.2), "sfx": "slam"}
 }
 
 var classes: Dictionary = {
-	"ranger": {"name": "Xạ Thủ", "max_hp": 100, "default_weapon": "pistol"},
-	"brawler": {"name": "Đấu Sĩ", "max_hp": 200, "default_weapon": "broadsword"}
+	"ranger": {"name": "Ranger", "max_hp": 100, "default_weapon": "pistol"},
+	"brawler": {"name": "Brawler", "max_hp": 200, "default_weapon": "broadsword"}
 }
 var current_class: String = "brawler"
 
@@ -46,6 +46,18 @@ var enemies: Dictionary = {
 	"slime": {"hp": 30, "speed": 95.0, "touch": 10, "touch_cd": 0.8, "touch_knock": 260.0, "radius": 13.0, "coins": 1, "weight": 1.0, "color": Color(0.35, 0.85, 0.35)},
 	"archer": {"hp": 22, "speed": 85.0, "touch": 0, "touch_cd": 1.0, "touch_knock": 200.0, "radius": 12.0, "coins": 2, "weight": 1.0, "color": Color(0.4, 0.6, 1.0), "shoot_cd": 1.5, "bullet_damage": 8, "bullet_speed": 280.0, "keep_away": 170.0, "range": 380.0},
 	"brute": {"hp": 120, "speed": 62.0, "touch": 20, "touch_cd": 1.0, "touch_knock": 430.0, "radius": 20.0, "coins": 3, "weight": 2.5, "color": Color(0.8, 0.35, 0.25)},
+
+	# --- BIOME 2 (Đầm Lầy) — bộ quái RIÊNG, không lặp với biome khác. Chủ đề Độc & Tiêu Hao:
+	# phối hợp giữ chân (Masked Orc) + dồn độc (Shaman tầm xa + Chort cận chiến) ---
+	"shaman": {"hp": 20, "speed": 80.0, "touch": 0, "touch_cd": 1.0, "touch_knock": 180.0, "radius": 12.0, "coins": 2, "weight": 1.0, "color": Color(0.55, 0.85, 0.35), "shoot_cd": 1.8, "bullet_damage": 4, "bullet_speed": 260.0, "keep_away": 170.0, "range": 380.0, "bullet_effect": "poison"},
+	"chort": {"hp": 18, "speed": 128.0, "touch": 6, "touch_cd": 0.5, "touch_knock": 150.0, "radius": 11.0, "coins": 2, "weight": 0.9, "color": Color(0.85, 0.25, 0.2)},
+	"masked_orc": {"hp": 140, "speed": 58.0, "touch": 16, "touch_cd": 1.1, "touch_knock": 350.0, "radius": 20.0, "coins": 3, "weight": 2.6, "color": Color(0.5, 0.65, 0.4)},
+
+	# --- BIOME 3 (Băng Giá) — bộ quái RIÊNG. Chủ đề Mất Kiểm Soát: không có vai tầm xa
+	# (hết quái CC0 phù hợp) nhưng bù lại dày CC — slide + slow — khớp với Ô Băng ---
+	"frost_zombie": {"hp": 35, "speed": 90.0, "touch": 8, "touch_cd": 0.9, "touch_knock": 220.0, "radius": 13.0, "coins": 2, "weight": 1.0, "color": Color(0.55, 0.8, 0.95)},
+	"frost_big_zombie": {"hp": 150, "speed": 50.0, "touch": 22, "touch_cd": 1.2, "touch_knock": 400.0, "radius": 21.0, "coins": 3, "weight": 2.8, "color": Color(0.6, 0.85, 1.0), "slam_cd": 2.2, "slam_radius": 70.0},
+	"frost_tiny": {"hp": 12, "speed": 150.0, "touch": 14, "touch_cd": 999.0, "touch_knock": 260.0, "radius": 9.0, "coins": 1, "weight": 0.6, "color": Color(0.75, 0.92, 1.0)},
 }
 # ==============================================================================
 
@@ -55,9 +67,54 @@ var player = null
 var camera = null
 var world: Node2D = null
 
+## Hệ số khó THÊM áp dụng cho tầng > 10 (Chế Độ Vô Hạn, sau khi hạ Dungeon Lord tầng 10):
+## nhân thêm vào công thức scale máu/giáp vốn có của boss.gd/enemy.gd, khiến độ khó tăng
+## NHANH HƠN hẳn so với tốc độ tăng đều 1-10 — đúng như phần thưởng/thử thách của Vô Hạn.
+const ENDLESS_START_FLOOR: int = 10
+const ENDLESS_RATE: float = 0.12
+
+func endless_difficulty_mult(for_floor_num: int) -> float:
+	if for_floor_num <= ENDLESS_START_FLOOR:
+		return 1.0
+	return 1.0 + ENDLESS_RATE * float(for_floor_num - ENDLESS_START_FLOOR)
+
 var _sfx: Dictionary = {}
 var _dot_tex: ImageTexture
 var _hitstop_active: bool = false
+
+## Cache dùng chung cho toàn bộ ảnh nạp từ res://assets — nhiều script (enemy,
+## player, boss, pickup, dungeon, menu...) từng tự viết lại 3 dòng Image.load() +
+## ImageTexture.create_from_image() giống hệt nhau, vừa trùng lặp code vừa tốn
+## I/O đĩa + cấp phát lại mỗi lần gọi. Gom về 1 chỗ, load 1 lần/path rồi tái sử dụng.
+var _tex_cache: Dictionary = {}
+
+func load_tex(path: String) -> ImageTexture:
+	if _tex_cache.has(path):
+		return _tex_cache[path]
+	var img := Image.new()
+	var tex: ImageTexture = null
+	if img.load(path) == OK:
+		tex = ImageTexture.create_from_image(img)
+	else:
+		push_error("Không tải được ảnh: " + path)
+	_tex_cache[path] = tex
+	return tex
+
+## Pixel font "Press Start 2P" dùng chung cho Main Menu + cửa hàng Gacha — nạp 1
+## lần từ byte (giống cách nạp ảnh ở trên) để không phụ thuộc file .import khi
+## chạy headless, rồi tái sử dụng thay vì mỗi màn hình tự đọc file riêng.
+const PIXEL_FONT_PATH: String = "res://assets/fonts/PressStart2P-Regular.ttf"
+var _pixel_font: FontFile
+
+func pixel_font() -> FontFile:
+	if _pixel_font == null:
+		_pixel_font = FontFile.new()
+		var bytes := FileAccess.get_file_as_bytes(PIXEL_FONT_PATH)
+		if bytes.is_empty():
+			push_error("Không tải được pixel font: " + PIXEL_FONT_PATH)
+		else:
+			_pixel_font.data = bytes
+	return _pixel_font
 
 
 func _ready() -> void:
