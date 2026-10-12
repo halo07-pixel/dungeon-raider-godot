@@ -19,6 +19,11 @@ shape = SubResource("CapsuleShape2D_pl")
 texture_filter = 1
 centered = true
 
+[node name="WeaponSprite" type="Sprite2D" parent="." unique_id=1700000002]
+texture_filter = 1
+centered = true
+scale = Vector2(1.6, 1.6)
+
 [node name="Camera" type="Camera2D" parent="." unique_id=911960645]
 zoom = Vector2(1.25, 1.25)
 position_smoothing_enabled = true
