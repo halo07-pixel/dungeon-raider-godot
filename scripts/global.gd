@@ -11,6 +11,76 @@ signal boss_defeated
 
 const TILE: int = 32
 
+# ---------------------------------------------------------------- Cài đặt (âm lượng / điều khiển / màn hình)
+const BUS_SFX: String = "SFX"
+## Các action cho phép đổi phím trong menu Settings (không gồm "shoot" - đang gắn
+## cứng chuột trái, và "confirm"/"restart" - phím hệ thống, không cần đổi).
+const REBINDABLE_ACTIONS: Array = ["move_up", "move_down", "move_left", "move_right", "dodge"]
+var settings: Dictionary = {
+	"master_volume": 1.0,
+	"sfx_volume": 1.0,
+	"fullscreen": false,
+}
+
+## Tạo bus "SFX" tách khỏi Master nếu chưa có (project không có AudioBusLayout.tres
+## sẵn nên dựng bằng code, đồng bộ cách UI toàn dự án đang được dựng runtime).
+func _setup_audio_buses() -> void:
+	if AudioServer.get_bus_index(BUS_SFX) == -1:
+		var idx: int = AudioServer.bus_count
+		AudioServer.add_bus(idx)
+		AudioServer.set_bus_name(idx, BUS_SFX)
+		AudioServer.set_bus_send(idx, "Master")
+
+func _apply_settings() -> void:
+	set_master_volume(float(settings.get("master_volume", 1.0)), false)
+	set_sfx_volume(float(settings.get("sfx_volume", 1.0)), false)
+	set_fullscreen(bool(settings.get("fullscreen", false)), false)
+
+func set_master_volume(v: float, p_save: bool = true) -> void:
+	v = clampf(v, 0.0, 1.0)
+	settings["master_volume"] = v
+	AudioServer.set_bus_volume_db(AudioServer.get_bus_index("Master"), linear_to_db(maxf(v, 0.0001)) if v > 0.0 else -80.0)
+	if p_save: save_game()
+
+func set_sfx_volume(v: float, p_save: bool = true) -> void:
+	v = clampf(v, 0.0, 1.0)
+	settings["sfx_volume"] = v
+	AudioServer.set_bus_volume_db(AudioServer.get_bus_index(BUS_SFX), linear_to_db(maxf(v, 0.0001)) if v > 0.0 else -80.0)
+	if p_save: save_game()
+
+func set_fullscreen(on: bool, p_save: bool = true) -> void:
+	settings["fullscreen"] = on
+	DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN if on else DisplayServer.WINDOW_MODE_WINDOWED)
+	if p_save: save_game()
+
+## Trả về tên phím hiện tại của 1 action (để Settings UI hiển thị), "..." nếu chưa gán.
+func key_name_for_action(action: String) -> String:
+	for ev in InputMap.action_get_events(action):
+		if ev is InputEventKey:
+			return OS.get_keycode_string(ev.physical_keycode)
+	return "..."
+
+## Đổi phím cho 1 action: xoá hết phím cũ, gán phím mới duy nhất.
+func rebind_action(action: String, keycode: Key) -> void:
+	if not InputMap.has_action(action):
+		return
+	InputMap.action_erase_events(action)
+	var ev := InputEventKey.new()
+	ev.physical_keycode = keycode
+	InputMap.action_add_event(action, ev)
+	settings["key_" + action] = int(keycode)
+	save_game()
+
+## Áp lại phím đã lưu (gọi sau _setup_input() để ghi đè phím mặc định).
+func _apply_saved_keybinds() -> void:
+	for action in REBINDABLE_ACTIONS:
+		var key_key: String = "key_" + action
+		if settings.has(key_key):
+			InputMap.action_erase_events(action)
+			var ev := InputEventKey.new()
+			ev.physical_keycode = int(settings[key_key]) as Key
+			InputMap.action_add_event(action, ev)
+
 # Bit collision layer (khớp [layer_names] trong project.godot)
 const L_WORLD: int = 1
 const L_PLAYER: int = 2
@@ -118,10 +188,13 @@ func pixel_font() -> FontFile:
 
 
 func _ready() -> void:
+	_setup_audio_buses()
 	load_game()
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	randomize()
 	_setup_input()
+	_apply_saved_keybinds()
+	_apply_settings()
 	var img := Image.create_empty(4, 4, false, Image.FORMAT_RGBA8)
 	img.fill(Color.WHITE)
 	_dot_tex = ImageTexture.create_from_image(img)
@@ -215,6 +288,7 @@ func sfx(sfx_name: String) -> void:
 	var p := AudioStreamPlayer.new()
 	p.stream = _sfx[sfx_name]
 	p.volume_db = -6.0
+	p.bus = BUS_SFX
 	add_child(p)
 	p.finished.connect(p.queue_free)
 	p.play()
@@ -308,7 +382,8 @@ func save_game() -> void:
 		var data = {
 			"purple_gems": purple_gems,
 			"upgrades": upgrades,
-			"saved_run": saved_run # Lưu thêm ván đang chơi
+			"saved_run": saved_run, # Lưu thêm ván đang chơi
+			"settings": settings
 		}
 		file.store_var(data)
 		file.close()
@@ -324,6 +399,9 @@ func load_game() -> void:
 				var loaded_upgrades = data.get("upgrades", {})
 				for k in loaded_upgrades.keys():
 					if upgrades.has(k): upgrades[k] = loaded_upgrades[k]
+				var loaded_settings = data.get("settings", {})
+				for k in loaded_settings.keys():
+					settings[k] = loaded_settings[k]
 			file.close()
 	else:
 		save_game()
