@@ -500,6 +500,8 @@ func _spawn_boss(cell: Vector2i) -> void:
 	b.summon_requested.connect(_on_summon.bind(cell))
 	entities.add_child(b)
 	b.global_position = room_center(cell)
+	if b.has_method("set_arena_bounds"):
+		b.set_arena_bounds(_room_rect(cell, 3))
 	if b.has_method("activate_boss"):
 		b.activate_boss()
 	boss_alive = true

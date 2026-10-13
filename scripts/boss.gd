@@ -71,6 +71,16 @@ var cc_resist: float = 0.0
 var is_boss: bool = true
 var blink_cd: float = 0.0 # riêng Necromancer: hồi chiêu dịch chuyển né cận chiến
 
+## Ranh giới phòng Boss (world space), do dungeon.gd truyền vào lúc spawn qua
+## set_arena_bounds(). Rect2() rỗng (mặc định) = KHÔNG giới hạn — để các code path cũ
+## (spawn test/debug không gọi set_arena_bounds) không bị ảnh hưởng. Chỉ dùng để chặn
+## _necro_blink() dịch chuyển xuyên tường ra ngoài bản đồ (BUG: global_position += ...
+## gán thẳng toạ độ, bỏ qua va chạm vật lý mà move_and_slide() vẫn tự chặn được).
+var arena_rect: Rect2 = Rect2()
+
+func set_arena_bounds(rect: Rect2) -> void:
+	arena_rect = rect
+
 @onready var hitbox: Area2D = $Hitbox
 @onready var slam_area: Area2D = $SlamArea
 @onready var attack_timer: Timer = $AttackTimer
@@ -409,6 +419,10 @@ func _necro_blink() -> void:
 	if away_dir == Vector2.ZERO:
 		away_dir = Vector2.RIGHT
 	global_position += away_dir * 260.0
+	if arena_rect.size != Vector2.ZERO:
+		# Trừ hao BODY_RADIUS để cả thân boss (không chỉ điểm gốc) ở lại trong phòng.
+		var safe_rect: Rect2 = arena_rect.grow(-BODY_RADIUS)
+		global_position = global_position.clamp(safe_rect.position, safe_rect.end)
 	Global.sfx("dodge")
 	Global.burst(global_position, Color(0.6, 0.2, 0.9), 20, 200.0, 1.5)
 
