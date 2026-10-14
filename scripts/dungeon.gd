@@ -563,6 +563,9 @@ func _room_cleared(cell: Vector2i) -> void:
 		Global.message.emit("Room cleared!", Color(0.6, 1.0, 0.6))
 		if randf() < 0.35:
 			_spawn_pickup("heal", "", room_center(cell))
+	# _room_cleared() chỉ được gọi cho phòng "normal"/"boss" (treasure/start tự set cleared=true
+	# thẳng ở nơi khác, không qua đây) — mời chọn buff Pick-1-of-3 sau khi dọn xong.
+	Global.request_buff_choice()
 
 
 ## Rương trang trí (tĩnh, không va chạm) đặt dưới vũ khí trong phòng Kho báu — chỉ để đẹp,

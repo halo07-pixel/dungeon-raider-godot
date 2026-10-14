@@ -34,6 +34,27 @@ var bleed_timer: float = 0.0
 const BLEED_TICK_INTERVAL: float = 0.5
 const BLEED_TICK_DAMAGE: int = 5
 
+## Buff "Phá Giáp" (Sử Thi) của Player: mỗi đòn trúng cộng 1 stack, mỗi stack tăng %
+## sát thương quái NÀY phải nhận, hết hạn nếu ngừng bị đánh trúng quá SUNDER_DURATION giây.
+var sunder_stacks: int = 0
+var sunder_timer: float = 0.0
+const SUNDER_PER_STACK: float = 0.08
+const SUNDER_MAX_STACKS: int = 5
+const SUNDER_DURATION: float = 3.0
+
+func apply_sunder() -> void:
+	if not alive:
+		return
+	sunder_stacks = mini(sunder_stacks + 1, SUNDER_MAX_STACKS)
+	sunder_timer = SUNDER_DURATION
+
+func tick_sunder(delta: float) -> void:
+	if sunder_stacks <= 0:
+		return
+	sunder_timer -= delta
+	if sunder_timer <= 0.0:
+		sunder_stacks = 0
+
 ## _owner2d: tham chiếu tới Node2D cha (Enemy) để lấy global_position khi tính hướng
 ## knockback — đây là component con đọc vị trí của node sở hữu trực tiếp nó, không phải
 ## kiểu get_parent().get_parent() xuyên cấp bị cấm.
@@ -60,6 +81,8 @@ func take_hit(amount: int, from_pos: Vector2 = Vector2.ZERO, knock: float = 200.
 	var actual_damage: int = amount
 	if not true_dmg:
 		actual_damage = maxi(1, amount - int(armor))
+	if sunder_stacks > 0:
+		actual_damage = int(float(actual_damage) * (1.0 + SUNDER_PER_STACK * float(sunder_stacks)))
 	hp = maxf(hp - float(actual_damage), 0.0)
 	var actual_knock: float = knock * (1.0 - cc_resist)
 	var knockback_vec: Vector2 = (_owner2d.global_position - from_pos).normalized() * actual_knock / weight

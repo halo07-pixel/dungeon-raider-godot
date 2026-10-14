@@ -4,6 +4,8 @@ extends Node2D
 @onready var dungeon: Node2D = $Dungeon
 @onready var player: CharacterBody2D = $Player
 const NPC_SCENE = preload("res://scenes/npc.tscn")
+const SETTINGS_MENU_SCENE = preload("res://scenes/settings_menu.tscn")
+const BUFF_PICKER_SCENE = preload("res://scenes/buff_picker.tscn")
 var current_npc: Node2D = null
 
 var _changing: bool = false
@@ -45,6 +47,8 @@ func _ready() -> void:
 		
 	Global.message.emit(_floor_label(Global.floor_num), Color(1.0, 0.85, 0.2) if Global.floor_num > 10 else Color.WHITE)
 	_spawn_npc_if_needed()
+
+	add_child(BUFF_PICKER_SCENE.instantiate())
 
 	# 3. KHỞI TẠO UI TẠM DỪNG
 	pause_layer = CanvasLayer.new()
@@ -161,7 +165,17 @@ func _build_pause_menu() -> void:
 		get_tree().paused = false
 		pause_layer.hide()
 	)
+	_add_btn("Settings", _open_settings_from_pause)
 	_add_btn("Save & Return to Menu", _save_and_quit)
+
+func _open_settings_from_pause() -> void:
+	pause_layer.hide()
+	var menu = SETTINGS_MENU_SCENE.instantiate()
+	add_child(menu)
+	menu.closed.connect(func():
+		menu.queue_free()
+		pause_layer.show()
+	)
 
 func _add_btn(text: String, action: Callable) -> void:
 	var btn = Button.new()

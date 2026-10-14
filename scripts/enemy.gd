@@ -236,6 +236,10 @@ func take_damage(amount: int, from_pos: Vector2 = Vector2.ZERO, knock: float = 2
 func apply_status(type: String, duration: float) -> void:
 	hurtbox.apply_status(type, duration)
 
+## Buff "Phá Giáp" (Sử Thi) — forward sang Hurtbox, cùng kiểu duck-typing với take_damage()/apply_status().
+func apply_sunder() -> void:
+	hurtbox.apply_sunder()
+
 ## Phản ứng VFX/âm thanh khi $Hurtbox báo đã nhận đòn — vật lý (cộng dồn knockback)
 ## vẫn là field "knockback" được _physics_process() của CHÍNH enemy tiêu thụ mỗi frame,
 ## Hurtbox chỉ tính toán vector rồi trả lên qua signal, không tự ý set velocity.
@@ -254,6 +258,7 @@ func _physics_process(delta: float) -> void:
 	_t += delta
 
 	hurtbox.tick_bleed(delta)
+	hurtbox.tick_sunder(delta)
 
 	if hurtbox.consume_stun(delta):
 		velocity = knockback
@@ -307,7 +312,21 @@ func _die() -> void:
 	far_zone.set_deferred("monitoring", false)
 	hide()
 	died.emit(self)
+	if Global.buff_stack("buff_deathnova") > 0:
+		_death_nova()
 	_drop_and_free.call_deferred()
+
+## Buff "Nổ Tử Thi" (Sử Thi): quái chết lan 1 lượng sát thương cố định cho quái khác
+## trong bán kính nhỏ quanh nó — dùng take_damage() có sẵn (true_dmg để bỏ qua giáp).
+func _death_nova() -> void:
+	const DEATH_NOVA_DMG: int = 30
+	const DEATH_NOVA_RADIUS: float = 90.0
+	Global.burst(global_position, Color(1.0, 0.5, 0.15), 14, 180.0, 2.0)
+	for e in get_tree().get_nodes_in_group("enemies"):
+		if e == self or not is_instance_valid(e):
+			continue
+		if e.has_method("take_damage") and e.alive and e.global_position.distance_to(global_position) < DEATH_NOVA_RADIUS:
+			e.take_damage(DEATH_NOVA_DMG, global_position, 80.0, true)
 
 func _drop_and_free() -> void:
 	var n: int = data["coins"]

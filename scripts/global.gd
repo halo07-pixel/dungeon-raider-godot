@@ -11,6 +11,76 @@ signal boss_defeated
 
 const TILE: int = 32
 
+# ---------------------------------------------------------------- Cài đặt (âm lượng / điều khiển / màn hình)
+const BUS_SFX: String = "SFX"
+## Các action cho phép đổi phím trong menu Settings (không gồm "shoot" - đang gắn
+## cứng chuột trái, và "confirm"/"restart" - phím hệ thống, không cần đổi).
+const REBINDABLE_ACTIONS: Array = ["move_up", "move_down", "move_left", "move_right", "dodge"]
+var settings: Dictionary = {
+	"master_volume": 1.0,
+	"sfx_volume": 1.0,
+	"fullscreen": false,
+}
+
+## Tạo bus "SFX" tách khỏi Master nếu chưa có (project không có AudioBusLayout.tres
+## sẵn nên dựng bằng code, đồng bộ cách UI toàn dự án đang được dựng runtime).
+func _setup_audio_buses() -> void:
+	if AudioServer.get_bus_index(BUS_SFX) == -1:
+		var idx: int = AudioServer.bus_count
+		AudioServer.add_bus(idx)
+		AudioServer.set_bus_name(idx, BUS_SFX)
+		AudioServer.set_bus_send(idx, "Master")
+
+func _apply_settings() -> void:
+	set_master_volume(float(settings.get("master_volume", 1.0)), false)
+	set_sfx_volume(float(settings.get("sfx_volume", 1.0)), false)
+	set_fullscreen(bool(settings.get("fullscreen", false)), false)
+
+func set_master_volume(v: float, p_save: bool = true) -> void:
+	v = clampf(v, 0.0, 1.0)
+	settings["master_volume"] = v
+	AudioServer.set_bus_volume_db(AudioServer.get_bus_index("Master"), linear_to_db(maxf(v, 0.0001)) if v > 0.0 else -80.0)
+	if p_save: save_game()
+
+func set_sfx_volume(v: float, p_save: bool = true) -> void:
+	v = clampf(v, 0.0, 1.0)
+	settings["sfx_volume"] = v
+	AudioServer.set_bus_volume_db(AudioServer.get_bus_index(BUS_SFX), linear_to_db(maxf(v, 0.0001)) if v > 0.0 else -80.0)
+	if p_save: save_game()
+
+func set_fullscreen(on: bool, p_save: bool = true) -> void:
+	settings["fullscreen"] = on
+	DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN if on else DisplayServer.WINDOW_MODE_WINDOWED)
+	if p_save: save_game()
+
+## Trả về tên phím hiện tại của 1 action (để Settings UI hiển thị), "..." nếu chưa gán.
+func key_name_for_action(action: String) -> String:
+	for ev in InputMap.action_get_events(action):
+		if ev is InputEventKey:
+			return OS.get_keycode_string(ev.physical_keycode)
+	return "..."
+
+## Đổi phím cho 1 action: xoá hết phím cũ, gán phím mới duy nhất.
+func rebind_action(action: String, keycode: Key) -> void:
+	if not InputMap.has_action(action):
+		return
+	InputMap.action_erase_events(action)
+	var ev := InputEventKey.new()
+	ev.physical_keycode = keycode
+	InputMap.action_add_event(action, ev)
+	settings["key_" + action] = int(keycode)
+	save_game()
+
+## Áp lại phím đã lưu (gọi sau _setup_input() để ghi đè phím mặc định).
+func _apply_saved_keybinds() -> void:
+	for action in REBINDABLE_ACTIONS:
+		var key_key: String = "key_" + action
+		if settings.has(key_key):
+			InputMap.action_erase_events(action)
+			var ev := InputEventKey.new()
+			ev.physical_keycode = int(settings[key_key]) as Key
+			InputMap.action_add_event(action, ev)
+
 # Bit collision layer (khớp [layer_names] trong project.godot)
 const L_WORLD: int = 1
 const L_PLAYER: int = 2
@@ -118,10 +188,13 @@ func pixel_font() -> FontFile:
 
 
 func _ready() -> void:
+	_setup_audio_buses()
 	load_game()
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	randomize()
 	_setup_input()
+	_apply_saved_keybinds()
+	_apply_settings()
 	var img := Image.create_empty(4, 4, false, Image.FORMAT_RGBA8)
 	img.fill(Color.WHITE)
 	_dot_tex = ImageTexture.create_from_image(img)
@@ -147,6 +220,99 @@ func reset_run() -> void:
 	coins = 0
 	Engine.time_scale = 1.0
 	_hitstop_active = false
+	reset_run_buffs()
+
+
+# ---------------------------------------------------------------- Hệ thống Buff (chọn 1/3 sau khi dọn phòng)
+signal buff_choice_requested(choices: Array)
+
+const BUFF_TIER_COLOR: Dictionary = {
+	"common": Color(0.85, 0.85, 0.85),
+	"rare": Color(0.3, 0.75, 1.0),
+	"epic": Color(0.75, 0.35, 0.95),
+}
+## Trần số lần stack cho từng buff — Thường/Hiếm stack nhiều lần (có trần chống phá cân
+## bằng), Sử Thi độc nhất (max 1), đổi hẳn lối chơi nên không cộng dồn.
+const BUFF_MAX_STACK: Dictionary = {
+	"buff_hp": 10, "buff_dmg": 5, "buff_haste": 5, "buff_armor": 5, "buff_speed": 5, "buff_reach": 5,
+	"buff_lifesteal": 5, "buff_crit": 5, "buff_bleed_proc": 3, "buff_slow_proc": 3, "buff_dodge_heal": 5,
+	"buff_deathnova": 1, "buff_momentum": 1, "buff_sunder": 1, "buff_berserk": 1, "buff_sweep": 1,
+}
+var buff_pool: Dictionary = {
+	"buff_hp": {"name": "Máu Dồi Dào", "desc": "+20 Max HP, hồi đầy phần tăng thêm.", "tier": "common"},
+	"buff_dmg": {"name": "Sức Mạnh", "desc": "+8% sát thương mọi nguồn.", "tier": "common"},
+	"buff_haste": {"name": "Nhanh Nhẹn", "desc": "-10% thời gian hồi chiêu vũ khí.", "tier": "common"},
+	"buff_armor": {"name": "Giáp Dày", "desc": "Giảm 6% sát thương nhận vào (có trần 50%).", "tier": "common"},
+	"buff_speed": {"name": "Săn Sóc", "desc": "+6% tốc độ di chuyển.", "tier": "common"},
+	"buff_reach": {"name": "Tầm Đánh", "desc": "Cận chiến: +15% phạm vi chém. Tầm xa: đạn bay xa & nhanh hơn.", "tier": "common"},
+	"buff_lifesteal": {"name": "Hút Máu", "desc": "Hồi 4% sát thương gây ra thành HP.", "tier": "rare"},
+	"buff_crit": {"name": "Chí Mạng", "desc": "+8% tỉ lệ chí mạng (x2 sát thương).", "tier": "rare"},
+	"buff_bleed_proc": {"name": "Lưỡi Rỉ Máu", "desc": "+15% cơ hội gây Chảy Máu khi đánh trúng.", "tier": "rare"},
+	"buff_slow_proc": {"name": "Đạn Băng", "desc": "+20% cơ hội gây Chậm khi đánh trúng.", "tier": "rare"},
+	"buff_dodge_heal": {"name": "Né Hồi Phục", "desc": "Né thành công hồi 3 HP.", "tier": "rare"},
+	"buff_deathnova": {"name": "Nổ Tử Thi", "desc": "Quái chết sẽ nổ, lan sát thương cho quái gần đó.", "tier": "epic"},
+	"buff_momentum": {"name": "Đà Chiến Đấu", "desc": "Tấn công liên tục tăng dần sát thương, tối đa +25%.", "tier": "epic"},
+	"buff_sunder": {"name": "Phá Giáp", "desc": "Đòn trúng cộng dồn khiến quái đó nhận thêm sát thương.", "tier": "epic"},
+	"buff_berserk": {"name": "Cuồng Nộ", "desc": "Máu càng thấp, sát thương gây ra càng cao (tối đa +40%).", "tier": "epic"},
+	"buff_sweep": {"name": "Vung Kiếm Càn Quét", "desc": "Cận chiến: +50% phạm vi, +40% góc chém. Tầm xa: đạn xuyên vĩnh viễn.", "tier": "epic"},
+}
+var run_buffs: Dictionary = {}
+
+func reset_run_buffs() -> void:
+	run_buffs.clear()
+
+func buff_stack(id: String) -> int:
+	return int(run_buffs.get(id, 0))
+
+func _buff_tier_weight(tier: String) -> float:
+	match tier:
+		"common": return 60.0
+		"rare": return 32.0
+		"epic": return 8.0
+	return 0.0
+
+## Random n lựa chọn buff (không trùng nhau trong 1 lượt, loại buff đã đạt trần stack),
+## random có trọng số theo tier (common > rare > epic).
+func roll_buff_choices(n: int = 3) -> Array:
+	var candidates: Array = []
+	for id in buff_pool:
+		if buff_stack(id) < int(BUFF_MAX_STACK.get(id, 1)):
+			candidates.append(id)
+	var choices: Array = []
+	for i in n:
+		if candidates.is_empty():
+			break
+		var total_w: float = 0.0
+		for id in candidates:
+			total_w += _buff_tier_weight(buff_pool[id]["tier"])
+		var roll: float = randf() * total_w
+		var picked: String = candidates[0]
+		for id in candidates:
+			roll -= _buff_tier_weight(buff_pool[id]["tier"])
+			if roll <= 0.0:
+				picked = id
+				break
+		choices.append(picked)
+		candidates.erase(picked)
+	return choices
+
+## Gọi khi dọn xong phòng (thường/boss) để yêu cầu UI hiện 3 lựa chọn Pick-1.
+func request_buff_choice() -> void:
+	var choices: Array = roll_buff_choices(3)
+	if not choices.is_empty():
+		buff_choice_requested.emit(choices)
+
+## Áp dụng buff đã chọn: +1 stack. Chỉ "buff_hp" cần xử lý NGAY (cộng thẳng max_hp/hp) —
+## mọi buff khác đọc Global.buff_stack(id) trực tiếp tại điểm hook (player.gd/bullet.gd/
+## enemy.gd/boss.gd) mỗi lần bắn/chém/nhận dmg, không cần cache lại giá trị ở đây.
+func apply_buff(id: String) -> void:
+	if not buff_pool.has(id):
+		return
+	run_buffs[id] = buff_stack(id) + 1
+	if id == "buff_hp" and is_instance_valid(player):
+		player.max_hp += 20
+		player.hp += 20
+	message.emit("Buff: " + buff_pool[id]["name"], BUFF_TIER_COLOR.get(buff_pool[id]["tier"], Color.WHITE))
 
 
 func add_coin() -> void:
@@ -215,6 +381,7 @@ func sfx(sfx_name: String) -> void:
 	var p := AudioStreamPlayer.new()
 	p.stream = _sfx[sfx_name]
 	p.volume_db = -6.0
+	p.bus = BUS_SFX
 	add_child(p)
 	p.finished.connect(p.queue_free)
 	p.play()
@@ -308,7 +475,8 @@ func save_game() -> void:
 		var data = {
 			"purple_gems": purple_gems,
 			"upgrades": upgrades,
-			"saved_run": saved_run # Lưu thêm ván đang chơi
+			"saved_run": saved_run, # Lưu thêm ván đang chơi
+			"settings": settings
 		}
 		file.store_var(data)
 		file.close()
@@ -324,6 +492,9 @@ func load_game() -> void:
 				var loaded_upgrades = data.get("upgrades", {})
 				for k in loaded_upgrades.keys():
 					if upgrades.has(k): upgrades[k] = loaded_upgrades[k]
+				var loaded_settings = data.get("settings", {})
+				for k in loaded_settings.keys():
+					settings[k] = loaded_settings[k]
 			file.close()
 	else:
 		save_game()

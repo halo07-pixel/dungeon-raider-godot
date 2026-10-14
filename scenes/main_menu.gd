@@ -5,6 +5,7 @@ extends Control
 ## và cây kỹ năng vĩnh viễn.
 
 const BG_SCALE: float = 2.0 # 32px gốc -> 64px trên màn hình
+const SETTINGS_MENU_SCENE = preload("res://scenes/settings_menu.tscn")
 
 ## Ánh xạ lớp nhân vật -> bộ sprite 0x72 dùng làm thân người (khớp với player.gd).
 const SPRITE_SET: Dictionary = {
@@ -175,6 +176,7 @@ func _build_main_menu() -> void:
 
 	vbox.add_child(_create_btn("SKILL TREE", show_upgrade_menu, Vector2(400, 60), Color(0.6, 0.2, 0.8)))
 	vbox.add_child(_create_btn("SURVIVAL GUIDE", show_index, Vector2(400, 60)))
+	vbox.add_child(_create_btn("SETTINGS", _open_settings, Vector2(400, 60), Color(0.3, 0.5, 0.7)))
 	vbox.add_child(_create_btn("QUIT", _quit_game, Vector2(400, 60), Color(0.5, 0.2, 0.2)))
 
 # ==========================================
@@ -453,3 +455,8 @@ func _continue_game() -> void:
 
 func _quit_game() -> void:
 	get_tree().quit()
+
+func _open_settings() -> void:
+	var menu = SETTINGS_MENU_SCENE.instantiate()
+	ui_layer.add_child(menu)
+	menu.closed.connect(func(): menu.queue_free())

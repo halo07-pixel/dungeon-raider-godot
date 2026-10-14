@@ -32,6 +32,15 @@ var swing_progress: float = 0.0
 var dagger_combo: int = 0
 var dagger_timer: float = 0.0
 
+## Buff "Đà Chiến Đấu" (Sử Thi): cộng 1 stack mỗi lần tấn công (bắn/chém), hết hạn nếu
+## ngừng tấn công quá MOMENTUM_WINDOW giây. Đơn giản hoá: tính theo HÀNH ĐỘNG tấn công
+## (không chờ xác nhận trúng đòn) để khỏi phải vòng về từ bullet.gd mỗi viên đạn.
+var momentum_stacks: int = 0
+var momentum_timer: float = 0.0
+const MOMENTUM_WINDOW: float = 1.2
+const MOMENTUM_MAX_STACKS: int = 5
+const MOMENTUM_PER_STACK: float = 0.05
+
 @onready var fire_timer: Timer = $FireTimer
 @onready var dodge_timer: Timer = $DodgeTimer
 @onready var dodge_cooldown: Timer = $DodgeCooldown
@@ -137,6 +146,10 @@ func _physics_process(delta: float) -> void:
 		slow_timer = maxf(0.0, slow_timer - delta)
 	if slide_timer > 0.0:
 		slide_timer = maxf(0.0, slide_timer - delta)
+	if momentum_timer > 0.0:
+		momentum_timer = maxf(0.0, momentum_timer - delta)
+		if momentum_timer <= 0.0:
+			momentum_stacks = 0
 	if poison_ticks > 0:
 		poison_timer -= delta
 		if poison_timer <= 0.0:
@@ -156,6 +169,8 @@ func _physics_process(delta: float) -> void:
 		_start_roll(input_dir if input_dir != Vector2.ZERO else aim_dir)
 
 	var speed_mult: float = 0.55 if slow_timer > 0.0 else 1.0
+	# Buff "Săn Sóc" (+tốc độ di chuyển)
+	speed_mult *= 1.0 + 0.06 * float(Global.buff_stack("buff_speed"))
 	if rolling: velocity = roll_dir * ROLL_SPEED
 	elif slide_timer > 0.0: velocity = slide_dir * SPEED # Trượt: giữ nguyên hướng cũ, bỏ qua input mới
 	else: velocity = input_dir * SPEED * speed_mult
@@ -178,6 +193,9 @@ func _start_roll(dir: Vector2) -> void:
 	dodge_cooldown.start()   
 	Global.sfx("dodge")
 	Global.burst(global_position, Color(0.6, 0.8, 1.0), 6, 80.0, 1.0)
+	# Buff "Né Hồi Phục": né thành công hồi máu (dodge_cooldown sẵn có đã tự giới hạn tần suất)
+	if Global.buff_stack("buff_dodge_heal") > 0:
+		heal(3 * Global.buff_stack("buff_dodge_heal"))
 
 func _on_dodge_finished() -> void:
 	rolling = false
@@ -191,8 +209,14 @@ func _shoot() -> void:
 	var mult = rarity_data["mult"]
 	# ÁP DỤNG KỸ NĂNG: Cộng % sát thương (mastery)
 	mult += Global.upgrades["mastery"] * 0.05
+	# ÁP DỤNG BUFF: Sức Mạnh / Đà Chiến Đấu / Cuồng Nộ
+	mult += 0.08 * float(Global.buff_stack("buff_dmg"))
+	if Global.buff_stack("buff_momentum") > 0:
+		mult += MOMENTUM_PER_STACK * float(momentum_stacks)
+	if Global.buff_stack("buff_berserk") > 0 and max_hp > 0:
+		mult += 0.4 * (1.0 - float(hp) / float(max_hp))
 	var dmg = int(base_dmg * mult)
-	
+
 	var pellets: int = w["pellets"]
 	var spread: float = w["spread"]
 	var speed: float = w["speed"]
@@ -202,7 +226,8 @@ func _shoot() -> void:
 	var w_knock: float = w["recoil"]
 	var eff: String = ""
 	var p_color: Color = w["color"]
-	
+	var is_crit: bool = false
+
 	# LOGIC ĐỘ HIẾM TẦM XA CHUYÊN SÂU
 	if weapon_id == "pistol":
 		if weapon_rarity == "rare": cd *= 0.85
@@ -217,7 +242,18 @@ func _shoot() -> void:
 		if weapon_rarity == "rare": cd *= 0.7; dmg = int(base_dmg * 1.3)
 		elif weapon_rarity == "epic": eff = "slow"
 		elif weapon_rarity == "legendary": eff = "chain"; p_color = Color.RED; dmg = base_dmg * 2
-	
+
+	# ÁP DỤNG BUFF: Nhanh Nhẹn / Chí Mạng / Tầm Đánh (tầm xa = bay xa+nhanh hơn) / Vung Kiếm Càn Quét (tầm xa = xuyên)
+	cd *= pow(0.9, float(Global.buff_stack("buff_haste")))
+	if randf() < 0.08 * float(Global.buff_stack("buff_crit")):
+		is_crit = true
+	if Global.buff_stack("buff_reach") > 0:
+		life *= 1.0 + 0.15 * float(Global.buff_stack("buff_reach"))
+		speed *= 1.0 + 0.08 * float(Global.buff_stack("buff_reach"))
+	if Global.buff_stack("buff_sweep") > 0:
+		is_pierce = true
+	if is_crit: dmg *= 2
+
 	fire_timer.start(cd)
 	spread = deg_to_rad(spread)
 	var base_ang: float = aim_dir.angle()
@@ -237,6 +273,9 @@ func _shoot() -> void:
 	Global.sfx(w["sfx"])
 	Global.burst(global_position + aim_dir * 28.0, p_color, 4, 90.0, 1.0)
 	Global.shake(0.10 if pellets > 1 else 0.04, 0.1)
+	if Global.buff_stack("buff_momentum") > 0:
+		momentum_stacks = mini(momentum_stacks + 1, MOMENTUM_MAX_STACKS)
+		momentum_timer = MOMENTUM_WINDOW
 
 # ==============================================================================
 # HỆ THỐNG HIỆU ỨNG CẬN CHIẾN & CHÉM ĐẠN
@@ -247,14 +286,22 @@ func _swing() -> void:
 	var mult = rarity_data["mult"]
 	# ÁP DỤNG KỸ NĂNG: Cộng % sát thương (mastery)
 	mult += Global.upgrades["mastery"] * 0.05
+	# ÁP DỤNG BUFF: Sức Mạnh / Đà Chiến Đấu / Cuồng Nộ
+	mult += 0.08 * float(Global.buff_stack("buff_dmg"))
+	if Global.buff_stack("buff_momentum") > 0:
+		mult += MOMENTUM_PER_STACK * float(momentum_stacks)
+	if Global.buff_stack("buff_berserk") > 0 and max_hp > 0:
+		mult += 0.4 * (1.0 - float(hp) / float(max_hp))
 	var dmg = int(base_dmg * mult)
-	
+
 	var cd = float(w["cooldown"])
 	var aoe_range = float(w["range"])
 	var aoe_angle = float(w["cleave_angle"])
 	var knock = float(w["knock"])
 	var lifesteal = rarity_data["lifesteal"] # Hút máu từ Gacha
-	
+	# Buff "Hút Máu"
+	lifesteal += 0.04 * float(Global.buff_stack("buff_lifesteal"))
+
 	var is_crit = false
 	var apply_bleed = false
 	var apply_stun = false
@@ -275,7 +322,17 @@ func _swing() -> void:
 		if weapon_rarity == "rare": aoe_range *= 1.25; knock *= 1.5
 		elif weapon_rarity == "epic": apply_stun = true; stun_duration = 1.0
 		elif weapon_rarity == "legendary": apply_stun = true; stun_duration = 1.5; aoe_range *= 1.5
-	
+
+	# ÁP DỤNG BUFF: Nhanh Nhẹn / Chí Mạng / Tầm Đánh / Vung Kiếm Càn Quét
+	cd *= pow(0.9, float(Global.buff_stack("buff_haste")))
+	if randf() < 0.08 * float(Global.buff_stack("buff_crit")):
+		is_crit = true
+	if Global.buff_stack("buff_reach") > 0:
+		aoe_range *= 1.0 + 0.15 * float(Global.buff_stack("buff_reach"))
+	if Global.buff_stack("buff_sweep") > 0:
+		aoe_range *= 1.5
+		aoe_angle += 40.0
+
 	if is_crit: dmg *= 2
 	
 	fire_timer.start(cd)
@@ -315,6 +372,11 @@ func _swing() -> void:
 					if apply_bleed and e.has_method("apply_status"): e.apply_status("bleed", 0.0)
 					if apply_stun and e.has_method("apply_status"): e.apply_status("stun", stun_duration)
 					if lifesteal > 0.0: total_heal += maxi(1, int(float(dmg) * lifesteal))
+					# ÁP DỤNG BUFF: Phá Giáp / Lưỡi Rỉ Máu / Đạn Băng
+					if Global.buff_stack("buff_sunder") > 0 and e.has_method("apply_sunder"): e.apply_sunder()
+					if e.has_method("apply_status"):
+						if randf() < minf(0.6, 0.15 * float(Global.buff_stack("buff_bleed_proc"))): e.apply_status("bleed", 0.0)
+						if randf() < minf(0.6, 0.20 * float(Global.buff_stack("buff_slow_proc"))): e.apply_status("slow", 1.5)
 					if weapon_id == "hammer" and weapon_rarity == "legendary":
 						e.take_damage(20, global_position, 0.0, true) # Lava phụ trợ
 						
@@ -327,6 +389,7 @@ func _swing() -> void:
 					b.take_damage(dmg, global_position, knock)
 					hit_something = true
 					if lifesteal > 0.0: total_heal += maxi(1, int(float(dmg) * lifesteal * 0.5))
+					if Global.buff_stack("buff_sunder") > 0 and b.has_method("apply_sunder"): b.apply_sunder()
 
 	# Kiếm Dài Sử Thi: Phóng Kiếm Khí
 	if weapon_id == "broadsword" and (weapon_rarity == "epic" or weapon_rarity == "legendary"):
@@ -337,6 +400,9 @@ func _swing() -> void:
 
 	if hit_something: Global.hitstop(0.04)
 	if total_heal > 0: heal(total_heal)
+	if Global.buff_stack("buff_momentum") > 0:
+		momentum_stacks = mini(momentum_stacks + 1, MOMENTUM_MAX_STACKS)
+		momentum_timer = MOMENTUM_WINDOW
 
 # ==============================================================================
 # HỆ THỐNG TIỆN ÍCH
@@ -353,6 +419,10 @@ func set_weapon_with_rarity(id: String, rarity: String) -> void:
 func take_damage(amount: int, from_pos: Vector2 = Vector2.ZERO, knock: float = 300.0, ignore_invuln: bool = false) -> void:
 	if not alive: return
 	if not ignore_invuln and is_invulnerable(): return
+	# Buff "Giáp Dày": giảm % sát thương nhận vào (trần 50%)
+	if Global.buff_stack("buff_armor") > 0:
+		var reduction: float = minf(0.5, 0.06 * float(Global.buff_stack("buff_armor")))
+		amount = maxi(1, int(float(amount) * (1.0 - reduction)))
 	hp = maxi(hp - amount, 0)
 	if not ignore_invuln:
 		hurt_timer.start()

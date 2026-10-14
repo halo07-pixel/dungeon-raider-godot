@@ -71,6 +71,20 @@ var cc_resist: float = 0.0
 var is_boss: bool = true
 var blink_cd: float = 0.0 # riêng Necromancer: hồi chiêu dịch chuyển né cận chiến
 
+## Buff "Phá Giáp" (Sử Thi) của Player — cùng công thức/field với HurtboxComponent của
+## enemy.gd thường (xem ghi chú ở đó), boss không dùng component nên khai báo trực tiếp.
+var sunder_stacks: int = 0
+var sunder_timer: float = 0.0
+const SUNDER_PER_STACK: float = 0.08
+const SUNDER_MAX_STACKS: int = 5
+const SUNDER_DURATION: float = 3.0
+
+func apply_sunder() -> void:
+	if not alive:
+		return
+	sunder_stacks = mini(sunder_stacks + 1, SUNDER_MAX_STACKS)
+	sunder_timer = SUNDER_DURATION
+
 ## Ranh giới phòng Boss (world space), do dungeon.gd truyền vào lúc spawn qua
 ## set_arena_bounds(). Rect2() rỗng (mặc định) = KHÔNG giới hạn — để các code path cũ
 ## (spawn test/debug không gọi set_arena_bounds) không bị ảnh hưởng. Chỉ dùng để chặn
@@ -546,6 +560,10 @@ func _physics_process(delta: float) -> void:
 	_t += delta
 	if not alive:
 		return
+	if sunder_stacks > 0:
+		sunder_timer -= delta
+		if sunder_timer <= 0.0:
+			sunder_stacks = 0
 	var p = Global.player
 
 	# === CƠ CHẾ CHỐNG ÔM BOSS ===
@@ -593,6 +611,8 @@ func take_damage(amount: int, _from_pos: Vector2 = Vector2.ZERO, _knock: float =
 		current_armor += 3.0
 
 	var actual_damage = maxi(1, amount - int(current_armor))
+	if sunder_stacks > 0:
+		actual_damage = int(float(actual_damage) * (1.0 + SUNDER_PER_STACK * float(sunder_stacks)))
 	hp = maxf(hp - float(actual_damage), 0.0)
 
 	Global.sfx("hit")
