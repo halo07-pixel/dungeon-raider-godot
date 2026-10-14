@@ -26,6 +26,7 @@ var last_move_dir: Vector2 = Vector2.RIGHT # Hướng di chuyển gần nhất, 
 var poison_ticks: int = 0 # Số nhịp độc còn lại (Orc Shaman / Chort - biome Đầm Lầy)
 var poison_timer: float = 0.0
 var poison_dmg: int = 0
+var stun_timer: float = 0.0 # Choáng (đòn "Giam Băng" của Frozen Horror) — khoá di chuyển/tấn công
 
 var swinging: bool = false
 var swing_progress: float = 0.0
@@ -130,6 +131,8 @@ func apply_status(type: String, duration: float, amount: float = 0.0) -> void:
 	elif type == "slide":
 		slide_timer = maxf(slide_timer, duration)
 		slide_dir = last_move_dir
+	elif type == "stun":
+		stun_timer = maxf(stun_timer, duration)
 	elif type == "poison":
 		poison_ticks = maxi(poison_ticks, int(duration))
 		poison_dmg = maxi(poison_dmg, int(amount))
@@ -158,6 +161,16 @@ func _physics_process(delta: float) -> void:
 			# Độc BỎ QUA khung bất tử vật lý (hurt_timer) — venom không quan tâm bạn vừa
 			# trúng đòn thường hay chưa, khác hẳn sát thương tiếp xúc thông thường.
 			take_damage(poison_dmg, global_position, 0.0, true)
+
+	if stun_timer > 0.0:
+		stun_timer = maxf(0.0, stun_timer - delta)
+		velocity = knockback
+		knockback = knockback.move_toward(Vector2.ZERO, KNOCK_DECAY * delta)
+		move_and_slide()
+		_update_sprite()
+		_update_weapon_visual()
+		queue_redraw()
+		return
 
 	var input_dir: Vector2 = Input.get_vector("move_left", "move_right", "move_up", "move_down")
 	if input_dir != Vector2.ZERO:

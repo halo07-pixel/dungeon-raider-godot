@@ -216,20 +216,19 @@ func _attack_pool() -> Array:
 			var pool: Array = ["frost_breath", "spike_field"]
 			if phase >= 2:
 				pool.append("frost_charge")
+				pool.append("ice_prison")
 			if phase >= 3:
 				pool.append("blizzard")
+				pool.append("ice_prison") # tăng tỉ lệ ở pha cuối, đòn chính xác rủi ro cao
 			return pool
 		"lord":
-			var pool: Array = ["charge", "ring"]
-			if phase >= 2:
-				pool.append("necro_bolt")
-				pool.append("necro_curse")
-			if phase >= 3:
-				pool.append("frost_breath")
-				pool.append("spike_field")
-			if phase >= 4:
-				pool.append("judgement")
-			return pool
+			# Mỗi pha có CHỦ ĐỀ riêng (không đơn thuần cộng dồn hết mọi đòn cùng lúc) để trận
+			# đấu cuối có cảm giác leo thang rõ rệt thay vì "trộn lẫn mọi đòn đã gặp".
+			match phase:
+				1: return ["charge", "ring", "ring"] # Pha 1: áp sát kiểu Warden
+				2: return ["necro_bolt", "necro_bolt", "necro_curse", "necro_summon", "charge"] # Pha 2: tầm xa + triệu hồi
+				3: return ["frost_breath", "spike_field", "frost_charge", "ice_prison", "necro_bolt"] # Pha 3: khống chế vùng
+				_: return ["judgement", "lord_summon_all", "ring", "necro_bolt", "ice_prison"] # Pha 4: tổng lực
 		_: # warden
 			var pool: Array = ["charge", "ring"]
 			if phase >= 2:
@@ -265,6 +264,8 @@ func _on_attack_timer_timeout() -> void:
 		"frost_charge": await _atk_frost_charge()
 		"blizzard": await _atk_blizzard()
 		"judgement": await _atk_judgement()
+		"ice_prison": await _atk_ice_prison()
+		"lord_summon_all": await _atk_lord_summon_all()
 	if not alive:
 		return
 	busy = false
@@ -461,12 +462,35 @@ func _atk_frost_breath() -> void:
 			var ang: float = absf(charge_dir.angle_to(to_p.normalized()))
 			if ang < deg_to_rad(40.0):
 				p.take_damage(22, global_position, 260.0)
+	_spawn_ice_patch(global_position + charge_dir * 70.0, 85.0)
 	await get_tree().create_timer(0.3).timeout
+
+
+## Vùng băng đọng lại trên sàn sau đòn đánh (tạo "vùng cấm" tạm thời thay vì đánh 1 phát
+## xong là hết) — sát thương nhẹ mỗi nhịp + làm chậm ai đứng trong, không cần telegraph vì
+## đã đứng sau đòn gốc (người chơi đã thấy/né đòn gốc rồi mới đến lượt vùng này).
+func _spawn_ice_patch(pos: Vector2, radius: float, duration: float = 2.5) -> void:
+	var hz := Area2D.new()
+	hz.set_script(BOSS_HAZARD)
+	hz.damage = 4
+	hz.tick_interval = 0.5
+	hz.duration = duration
+	hz.radius = radius
+	hz.telegraph_time = 0.0
+	hz.apply_slow = true
+	hz.color = Color(0.5, 0.85, 1.0, 0.3)
+	Global.world.add_child(hz)
+	hz.global_position = pos
 
 
 func _atk_frost_spike_field() -> void:
 	var p = Global.player
-	var center: Vector2 = p.global_position if is_instance_valid(p) else global_position
+	# Nhắm vào vị trí DỰ ĐOÁN (vị trí hiện tại + hướng di chuyển trong khoảng thời gian
+	# telegraph 0.65s) thay vì vị trí đứng yên — buộc người chơi phải đọc hướng đi của mình
+	# và né thật, không phải cứ đứng yên là tự động né được.
+	var center: Vector2 = global_position
+	if is_instance_valid(p):
+		center = p.global_position + p.velocity * 0.65
 	Global.sfx("slam")
 	var n: int = 5
 	for i in n:
@@ -514,13 +538,37 @@ func _atk_blizzard() -> void:
 			if p.has_method("apply_status"):
 				p.apply_status("slow", 1.2)
 	Global.burst(global_position, Color(0.6, 0.9, 1.0), 30, 260.0, 2.0)
-	var n: int = 2
+	_spawn_ice_patch(global_position, 150.0, 2.0)
+	var n: int = 3 if phase >= 3 else 2 # tăng theo pha, khớp cách Warden/Necromancer đã làm
 	for i in n:
 		var ang: float = TAU * float(i) / float(n) + randf() * 0.6
 		# Frost ở biome Băng Giá -> triệu hồi "frost_zombie" (KHÔNG dùng "slime", vốn là
 		# quái cơ bản độc quyền biome 1, để không phá quy tắc không lẫn quái giữa biome).
 		summon_requested.emit("frost_zombie", global_position + Vector2.from_angle(ang) * 100.0)
 	await get_tree().create_timer(0.5).timeout
+
+
+## "Giam Băng" — đòn skillshot chính xác: nhắm thẳng vị trí Player NGAY LÚC BẮT ĐẦU
+## telegraph (không đuổi theo sau đó), trúng thì Choáng + sát thương nặng. Khác hẳn các
+## đòn AoE còn lại của Frost (vốn đều là tỏa tròn/quạt quanh thân boss) — rủi ro/thưởng
+## cao: dễ đọc hướng nhắm nhưng nếu không né kịp thì bị phạt nặng.
+func _atk_ice_prison() -> void:
+	var p = Global.player
+	# Nhắm vào vị trí Player NGAY LÚC BẮT ĐẦU telegraph (không đuổi theo sau đó) — người
+	# chơi thấy vòng tròn hiện ra đúng dưới chân mình thì biết phải bước ra trước khi hết giờ.
+	var target_pos: Vector2 = p.global_position if is_instance_valid(p) else global_position
+	Global.sfx("boss_charge")
+	var hz := Area2D.new()
+	hz.set_script(BOSS_HAZARD)
+	hz.single_shot = true
+	hz.damage = 24
+	hz.radius = 46.0
+	hz.telegraph_time = 0.85 * _speed_mult()
+	hz.apply_stun_duration = 1.3
+	hz.color = Color(0.6, 0.95, 1.0, 0.6)
+	Global.world.add_child(hz)
+	hz.global_position = target_pos
+	await get_tree().create_timer(0.85 * _speed_mult() + 0.2).timeout
 
 
 # ==============================================================================
@@ -542,6 +590,26 @@ func _atk_judgement() -> void:
 	Global.world.add_child(hz)
 	hz.global_position = center
 	await get_tree().create_timer(1.8).timeout
+	if not alive:
+		return
+	# Nối liền ngay 1 đòn Ring ngay sau Judgement, không có khoảng nghỉ — tạo cảm giác dồn
+	# dập đúng chất "khoảnh khắc chung kết" thay vì nhịp độ đều đều như các boss thường.
+	_fire_ring(14, 0.0, Color(1.0, 0.3, 0.2))
+
+
+## "Tổng Triệu Hồi" — đòn độc quyền Dungeon Lord (pha 4): triệu hồi cùng lúc 1 quái mỗi
+## biome (slime/chort/frost_tiny) thay vì chỉ lặp lại đúng 1 loại như các boss khác — biểu
+## tượng cho việc Lord nắm quyền năng của cả 3 vùng, khác hẳn mọi đòn triệu hồi đã gặp trước đó.
+func _atk_lord_summon_all() -> void:
+	await _telegraph("flash", 0.6 * _speed_mult())
+	if not alive:
+		return
+	Global.sfx("door")
+	var kinds: Array = ["slime", "chort", "frost_tiny"]
+	for i in kinds.size():
+		var ang: float = TAU * float(i) / float(kinds.size()) + randf() * 0.4
+		summon_requested.emit(kinds[i], global_position + Vector2.from_angle(ang) * 100.0)
+	await get_tree().create_timer(0.5).timeout
 
 
 # ------------------------------------------------------------------ Va chạm (signal)
