@@ -13,6 +13,7 @@ var radius: float = 60.0
 var telegraph_time: float = 0.0 # >0: chờ bấy nhiêu giây rồi mới kích hoạt (đòn 1 lần)
 var single_shot: bool = false
 var apply_slow: bool = false # true: ngoài sát thương còn làm chậm Player khi đứng trong vùng
+var apply_stun_duration: float = 0.0 # >0: ngoài sát thương còn gây Choáng bấy nhiêu giây (đòn "Giam Băng")
 
 var _t: float = 0.0
 var _tick_t: float = 0.0
@@ -75,8 +76,11 @@ func _deal_damage() -> void:
 	if is_instance_valid(p) and p.has_method("take_damage"):
 		if not (p.has_method("is_invulnerable") and p.is_invulnerable()):
 			p.take_damage(damage, global_position, 60.0)
-			if apply_slow and p.has_method("apply_status"):
-				p.apply_status("slow", 1.0)
+			if p.has_method("apply_status"):
+				if apply_slow:
+					p.apply_status("slow", 1.0)
+				if apply_stun_duration > 0.0:
+					p.apply_status("stun", apply_stun_duration)
 
 
 func _draw() -> void:
