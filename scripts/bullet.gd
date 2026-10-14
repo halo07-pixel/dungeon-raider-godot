@@ -66,6 +66,14 @@ func _on_body_entered(body: Node) -> void:
 			
 		body.take_damage(damage, global_position - dir * 8.0, knock)
 
+		if from_player:
+			# ÁP DỤNG BUFF (tầm xa — sát thương tầm xa "đổ bộ" ở đây, không phải trong player.gd._shoot()):
+			# Phá Giáp / Hút Máu
+			if Global.buff_stack("buff_sunder") > 0 and body.has_method("apply_sunder"):
+				body.apply_sunder()
+			if Global.buff_stack("buff_lifesteal") > 0 and is_instance_valid(Global.player):
+				Global.player.heal(maxi(1, int(float(damage) * 0.04 * float(Global.buff_stack("buff_lifesteal")))))
+
 		if body.has_method("apply_status"):
 			if from_player:
 				# Kích hoạt trạng thái lên quái (Sử thi / Huyền thoại)
@@ -73,6 +81,11 @@ func _on_body_entered(body: Node) -> void:
 					body.apply_status("slow", 2.0)
 				elif effect == "chain": # Xích sét laser Huyền thoại
 					_chain_lightning(body)
+				# ÁP DỤNG BUFF: Lưỡi Rỉ Máu / Đạn Băng
+				if randf() < minf(0.6, 0.15 * float(Global.buff_stack("buff_bleed_proc"))):
+					body.apply_status("bleed", 0.0)
+				if randf() < minf(0.6, 0.20 * float(Global.buff_stack("buff_slow_proc"))):
+					body.apply_status("slow", 1.5)
 			elif effect == "poison":
 				# Độc Trượng (Orc Shaman, biome Đầm Lầy): 3 nhịp x 4 dmg lên Player
 				body.apply_status("poison", 3, 4)
