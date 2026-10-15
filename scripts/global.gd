@@ -265,6 +265,7 @@ const BUFF_MAX_STACK: Dictionary = {
 	"buff_dodge_heal": 5, "buff_gourmand": 3, "buff_sense": 1,
 	"buff_lifesteal": 5, "buff_deathnova": 1, "buff_momentum": 1, "buff_sunder": 1, "buff_berserk": 1, "buff_sweep": 1,
 	# Giáp ảo
+	"buff_burn": 3, "buff_poison": 3, "buff_freeze": 2, "buff_arc": 1, "buff_chain": 1,
 	"buff_shield_cap": 5, "buff_shield_regen": 4, "buff_shield_nova": 1,
 	# Cận chiến
 	"buff_deflect": 1, "buff_wave": 3, "buff_rollslash": 3, "buff_counter": 1, "buff_whirl": 1,
@@ -290,6 +291,12 @@ var buff_pool: Dictionary = {
 	"buff_sunder": {"name": "Phá Giáp", "desc": "Đòn trúng cộng dồn khiến quái đó nhận thêm sát thương.", "tier": "epic", "class": "any"},
 	"buff_berserk": {"name": "Cuồng Nộ", "desc": "Máu càng thấp, sát thương gây ra càng cao (tối đa +40%).", "tier": "epic", "class": "any"},
 	"buff_sweep": {"name": "Vung Kiếm Càn Quét", "desc": "Cận chiến: +50% phạm vi, +40% góc chém. Tầm xa: đạn xuyên vĩnh viễn.", "tier": "epic", "class": "any"},
+	# ---- Nguyên tố
+	"buff_burn": {"name": "Lửa Thiêu", "desc": "Đòn trúng: 20% cơ hội mỗi cấp gây Thiêu Đốt 3s (sát thương theo thời gian).", "tier": "rare", "class": "any"},
+	"buff_poison": {"name": "Kịch Độc", "desc": "Mỗi đòn trúng cộng 1 stack Độc (tối đa 3, +2 mỗi cấp); độc càng nhiều tick càng đau.", "tier": "rare", "class": "any"},
+	"buff_freeze": {"name": "Băng Giá", "desc": "Đòn trúng cộng dồn Lạnh (làm chậm); đủ 3 stack (2 ở cấp 2) thì đóng băng 1.5s. Boss chỉ bị chậm.", "tier": "rare", "class": "any"},
+	"buff_arc": {"name": "Sét Lan", "desc": "Mỗi 2.5s phóng xung sét đánh tối đa 3 quái gần nhất.", "tier": "epic", "class": "any"},
+	"buff_chain": {"name": "Chớp Giật", "desc": "Đòn chí mạng nảy sét sang 3 quái gần đó (60% sát thương).", "tier": "epic", "class": "any"},
 	# ---- Giáp ảo
 	"buff_shield_cap": {"name": "Lá Chắn Lớn", "desc": "+10 giáp ảo tối đa.", "tier": "common", "class": "any"},
 	"buff_shield_regen": {"name": "Hồi Giáp Nhanh", "desc": "Giáp ảo hồi nhanh hơn 25% và bắt đầu hồi sớm hơn 0.4s.", "tier": "rare", "class": "any"},
@@ -381,6 +388,41 @@ func _offer_next_buff_pick() -> void:
 func consume_buff_pick() -> void:
 	buff_picks_left = maxi(0, buff_picks_left - 1)
 	_offer_next_buff_pick()
+
+## Điểm CHUNG cho hiệu ứng nguyên tố khi đòn của Player trúng mục tiêu (cận chiến + đạn đều gọi).
+## target: quái/boss (duck-typing apply_element). dmg: sát thương đòn vừa gây (để tính DOT).
+func on_player_hit(target: Node, dmg: int, is_crit: bool) -> void:
+	if not is_instance_valid(target) or not target.has_method("apply_element"):
+		return
+	var burn: int = buff_stack("buff_burn")
+	if burn > 0 and randf() < 0.2 * float(burn):
+		target.apply_element("burn", maxi(2, int(float(dmg) * 0.12)), 0)
+	var poison: int = buff_stack("buff_poison")
+	if poison > 0:
+		target.apply_element("poison", 2 + floor_num / 2, 3 + 2 * (poison - 1))
+	var freeze: int = buff_stack("buff_freeze")
+	if freeze > 0:
+		target.apply_element("frost", 0, 3 if freeze < 2 else 2)
+	if is_crit and buff_stack("buff_chain") > 0:
+		chain_lightning(target, int(float(dmg) * 0.6), 3)
+
+## Sét nảy từ `origin_target` sang tối đa n quái gần nhất (bán kính 200px). Gây sát thương trực tiếp
+## (không gọi lại on_player_hit nên không đệ quy).
+func chain_lightning(origin_target: Node, dmg: int, n: int) -> int:
+	var origin: Vector2 = origin_target.global_position
+	var cands: Array = []
+	for e in get_tree().get_nodes_in_group("enemies"):
+		if e != origin_target and is_instance_valid(e) and e.alive and e.global_position.distance_to(origin) <= 200.0:
+			cands.append(e)
+	cands.sort_custom(func(a, b): return a.global_position.distance_to(origin) < b.global_position.distance_to(origin))
+	var hit: int = 0
+	for e in cands:
+		if hit >= n:
+			break
+		e.take_damage(maxi(1, dmg), origin, 0.0)
+		burst(e.global_position, Color(1.0, 0.95, 0.3), 5, 120.0, 1.2)
+		hit += 1
+	return hit
 
 ## Áp dụng buff đã chọn: +1 stack. Chỉ "buff_shield_cap" cần xử lý NGAY (cộng giáp) —
 ## mọi buff khác đọc Global.buff_stack(id) trực tiếp tại điểm hook (player.gd/bullet.gd/

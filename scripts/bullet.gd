@@ -21,6 +21,7 @@ var _q_reward_sent: bool = false
 ## Buff tầm xa (đặt bởi player.gd lúc bắn)
 var bounces_left: int = 0
 var split_on_hit: bool = false
+var is_crit: bool = false
 var is_fragment: bool = false # mảnh tách ra từ Đạn Phân Tách — không tách tiếp
 const HOMING_TURN_RATE: float = 2.2 # rad/s - bẻ hướng từ từ, không phải dính chắc chắn
 
@@ -118,6 +119,7 @@ func _on_body_entered(body: Node) -> void:
 		if from_player:
 			# ÁP DỤNG BUFF (tầm xa — sát thương tầm xa "đổ bộ" ở đây, không phải trong player.gd._shoot()):
 			# Phá Giáp / Hút Máu
+			Global.on_player_hit(body, damage, is_crit)
 			if Global.buff_stack("buff_sunder") > 0 and body.has_method("apply_sunder"):
 				body.apply_sunder()
 			if Global.buff_stack("buff_lifesteal") > 0 and is_instance_valid(Global.player):

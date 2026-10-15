@@ -21,6 +21,8 @@ var counter_timer: float = 0.0   # Phản Công: cửa sổ x2 sát thương sau
 var swing_count: int = 0         # Lốc Xoáy
 var shot_count: int = 0          # Loạt Đạn Vòng / Siêu Đạn
 var still_time: float = 0.0      # Tập Trung
+var arc_timer: float = 0.0       # Sét Lan
+const ARC_INTERVAL: float = 2.5
 var shield: float = 20.0
 var shield_delay_timer: float = 0.0
 var weapon_id: String = "pistol"
@@ -339,6 +341,7 @@ func _shoot() -> void:
 		var b = BULLET.instantiate()
 		b.setup(true, dir, dmg, speed, life, p_color, bullet_radius, is_pierce, eff)
 		_apply_ranged_buffs(b)
+		b.is_crit = is_crit
 		Global.world.add_child(b)
 		b.global_position = global_position + aim_dir * 24.0
 
@@ -471,6 +474,7 @@ func _swing() -> void:
 			if to_e.length() <= aoe_range + float(e.data["radius"]):
 				if absf(aim_dir.angle_to(to_e)) <= rad_angle * 0.5:
 					e.take_damage(dmg, global_position, knock)
+					Global.on_player_hit(e, dmg, is_crit)
 					hit_something = true
 					if apply_bleed and e.has_method("apply_status"): e.apply_status("bleed", 0.0)
 					if apply_stun and e.has_method("apply_status"): e.apply_status("stun", stun_duration)
@@ -490,6 +494,7 @@ func _swing() -> void:
 			if to_b.length() <= aoe_range + 34.0:
 				if absf(aim_dir.angle_to(to_b)) <= rad_angle * 0.5:
 					b.take_damage(dmg, global_position, knock)
+					Global.on_player_hit(b, dmg, is_crit)
 					hit_something = true
 					if lifesteal > 0.0: total_heal += maxi(1, int(float(dmg) * lifesteal * 0.5))
 					if Global.buff_stack("buff_sunder") > 0 and b.has_method("apply_sunder"): b.apply_sunder()
@@ -527,12 +532,35 @@ func set_weapon_with_rarity(id: String, rarity: String) -> void:
 	Global.message.emit("Picked up: " + display_name, rarity_data["color"])
 
 func _tick_buff_timers(delta: float) -> void:
+	_tick_arc(delta)
 	shield_nova_cd = maxf(0.0, shield_nova_cd - delta)
 	counter_timer = maxf(0.0, counter_timer - delta)
 	if velocity.length() < 5.0 and not rolling:
 		still_time += delta
 	else:
 		still_time = 0.0
+
+## Buff Sét Lan: mỗi ARC_INTERVAL giây đánh tối đa 3 quái gần nhất trong 220px.
+func _tick_arc(delta: float) -> void:
+	if Global.buff_stack("buff_arc") <= 0:
+		return
+	arc_timer -= delta
+	if arc_timer > 0.0:
+		return
+	var cands: Array = []
+	for e in get_tree().get_nodes_in_group("enemies"):
+		if is_instance_valid(e) and e.alive and e.global_position.distance_to(global_position) <= 220.0:
+			cands.append(e)
+	if cands.is_empty():
+		arc_timer = 0.3 # chưa có mục tiêu: thử lại sớm
+		return
+	arc_timer = ARC_INTERVAL
+	cands.sort_custom(func(a, b): return a.global_position.distance_to(global_position) < b.global_position.distance_to(global_position))
+	var dmg: int = maxi(6, int(float(weapon["damage"]) * rarity_data["mult"] * 0.8))
+	for i in mini(3, cands.size()):
+		cands[i].take_damage(dmg, global_position, 100.0)
+		Global.burst(cands[i].global_position, Color(1.0, 0.95, 0.3), 6, 140.0, 1.2)
+	Global.shake(0.1, 0.08)
 
 ## Buff Thực Khách Hầm Ngục: dọn sạch phòng hồi % máu tối đa.
 func _on_room_cleared() -> void:

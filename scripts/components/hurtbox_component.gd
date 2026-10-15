@@ -31,6 +31,10 @@ var slow_timer: float = 0.0
 var bleed_ticks: int = 0
 var bleed_timer: float = 0.0
 
+const ElementStatusScript = preload("res://scripts/components/element_status.gd")
+## Trạng thái nguyên tố (buff Thiêu Đốt / Kịch Độc / Băng Giá) — xem element_status.gd.
+var elements = ElementStatusScript.new()
+
 const BLEED_TICK_INTERVAL: float = 0.5
 const BLEED_TICK_DAMAGE: int = 5
 
@@ -41,6 +45,32 @@ var sunder_timer: float = 0.0
 const SUNDER_PER_STACK: float = 0.08
 const SUNDER_MAX_STACKS: int = 5
 const SUNDER_DURATION: float = 3.0
+
+func _init_elements() -> void:
+	elements.dot_cb = _element_dot
+	elements.slow_cb = func(d: float): apply_status("slow", d)
+	elements.freeze_cb = func(d: float): apply_status("stun", d)
+
+func _element_dot(dmg: int, color: Color) -> void:
+	if not alive:
+		return
+	take_hit(dmg, _owner2d.global_position, 0.0, true)
+	Global.burst(_owner2d.global_position, color, 3, 50.0, 1.0)
+
+## Buff nguyên tố từ Player: kind = "burn" | "poison" | "frost".
+func apply_element(kind: String, power: int, cap: int) -> void:
+	if not alive:
+		return
+	if not elements.dot_cb.is_valid():
+		_init_elements()
+	match kind:
+		"burn": elements.apply_burn(power)
+		"poison": elements.apply_poison(power, cap)
+		"frost": elements.apply_frost(cap, true)
+
+func tick_elements(delta: float) -> void:
+	if alive and elements.is_active():
+		elements.tick(delta)
 
 func apply_sunder() -> void:
 	if not alive:
