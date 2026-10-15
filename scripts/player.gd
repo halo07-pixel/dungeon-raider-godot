@@ -30,6 +30,11 @@ var stun_timer: float = 0.0 # Choáng (đòn "Giam Băng" của Frozen Horror) �
 
 var swinging: bool = false
 var swing_progress: float = 0.0
+## Tầm/góc chém THẬT đã cộng buff + độ hiếm của cú chém đang diễn ra — _draw() và
+## _update_weapon_visual() phải đọc từ đây (không đọc thẳng weapon["range"]/["cleave_angle"])
+## để vệt chém hiển thị luôn khớp vùng gây sát thương thật. Set lại mỗi lần _swing().
+var display_swing_range: float = 0.0
+var display_swing_half_angle: float = 0.0
 var dagger_combo: int = 0
 var dagger_timer: float = 0.0
 
@@ -202,8 +207,9 @@ func _physics_process(delta: float) -> void:
 func _start_roll(dir: Vector2) -> void:
 	rolling = true
 	roll_dir = dir.normalized()
-	dodge_timer.start()      
-	dodge_cooldown.start()   
+	PlayerProfiler.record_dodge(roll_dir.x) # AI Tầng 1: ghi nhận thói quen né trái/phải
+	dodge_timer.start()
+	dodge_cooldown.start()
 	Global.sfx("dodge")
 	Global.burst(global_position, Color(0.6, 0.8, 1.0), 6, 80.0, 1.0)
 	# Buff "Né Hồi Phục": né thành công hồi máu (dodge_cooldown sẵn có đã tự giới hạn tần suất)
@@ -267,6 +273,7 @@ func _shoot() -> void:
 		is_pierce = true
 	if is_crit: dmg *= 2
 
+	PlayerProfiler.record_attack(false) # AI Tầng 1: ghi nhận lối chơi tầm xa
 	fire_timer.start(cd)
 	spread = deg_to_rad(spread)
 	var base_ang: float = aim_dir.angle()
@@ -313,7 +320,7 @@ func _swing() -> void:
 	var knock = float(w["knock"])
 	var lifesteal = rarity_data["lifesteal"] # Hút máu từ Gacha
 	# Buff "Hút Máu"
-	lifesteal += 0.04 * float(Global.buff_stack("buff_lifesteal"))
+	lifesteal += 0.02 * float(Global.buff_stack("buff_lifesteal"))
 
 	var is_crit = false
 	var apply_bleed = false
@@ -347,7 +354,13 @@ func _swing() -> void:
 		aoe_angle += 40.0
 
 	if is_crit: dmg *= 2
-	
+
+	# Lưu lại tầm/góc THẬT (đã cộng buff + độ hiếm) để _draw()/_update_weapon_visual()
+	# vẽ đúng vệt chém khớp vùng gây sát thương — xem khai báo display_swing_range/half_angle.
+	display_swing_range = aoe_range
+	display_swing_half_angle = deg_to_rad(aoe_angle) * 0.5
+
+	PlayerProfiler.record_attack(true) # AI Tầng 1: ghi nhận lối chơi cận chiến
 	fire_timer.start(cd)
 	swinging = true
 	swing_progress = 0.0
@@ -432,6 +445,9 @@ func set_weapon_with_rarity(id: String, rarity: String) -> void:
 func take_damage(amount: int, from_pos: Vector2 = Vector2.ZERO, knock: float = 300.0, ignore_invuln: bool = false) -> void:
 	if not alive: return
 	if not ignore_invuln and is_invulnerable(): return
+	# Hệ số sát thương quái/boss/bẫy theo tầng (xem Global.enemy_dmg_mult_for_floor) —
+	# chặn điểm chung duy nhất mà MỌI nguồn sát thương từ môi trường đổ vào Player.
+	amount = maxi(1, int(float(amount) * Global.enemy_dmg_mult_for_floor(Global.floor_num)))
 	# Buff "Giáp Dày": giảm % sát thương nhận vào (trần 50%)
 	if Global.buff_stack("buff_armor") > 0:
 		var reduction: float = minf(0.5, 0.06 * float(Global.buff_stack("buff_armor")))
@@ -494,9 +510,14 @@ func _die() -> void:
 	died.emit()
 	Global.player_died.emit()
 
-## Nửa góc quạt chém hiện tại (tuỳ vũ khí/độ hiếm) — dùng chung bởi _draw() (vệt
-## chém) và _update_weapon_visual() (xoay icon) để khỏi lặp logic 2 nơi.
+## Nửa góc quạt chém hiện tại — dùng chung bởi _draw() (vệt chém) và
+## _update_weapon_visual() (xoay icon) để khỏi lặp logic 2 nơi.
+## Đọc display_swing_half_angle (đã cộng buff Tầm Đánh/Vung Kiếm Càn Quét + độ hiếm,
+## set bởi _swing()) để vệt chém LUÔN khớp vùng gây sát thương thật — không đọc thẳng
+## weapon["cleave_angle"] gốc nữa (bug cũ: vệt chém hiển thị nhỏ hơn tầm đánh thật).
 func _melee_half_angle() -> float:
+	if swinging and display_swing_half_angle > 0.0:
+		return display_swing_half_angle
 	var half_angle = deg_to_rad(float(weapon["cleave_angle"])) * 0.5
 	if weapon_id == "broadsword" and weapon_rarity == "legendary": half_angle = deg_to_rad(300.0) * 0.5
 	return half_angle
@@ -520,7 +541,7 @@ func _draw() -> void:
 	if weapon.get("is_melee", false) and swinging:
 		var gun_c: Color = weapon.get("color", Color.WHITE)
 		if rarity_data.has("color"): gun_c = rarity_data["color"].lerp(gun_c, 0.5)
-		var r = float(weapon["range"])
+		var r = display_swing_range if display_swing_range > 0.0 else float(weapon["range"])
 		var half_angle = _melee_half_angle()
 		var start_ang = aim_dir.angle() - half_angle
 		var end_ang = aim_dir.angle() + half_angle

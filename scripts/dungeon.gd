@@ -12,6 +12,7 @@ const PICKUP = preload("res://scenes/pickup.tscn")
 const SpikeTrapScript = preload("res://scripts/spike_trap.gd")
 const PoisonTileScript = preload("res://scripts/poison_tile.gd")
 const IceTileScript = preload("res://scripts/ice_tile.gd")
+const LordArenaRuneScript = preload("res://scripts/lord_arena_rune.gd")
 
 const CELL_W: int = 24
 const CELL_H: int = 16
@@ -153,8 +154,33 @@ func _make_tileset(biome: String = "stone") -> TileSet:
 	return ts
 
 
+## Tầng 10 (Dungeon Lord) dùng layout CỐ ĐỊNH riêng thay vì random-walk như các tầng khác:
+## chỉ 2 phòng — Start (có thương gia, tuyệt đối an toàn) nối thẳng 1 cửa sang phòng Boss,
+## KHÔNG có phòng thường nào để cày máu/dọn quái trước — buộc đối mặt Boss ngay, đúng tinh
+## thần "1 phòng spawn + thương gia, 1 phòng boss thật khó" người chơi yêu cầu.
+func _generate_lord_floor() -> void:
+	_clear()
+	_ensure_tileset_for_biome(_biome_for_floor(10))
+	start_cell = Vector2i(2, 2)
+	boss_cell = Vector2i(3, 2)
+	rooms[start_cell] = _new_room("start")
+	rooms[boss_cell] = _new_room("boss")
+	_connect(start_cell, boss_cell)
+	for c in rooms:
+		_build_room(c, rooms[c])
+	current_cell = start_cell
+	rooms[start_cell]["type"] = "start"
+	rooms[start_cell]["visited"] = true
+	rooms[start_cell]["cleared"] = true
+	_unlock_doors(rooms[start_cell])
+	rooms_updated.emit()
+
+
 # ------------------------------------------------------------------ Sinh tầng
 func generate(floor_number: int) -> void:
+	if floor_number == 10:
+		_generate_lord_floor()
+		return
 	_clear()
 	_ensure_tileset_for_biome(_biome_for_floor(floor_number))
 	var target: int = mini(5 + floor_number, 11)
@@ -495,13 +521,20 @@ func _boss_kind_for_floor(floor_num: int) -> String:
 
 func _spawn_boss(cell: Vector2i) -> void:
 	var b = BOSS.instantiate()
-	b.setup(1.0 + 0.3 * float(Global.floor_num - 1), _boss_kind_for_floor(Global.floor_num))
+	var kind: String = _boss_kind_for_floor(Global.floor_num)
+	b.setup(1.0 + 0.3 * float(Global.floor_num - 1), kind)
 	b.died.connect(_on_boss_died.bind(cell))
 	b.summon_requested.connect(_on_summon.bind(cell))
 	entities.add_child(b)
 	b.global_position = room_center(cell)
 	if b.has_method("set_arena_bounds"):
 		b.set_arena_bounds(_room_rect(cell, 3))
+	if kind == "lord":
+		var rune := Node2D.new()
+		rune.set_script(LordArenaRuneScript)
+		rune.z_index = -1
+		entities.add_child(rune)
+		rune.global_position = room_center(cell)
 	if b.has_method("activate_boss"):
 		b.activate_boss()
 	boss_alive = true
@@ -559,13 +592,13 @@ func _room_cleared(cell: Vector2i) -> void:
 	if room["type"] == "boss":
 		_spawn_pickup("portal", "", room_center(cell))
 		Global.message.emit("The stairs down have opened!", Color(0.6, 0.6, 1.0))
+		# Cân bằng lại: trước đây mời chọn buff sau MỌI phòng dọn sạch (quá dễ cày),
+		# giờ chỉ 1 lần chọn buff duy nhất mỗi tầng, ngay sau khi hạ Boss.
+		Global.request_buff_choice()
 	else:
 		Global.message.emit("Room cleared!", Color(0.6, 1.0, 0.6))
 		if randf() < 0.35:
 			_spawn_pickup("heal", "", room_center(cell))
-	# _room_cleared() chỉ được gọi cho phòng "normal"/"boss" (treasure/start tự set cleared=true
-	# thẳng ở nơi khác, không qua đây) — mời chọn buff Pick-1-of-3 sau khi dọn xong.
-	Global.request_buff_choice()
 
 
 ## Rương trang trí (tĩnh, không va chạm) đặt dưới vũ khí trong phòng Kho báu — chỉ để đẹp,

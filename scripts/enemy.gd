@@ -12,6 +12,15 @@ signal died(enemy)
 
 const PICKUP = preload("res://scenes/pickup.tscn")
 const BULLET = preload("res://scenes/bullet.tscn")
+const QAgentScript = preload("res://scripts/q_agent.gd")
+
+## AI Tầng 2 (Q-Learning): % quái tầm xa (archer/shaman) trở thành "Tinh Anh" mỗi lần spawn —
+## HP cao hơn, tint tím nhận diện, và dùng QAgent (scripts/q_agent.gd) để quyết định hành vi
+## bắn thay vì luôn theo nhịp cố định như quái thường.
+const ELITE_CHANCE: float = 0.15
+const ELITE_HP_MULT: float = 1.4
+var is_elite: bool = false
+var q_agent: Node = null
 
 var kind: String = "slime"
 var data: Dictionary = {}
@@ -75,12 +84,20 @@ func hurt_center() -> Vector2:
 func setup(p_kind: String, hp_mult: float = 1.0) -> void:
 	kind = p_kind
 	data = Global.enemies[p_kind]
+	if (kind == "archer" or kind == "shaman") and randf() < ELITE_CHANCE:
+		is_elite = true
+		hp_mult *= ELITE_HP_MULT
 	var floor_scale: float = 1.0 + 0.15 * float(Global.floor_num - 1)
 	var endless_mult: float = Global.endless_difficulty_mult(Global.floor_num) # >1.0 chỉ khi tầng > 10 (Vô Hạn)
 	var computed_max_hp: float = float(data["hp"]) * hp_mult * floor_scale * endless_mult
 	var computed_armor: float = floor((Global.floor_num - 1) * 1.2) + floor((endless_mult - 1.0) * 8.0)
 	var computed_cc_resist: float = minf(0.0 + (Global.floor_num - 1) * 0.15, 0.6)
 	$Hurtbox.setup(computed_max_hp, computed_armor, computed_cc_resist, float(data["weight"]))
+	if is_elite:
+		q_agent = Node.new()
+		q_agent.set_script(QAgentScript)
+		add_child(q_agent)
+		q_agent.attach(self)
 
 func _ready() -> void:
 	if data.is_empty():
@@ -155,6 +172,8 @@ func _update_sprite(moving: bool) -> void:
 		sprite.modulate = Color.YELLOW
 	elif hurtbox.is_slowed():
 		sprite.modulate = Color.AQUA
+	elif is_elite:
+		sprite.modulate = Color(1.4, 0.85, 1.7) # Tinh Anh: tint tím nhận diện bằng mắt
 	else:
 		sprite.modulate = Color.WHITE
 	var want_anim: String = "run" if moving else "idle"
@@ -198,14 +217,44 @@ func _on_action_timer_timeout() -> void:
 	elif kind == "frost_big_zombie":
 		_frost_slam()
 
+## AI Tầng 1 (Heuristic/Adaptive): thay vì luôn bắn thẳng vào vị trí hiện tại, pha trộn
+## thêm hướng "đón đầu" dựa trên thói quen né trái/phải (PlayerProfiler.dodge_bias) VÀ vận
+## tốc hiện tại của Player — trọng số pha trộn tăng dần theo _confidence (càng quan sát
+## nhiều ván càng đoán đúng hơn). Luôn cộng thêm 1 lệch góc ngẫu nhiên nhỏ ("Human Error",
+## xem PlayerProfiler.human_error_rad()) để không biến thành aimbot bóp nghẹt tuyệt đối.
 func _shoot() -> void:
 	var p = Global.player
 	if not is_instance_valid(p) or not p.alive:
 		return
 	var p_center = p.hurt_center() if p.has_method("hurt_center") else p.global_position
-	var dir: Vector2 = (p_center - global_position).normalized()
+	var to_player: Vector2 = p_center - global_position
+	var base_dir: Vector2 = to_player.normalized()
+
+	# AI Tầng 2 (quái Tinh Anh, xem q_agent.gd): để QAgent quyết định hành vi thay vì luôn bắn.
+	var q_action: String = ""
+	if is_elite and q_agent:
+		q_action = q_agent.choose_action()
+		if q_action == "hold" or q_action == "retreat":
+			return # Bỏ lượt bắn này — QAgent học dần khi nào "nhịn" có lợi hơn là xả liên tục.
+
+	# Vector "đón đầu": kết hợp vận tốc thực tế của Player + xu hướng né ngang đã quan sát
+	# (AI Tầng 1, PlayerProfiler). Quái Tinh Anh chọn "shoot_straight" thì bỏ qua đón đầu hẳn.
+	var lead_weight: float = 0.0 if q_action == "shoot_straight" else PlayerProfiler.predictive_lead_weight()
+	var perp: Vector2 = base_dir.orthogonal()
+	var lateral_lead: Vector2 = perp * PlayerProfiler.dodge_bias * 40.0
+	var velocity_lead: Vector2 = p.velocity * 0.18
+	var predicted_point: Vector2 = p_center + (lateral_lead + velocity_lead) * lead_weight
+	var dir: Vector2 = (predicted_point - global_position).normalized()
+	if dir == Vector2.ZERO:
+		dir = base_dir
+
+	# Human Error: luôn lệch thêm 1 góc ngẫu nhiên nhỏ, không bao giờ bắn "hoàn hảo" 100%.
+	dir = dir.rotated(randf_range(-1.0, 1.0) * PlayerProfiler.human_error_rad())
+
 	var b = BULLET.instantiate()
 	b.setup(false, dir, int(data["bullet_damage"]), float(data["bullet_speed"]), 2.5, data["color"], 6.0, false, String(data.get("bullet_effect", "")))
+	if is_elite and q_agent:
+		b.source_q_agent = q_agent # bullet.gd báo kết quả trúng/trượt ngược lại qua field này
 	Global.world.add_child(b)
 	b.global_position = global_position + dir * 18.0
 	Global.sfx("enemy_shoot")
