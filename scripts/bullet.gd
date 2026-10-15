@@ -18,6 +18,10 @@ var homing_target: Node = null
 ## đạn), báo kết quả trúng/trượt ngược lại cho QAgent của nó để cập nhật Q-table.
 var source_q_agent: Node = null
 var _q_reward_sent: bool = false
+## Buff tầm xa (đặt bởi player.gd lúc bắn)
+var bounces_left: int = 0
+var split_on_hit: bool = false
+var is_fragment: bool = false # mảnh tách ra từ Đạn Phân Tách — không tách tiếp
 const HOMING_TURN_RATE: float = 2.2 # rad/s - bẻ hướng từ từ, không phải dính chắc chắn
 
 @onready var life_timer: Timer = $Life
@@ -51,8 +55,45 @@ func _ready() -> void:
 	life_timer.timeout.connect(_on_timeout)
 	life_timer.start(life)
 
+## Đạn địch bị Phản Đạn: đổi chủ thành đạn của Player bay theo hướng mới.
+func reflect(new_dir: Vector2, dmg_mult: float) -> void:
+	from_player = true
+	remove_from_group("enemy_bullets")
+	source_q_agent = null
+	_q_reward_sent = true
+	dir = new_dir.normalized()
+	rotation = dir.angle()
+	damage = maxi(1, int(float(damage) * dmg_mult))
+	knock = 140.0
+	_hit.clear()
+	collision_layer = Global.L_PBULLET
+	collision_mask = Global.L_WORLD | Global.L_ENEMY
+	life_timer.start(maxf(life_timer.time_left, 1.0))
+	color = Color(0.6, 1.0, 0.7)
+	queue_redraw()
+
+func _nearest_enemy_pos(max_dist: float) -> Variant:
+	var best: Variant = null
+	var best_d: float = max_dist
+	for e in get_tree().get_nodes_in_group("enemies") + get_tree().get_nodes_in_group("boss"):
+		if not is_instance_valid(e) or not e.get("alive"):
+			continue
+		var pos: Vector2 = e.hurt_center() if e.has_method("hurt_center") else e.global_position
+		var dd: float = global_position.distance_to(pos)
+		if dd < best_d:
+			best_d = dd
+			best = pos
+	return best
+
 func _physics_process(delta: float) -> void:
-	if homing and is_instance_valid(homing_target):
+	if homing and from_player:
+		# Đạn Tầm Nhiệt của Player: tự dò quái gần nhất trong 320px
+		var tp: Variant = _nearest_enemy_pos(320.0)
+		if tp != null:
+			var want: Vector2 = ((tp as Vector2) - global_position).normalized()
+			dir = dir.slerp(want, minf(1.0, 4.0 * delta))
+			rotation = dir.angle()
+	elif homing and is_instance_valid(homing_target):
 		var target_pos = homing_target.hurt_center() if homing_target.has_method("hurt_center") else homing_target.global_position
 		var want_dir: Vector2 = (target_pos - global_position).normalized()
 		dir = dir.slerp(want_dir, minf(1.0, HOMING_TURN_RATE * delta))
@@ -98,14 +139,45 @@ func _on_body_entered(body: Node) -> void:
 				# Độc Trượng (Orc Shaman, biome Đầm Lầy): 3 nhịp x 4 dmg lên Player
 				body.apply_status("poison", 3, 4)
 				
+		if from_player and split_on_hit and not is_fragment:
+			_spawn_fragments()
 		if not pierce:
 			_impact()
+	elif from_player and bounces_left > 0 and _try_bounce():
+		return
 	else:
 		# Đập tường/vật cản (không có take_damage) = trượt -> phạt QAgent nếu là đạn Tinh Anh
 		if source_q_agent and not _q_reward_sent:
 			_q_reward_sent = true
 			source_q_agent.learn(-5.0)
 		_impact()
+
+## Đạn Nảy: dò pháp tuyến tường bằng raycast ngắn rồi phản xạ hướng bay.
+func _try_bounce() -> bool:
+	var space := get_world_2d().direct_space_state
+	var q := PhysicsRayQueryParameters2D.create(global_position - dir * (radius + 10.0), global_position + dir * (radius + 14.0), Global.L_WORLD)
+	var hit: Dictionary = space.intersect_ray(q)
+	if hit.is_empty():
+		return false
+	bounces_left -= 1
+	dir = dir.bounce(hit["normal"]).normalized()
+	rotation = dir.angle()
+	global_position = hit["position"] + hit["normal"] * (radius + 2.0)
+	_hit.clear()
+	Global.burst(global_position, color, 3, 70.0, 0.8)
+	return true
+
+func _spawn_fragments() -> void:
+	for off in [-0.6, 0.6]:
+		var nb = load("res://scenes/bullet.tscn").instantiate()
+		nb.setup(true, dir.rotated(off), maxi(1, int(float(damage) * 0.4)), speed, 0.45, color, maxf(3.0, radius * 0.6))
+		nb.is_fragment = true
+		_add_deferred(nb, global_position)
+
+## Không được add_child ngay trong callback va chạm (đang flush physics).
+func _add_deferred(node: Node, pos: Vector2) -> void:
+	Global.world.add_child.call_deferred(node)
+	node.set_deferred("global_position", pos)
 
 func _chain_lightning(first_target: Node) -> void:
 	for e in get_tree().get_nodes_in_group("enemies"):

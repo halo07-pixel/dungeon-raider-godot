@@ -16,6 +16,11 @@ const SHIELD_PER_FLOOR: int = 4
 const SHIELD_REGEN_DELAY: float = 2.5
 const SHIELD_REGEN_RATE: float = 10.0
 var max_shield: int = 20
+var shield_nova_cd: float = 0.0
+var counter_timer: float = 0.0   # Phản Công: cửa sổ x2 sát thương sau khi bị đánh
+var swing_count: int = 0         # Lốc Xoáy
+var shot_count: int = 0          # Loạt Đạn Vòng / Siêu Đạn
+var still_time: float = 0.0      # Tập Trung
 var shield: float = 20.0
 var shield_delay_timer: float = 0.0
 var weapon_id: String = "pistol"
@@ -83,6 +88,7 @@ func _ready() -> void:
 
 	refresh_max_shield()
 	shield = float(max_shield)
+	Global.room_cleared.connect(_on_room_cleared)
 
 	set_weapon_with_rarity(cls["default_weapon"], "common")
 	dodge_timer.timeout.connect(_on_dodge_finished)
@@ -158,6 +164,7 @@ func apply_status(type: String, duration: float, amount: float = 0.0) -> void:
 func _physics_process(delta: float) -> void:
 	if not alive: return
 	_tick_shield(delta)
+	_tick_buff_timers(delta)
 
 	if dagger_timer > 0:
 		dagger_timer -= delta
@@ -199,8 +206,6 @@ func _physics_process(delta: float) -> void:
 		_start_roll(input_dir if input_dir != Vector2.ZERO else aim_dir)
 
 	var speed_mult: float = 0.55 if slow_timer > 0.0 else 1.0
-	# Buff "Săn Sóc" (+tốc độ di chuyển)
-	speed_mult *= 1.0 + 0.06 * float(Global.buff_stack("buff_speed"))
 	if rolling: velocity = roll_dir * ROLL_SPEED
 	elif slide_timer > 0.0: velocity = slide_dir * SPEED # Trượt: giữ nguyên hướng cũ, bỏ qua input mới
 	else: velocity = input_dir * SPEED * speed_mult
@@ -216,6 +221,12 @@ func _physics_process(delta: float) -> void:
 	_update_weapon_visual()
 	queue_redraw()
 
+## Gắn thuộc tính buff tầm xa lên viên đạn vừa tạo (Đạn Nảy / Phân Tách / Tầm Nhiệt).
+func _apply_ranged_buffs(b) -> void:
+	b.bounces_left = Global.buff_stack("buff_bounce")
+	b.split_on_hit = Global.buff_stack("buff_split") > 0
+	b.homing = Global.buff_stack("buff_homing") > 0
+
 func _start_roll(dir: Vector2) -> void:
 	rolling = true
 	roll_dir = dir.normalized()
@@ -230,6 +241,21 @@ func _start_roll(dir: Vector2) -> void:
 
 func _on_dodge_finished() -> void:
 	rolling = false
+	_roll_slash()
+
+## Buff Lăn Chém (cận chiến): kết thúc cú lăn chém vòng quanh.
+func _roll_slash() -> void:
+	var stacks: int = Global.buff_stack("buff_rollslash")
+	if stacks <= 0 or not weapon.get("is_melee", false):
+		return
+	var dmg: int = maxi(1, int(float(weapon["damage"]) * rarity_data["mult"] * 1.2 * (1.0 + 0.25 * float(stacks - 1))))
+	for e in get_tree().get_nodes_in_group("enemies"):
+		if is_instance_valid(e) and e.alive and e.global_position.distance_to(global_position) <= 85.0:
+			e.take_damage(dmg, global_position, 320.0)
+	for b in get_tree().get_nodes_in_group("boss"):
+		if is_instance_valid(b) and b.alive and b.global_position.distance_to(global_position) <= 110.0:
+			b.take_damage(dmg, global_position, 0.0)
+	Global.burst(global_position, Color(0.8, 0.9, 1.0), 14, 220.0, 1.5)
 
 # ==============================================================================
 # HỆ THỐNG HIỆU ỨNG VŨ KHÍ TẦM XA
@@ -246,6 +272,9 @@ func _shoot() -> void:
 		mult += MOMENTUM_PER_STACK * float(momentum_stacks)
 	if Global.buff_stack("buff_berserk") > 0 and max_hp > 0:
 		mult += 0.4 * (1.0 - float(hp) / float(max_hp))
+	# Buff "Tập Trung": đứng yên đủ lâu -> tăng sát thương
+	if Global.buff_stack("buff_focus") > 0 and still_time >= 0.6:
+		mult += 0.2 * float(Global.buff_stack("buff_focus"))
 	var dmg = int(base_dmg * mult)
 
 	var pellets: int = w["pellets"]
@@ -285,6 +314,17 @@ func _shoot() -> void:
 		is_pierce = true
 	if is_crit: dmg *= 2
 
+	# Siêu Đạn / Loạt Đạn Vòng: đếm phát bắn
+	shot_count += 1
+	var is_super: bool = Global.buff_stack("buff_super") > 0 and shot_count % 6 == 0
+	var do_ring: bool = Global.buff_stack("buff_ring") > 0 and shot_count % 5 == 0
+	var bullet_radius: float = float(w["radius"])
+	if is_super:
+		dmg *= 3
+		is_pierce = true
+		bullet_radius *= 2.0
+		p_color = Color(1.0, 0.85, 0.2)
+
 	PlayerProfiler.record_attack(false) # AI Tầng 1: ghi nhận lối chơi tầm xa
 	fire_timer.start(cd)
 	spread = deg_to_rad(spread)
@@ -297,9 +337,17 @@ func _shoot() -> void:
 			off += randf_range(-spread, spread) * 0.08
 		var dir: Vector2 = Vector2.from_angle(base_ang + off)
 		var b = BULLET.instantiate()
-		b.setup(true, dir, dmg, speed, life, p_color, float(w["radius"]), is_pierce, eff)
+		b.setup(true, dir, dmg, speed, life, p_color, bullet_radius, is_pierce, eff)
+		_apply_ranged_buffs(b)
 		Global.world.add_child(b)
 		b.global_position = global_position + aim_dir * 24.0
+
+	if do_ring:
+		for k in 8:
+			var rb = BULLET.instantiate()
+			rb.setup(true, Vector2.from_angle(TAU * float(k) / 8.0), maxi(1, int(float(dmg) * 0.5)), speed * 0.8, life * 0.8, Color(0.6, 0.9, 1.0), 5.0)
+			Global.world.add_child(rb)
+			rb.global_position = global_position
 		
 	knockback -= aim_dir * w_knock
 	Global.sfx(w["sfx"])
@@ -368,6 +416,17 @@ func _swing() -> void:
 
 	if is_crit: dmg *= 2
 
+	# Phản Công: sau khi bị đánh, đòn chém kế tiếp x2 sát thương
+	if Global.buff_stack("buff_counter") > 0 and counter_timer > 0.0:
+		dmg *= 2
+		counter_timer = 0.0
+		Global.float_text(global_position + Vector2(0, -36), "PHẢN CÔNG!", Color(1.0, 0.6, 0.2), 18)
+	# Lốc Xoáy: mỗi đòn thứ 4 chém vòng 360 độ
+	swing_count += 1
+	if Global.buff_stack("buff_whirl") > 0 and swing_count % 4 == 0:
+		aoe_angle = 360.0
+		aoe_range *= 1.15
+
 	# Lưu lại tầm/góc THẬT (đã cộng buff + độ hiếm) để _draw()/_update_weapon_visual()
 	# vẽ đúng vệt chém khớp vùng gây sát thương — xem khai báo display_swing_range/half_angle.
 	display_swing_range = aoe_range
@@ -390,13 +449,18 @@ func _swing() -> void:
 	var rad_angle = deg_to_rad(aoe_angle)
 	
 	# CƠ CHẾ DAO GĂM: CHÉM XÓA ĐẠN QUÁI
-	if weapon_id == "daggers":
+	# (Dao Găm xóa đạn sẵn; buff Phản Đạn mở rộng cho mọi vũ khí cận chiến, Dao Găm thì PHẢN đạn.)
+	var can_deflect: bool = Global.buff_stack("buff_deflect") > 0
+	if weapon_id == "daggers" or can_deflect:
 		for b in get_tree().get_nodes_in_group("enemy_bullets"):
 			var to_b = b.global_position - global_position
 			if to_b.length() <= aoe_range + 10.0:
 				if absf(aim_dir.angle_to(to_b)) <= rad_angle * 0.5:
 					Global.burst(b.global_position, Color.WHITE, 4, 60.0, 0.6)
-					b.queue_free() # Xóa đạn!
+					if can_deflect and weapon_id == "daggers" and b.has_method("reflect"):
+						b.reflect(aim_dir, 1.5) # Phản đạn!
+					else:
+						b.queue_free() # Xóa đạn!
 					Global.sfx("dodge")
 					
 	# CHÉM QUÁI VÀ BOSS
@@ -430,6 +494,13 @@ func _swing() -> void:
 					if lifesteal > 0.0: total_heal += maxi(1, int(float(dmg) * lifesteal * 0.5))
 					if Global.buff_stack("buff_sunder") > 0 and b.has_method("apply_sunder"): b.apply_sunder()
 
+	# Buff Kiếm Khí: mỗi đòn chém phóng thêm luồng kiếm khí xuyên
+	if Global.buff_stack("buff_wave") > 0:
+		var wb = BULLET.instantiate()
+		wb.setup(true, aim_dir, maxi(1, int(float(dmg) * 0.35 * float(Global.buff_stack("buff_wave")))), 480.0, 0.4, Color(0.7, 0.9, 1.0), 9.0, true)
+		Global.world.add_child(wb)
+		wb.global_position = global_position + aim_dir * 25.0
+
 	# Kiếm Dài Sử Thi: Phóng Kiếm Khí
 	if weapon_id == "broadsword" and (weapon_rarity == "epic" or weapon_rarity == "legendary"):
 		var b = BULLET.instantiate()
@@ -455,9 +526,23 @@ func set_weapon_with_rarity(id: String, rarity: String) -> void:
 	var display_name = weapon["name"] + " (" + rarity_data["name"] + ")"
 	Global.message.emit("Picked up: " + display_name, rarity_data["color"])
 
-## Giáp tối đa tăng theo tầng; gọi lại khi sang tầng mới.
+func _tick_buff_timers(delta: float) -> void:
+	shield_nova_cd = maxf(0.0, shield_nova_cd - delta)
+	counter_timer = maxf(0.0, counter_timer - delta)
+	if velocity.length() < 5.0 and not rolling:
+		still_time += delta
+	else:
+		still_time = 0.0
+
+## Buff Thực Khách Hầm Ngục: dọn sạch phòng hồi % máu tối đa.
+func _on_room_cleared() -> void:
+	var stacks: int = Global.buff_stack("buff_gourmand")
+	if stacks > 0 and alive:
+		heal(maxi(1, int(float(max_hp) * 0.08 * float(stacks))))
+
+## Giáp tối đa tăng theo tầng + buff Lá Chắn Lớn; gọi lại khi sang tầng mới.
 func refresh_max_shield() -> void:
-	var new_max: int = SHIELD_BASE + SHIELD_PER_FLOOR * maxi(0, Global.floor_num - 1)
+	var new_max: int = SHIELD_BASE + SHIELD_PER_FLOOR * maxi(0, Global.floor_num - 1) + 10 * Global.buff_stack("buff_shield_cap")
 	shield += float(new_max - max_shield) if new_max > max_shield else 0.0
 	max_shield = new_max
 	shield = minf(shield, float(max_shield))
@@ -466,16 +551,36 @@ func _tick_shield(delta: float) -> void:
 	if shield_delay_timer > 0.0:
 		shield_delay_timer = maxf(0.0, shield_delay_timer - delta)
 	elif shield < float(max_shield):
-		shield = minf(float(max_shield), shield + SHIELD_REGEN_RATE * delta)
+		shield = minf(float(max_shield), shield + SHIELD_REGEN_RATE * (1.0 + 0.25 * float(Global.buff_stack("buff_shield_regen"))) * delta)
 
 ## Trả về lượng sát thương còn lại sau khi giáp hấp thụ. Luôn reset nhịp hồi giáp.
 func _absorb_with_shield(amount: int) -> int:
-	shield_delay_timer = SHIELD_REGEN_DELAY
+	shield_delay_timer = maxf(1.0, SHIELD_REGEN_DELAY - 0.4 * float(Global.buff_stack("buff_shield_regen")))
 	if shield <= 0.0:
 		return amount
 	var absorbed: int = mini(amount, int(ceil(shield)))
 	shield = maxf(0.0, shield - float(absorbed))
+	if shield <= 0.0:
+		_on_shield_broken()
 	return amount - absorbed
+
+## Buff Giáp Phản Chấn: giáp vỡ -> xung chấn quanh Player (có hồi chiêu).
+func _on_shield_broken() -> void:
+	if Global.buff_stack("buff_shield_nova") <= 0 or shield_nova_cd > 0.0:
+		return
+	shield_nova_cd = 6.0
+	var dmg: int = 25 + 3 * Global.floor_num
+	for e in get_tree().get_nodes_in_group("enemies"):
+		if is_instance_valid(e) and e.alive and e.global_position.distance_to(global_position) <= 140.0:
+			e.take_damage(dmg, global_position, 450.0)
+	for b in get_tree().get_nodes_in_group("boss"):
+		if is_instance_valid(b) and b.alive and b.global_position.distance_to(global_position) <= 160.0:
+			b.take_damage(dmg, global_position, 0.0)
+	for eb in get_tree().get_nodes_in_group("enemy_bullets"):
+		if is_instance_valid(eb) and eb.global_position.distance_to(global_position) <= 160.0:
+			eb.queue_free()
+	Global.burst(global_position, Color(0.55, 0.75, 1.0), 30, 320.0, 2.0)
+	Global.shake(0.4, 0.2)
 
 func take_damage(amount: int, from_pos: Vector2 = Vector2.ZERO, knock: float = 300.0, ignore_invuln: bool = false, bypass_shield: bool = false) -> void:
 	if not alive: return
@@ -483,10 +588,7 @@ func take_damage(amount: int, from_pos: Vector2 = Vector2.ZERO, knock: float = 3
 	# Hệ số sát thương quái/boss/bẫy theo tầng (xem Global.enemy_dmg_mult_for_floor) —
 	# chặn điểm chung duy nhất mà MỌI nguồn sát thương từ môi trường đổ vào Player.
 	amount = maxi(1, int(float(amount) * Global.enemy_dmg_mult_for_floor(Global.floor_num)))
-	# Buff "Giáp Dày": giảm % sát thương nhận vào (trần 50%)
-	if Global.buff_stack("buff_armor") > 0:
-		var reduction: float = minf(0.5, 0.06 * float(Global.buff_stack("buff_armor")))
-		amount = maxi(1, int(float(amount) * (1.0 - reduction)))
+	counter_timer = 3.0 # Phản Công: bị đánh trúng mở cửa sổ x2 sát thương
 	var hp_damage: int = amount if bypass_shield else _absorb_with_shield(amount)
 	hp = maxi(hp - hp_damage, 0)
 	if not ignore_invuln:
