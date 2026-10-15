@@ -282,6 +282,10 @@ func take_damage(amount: int, from_pos: Vector2 = Vector2.ZERO, knock: float = 2
 		return
 	hurtbox.take_hit(amount, from_pos, knock, true_dmg)
 
+## Buff nguyên tố (burn/poison/frost) — forward sang Hurtbox, cùng kiểu duck-typing.
+func apply_element(kind: String, power: int, cap: int) -> void:
+	hurtbox.apply_element(kind, power, cap)
+
 func apply_status(type: String, duration: float) -> void:
 	hurtbox.apply_status(type, duration)
 
@@ -307,6 +311,7 @@ func _physics_process(delta: float) -> void:
 	_t += delta
 
 	hurtbox.tick_bleed(delta)
+	hurtbox.tick_elements(delta)
 	hurtbox.tick_sunder(delta)
 
 	if hurtbox.consume_stun(delta):

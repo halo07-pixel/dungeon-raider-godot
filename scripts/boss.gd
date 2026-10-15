@@ -83,6 +83,22 @@ const SUNDER_PER_STACK: float = 0.08
 const SUNDER_MAX_STACKS: int = 5
 const SUNDER_DURATION: float = 3.0
 
+## Boss chỉ chịu Thiêu Đốt / Độc / làm chậm-tích-băng (KHÔNG bị đóng băng cứng) — xem element_status.gd.
+var elements = preload("res://scripts/components/element_status.gd").new()
+
+func apply_element(kind: String, power: int, cap: int) -> void:
+	if not alive:
+		return
+	if not elements.dot_cb.is_valid():
+		elements.dot_cb = func(dmg: int, color: Color):
+			if alive:
+				take_damage(dmg, global_position, 0.0)
+				Global.burst(global_position, color, 3, 50.0, 1.0)
+	match kind:
+		"burn": elements.apply_burn(power)
+		"poison": elements.apply_poison(power, cap)
+		"frost": pass # boss miễn nhiễm đóng băng
+
 func apply_sunder() -> void:
 	if not alive:
 		return
@@ -671,6 +687,8 @@ func _physics_process(delta: float) -> void:
 		sunder_timer -= delta
 		if sunder_timer <= 0.0:
 			sunder_stacks = 0
+	if elements.is_active():
+		elements.tick(delta)
 	var p = Global.player
 
 	# === CƠ CHẾ CHỐNG ÔM BOSS ===
