@@ -14,6 +14,10 @@ var effect: String = ""
 var _hit: Array = []
 var homing: bool = false # Đạn Dark Bolt của Necromancer: bẻ hướng dần về phía mục tiêu
 var homing_target: Node = null
+## AI Tầng 2 (Q-Learning): nếu viên đạn này do quái Tinh Anh bắn ra (enemy.gd gán khi tạo
+## đạn), báo kết quả trúng/trượt ngược lại cho QAgent của nó để cập nhật Q-table.
+var source_q_agent: Node = null
+var _q_reward_sent: bool = false
 const HOMING_TURN_RATE: float = 2.2 # rad/s - bẻ hướng từ từ, không phải dính chắc chắn
 
 @onready var life_timer: Timer = $Life
@@ -66,13 +70,17 @@ func _on_body_entered(body: Node) -> void:
 			
 		body.take_damage(damage, global_position - dir * 8.0, knock)
 
+		if not from_player and source_q_agent and not _q_reward_sent:
+			_q_reward_sent = true
+			source_q_agent.learn(10.0) # AI Tầng 2: đòn chọn vừa rồi trúng Player -> thưởng
+
 		if from_player:
 			# ÁP DỤNG BUFF (tầm xa — sát thương tầm xa "đổ bộ" ở đây, không phải trong player.gd._shoot()):
 			# Phá Giáp / Hút Máu
 			if Global.buff_stack("buff_sunder") > 0 and body.has_method("apply_sunder"):
 				body.apply_sunder()
 			if Global.buff_stack("buff_lifesteal") > 0 and is_instance_valid(Global.player):
-				Global.player.heal(maxi(1, int(float(damage) * 0.04 * float(Global.buff_stack("buff_lifesteal")))))
+				Global.player.heal(maxi(1, int(float(damage) * 0.02 * float(Global.buff_stack("buff_lifesteal")))))
 
 		if body.has_method("apply_status"):
 			if from_player:
@@ -93,6 +101,10 @@ func _on_body_entered(body: Node) -> void:
 		if not pierce:
 			_impact()
 	else:
+		# Đập tường/vật cản (không có take_damage) = trượt -> phạt QAgent nếu là đạn Tinh Anh
+		if source_q_agent and not _q_reward_sent:
+			_q_reward_sent = true
+			source_q_agent.learn(-5.0)
 		_impact()
 
 func _chain_lightning(first_target: Node) -> void:
@@ -102,6 +114,9 @@ func _chain_lightning(first_target: Node) -> void:
 			Global.burst(e.global_position, Color.YELLOW, 2, 80.0, 1.0)
 
 func _on_timeout() -> void:
+	if source_q_agent and not _q_reward_sent:
+		_q_reward_sent = true
+		source_q_agent.learn(-5.0) # AI Tầng 2: hết giờ mà không trúng -> phạt
 	_impact()
 
 func _impact() -> void:

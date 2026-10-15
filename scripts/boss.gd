@@ -70,6 +70,10 @@ var armor: float = 0.0
 var cc_resist: float = 0.0
 var is_boss: bool = true
 var blink_cd: float = 0.0 # riêng Necromancer: hồi chiêu dịch chuyển né cận chiến
+## Riêng Frost: khi máu <=25%, vào pha "nổi điên" — đánh nhanh hơn, telegraph ngắn hơn,
+## đuổi theo nhanh hơn, ưu tiên các đòn nguy hiểm nhất. Bù lại cho việc đòn to-xác mà
+## thiếu áp lực thời gian khiến người chơi kiting thoải mái ở pha cuối.
+var frost_enraged: bool = false
 
 ## Buff "Phá Giáp" (Sử Thi) của Player — cùng công thức/field với HurtboxComponent của
 ## enemy.gd thường (xem ghi chú ở đó), boss không dùng component nên khai báo trực tiếp.
@@ -195,11 +199,17 @@ func _update_sprite() -> void:
 
 
 func _cooldown() -> float:
-	return COOLDOWN_TABLE[mini(phase - 1, COOLDOWN_TABLE.size() - 1)]
+	var base: float = COOLDOWN_TABLE[mini(phase - 1, COOLDOWN_TABLE.size() - 1)]
+	if kind == "frost" and frost_enraged:
+		base *= 0.6
+	return base
 
 
 func _speed_mult() -> float:
-	return SPEED_MULT_TABLE[mini(phase - 1, SPEED_MULT_TABLE.size() - 1)]
+	var m: float = SPEED_MULT_TABLE[mini(phase - 1, SPEED_MULT_TABLE.size() - 1)]
+	if kind == "frost" and frost_enraged:
+		m *= 0.75 # telegraph ngắn hơn -> khó đọc đòn hơn ở pha nổi điên
+	return m
 
 
 # ------------------------------------------------------------------ Vòng đời đòn đánh
@@ -220,6 +230,9 @@ func _attack_pool() -> Array:
 			if phase >= 3:
 				pool.append("blizzard")
 				pool.append("ice_prison") # tăng tỉ lệ ở pha cuối, đòn chính xác rủi ro cao
+			if frost_enraged:
+				pool.append("ice_prison")
+				pool.append("blizzard") # nổi điên: dồn thêm trọng số vào 2 đòn nguy hiểm nhất
 			return pool
 		"lord":
 			# Mỗi pha có CHỦ ĐỀ riêng (không đơn thuần cộng dồn hết mọi đòn cùng lúc) để trận
@@ -574,26 +587,52 @@ func _atk_ice_prison() -> void:
 # ==============================================================================
 # ĐÒN ĐỘC QUYỀN DUNGEON LORD — "Phán Quyết" (pha 4, ultimate)
 # ==============================================================================
+## "Phán Quyết" — nay là 1 CHUỖI COMBO 4 nhịp thay vì 1 phát nổ tĩnh đơn điệu:
+## (1) đòn giả (false-telegraph, không gây sát thương) nhử người chơi né hụt sớm ->
+## (2) đòn nổ lớn thật, telegraph dài, tâm cố định lúc bắt đầu -> (3)+(4) 2 đòn truy đuổi
+## nhỏ hơn nhưng NHANH hơn, mỗi đòn nhắm lại đúng vị trí Player lúc đó -> buộc phải né
+## liên tục chứ không phải "thấy vòng tròn, bước ra 1 lần là xong" -> kết bằng Ring dồn dập.
 func _atk_judgement() -> void:
 	var p = Global.player
-	var center: Vector2 = p.global_position if is_instance_valid(p) else global_position
 	Global.message.emit("Dungeon Lord đang tụ sức mạnh...!", Color(1.0, 0.2, 0.2))
-	Global.shake(0.3, 1.5)
 	Global.sfx("roar")
+	# (1) Đòn giả: lóe sáng nhanh, KHÔNG spawn hazard — chỉ để nhử phản xạ né sớm của người chơi.
+	await _telegraph("flash", 0.4)
+	if not alive:
+		return
+	# (2) Đòn nổ lớn thật.
+	Global.shake(0.3, 1.5)
+	var center: Vector2 = p.global_position if is_instance_valid(p) else global_position
 	var hz := Area2D.new()
 	hz.set_script(BOSS_HAZARD)
 	hz.single_shot = true
-	hz.damage = 42
+	hz.damage = 38
 	hz.radius = 170.0
-	hz.telegraph_time = 1.6
+	hz.telegraph_time = 1.3
 	hz.color = Color(1.0, 0.15, 0.15, 0.5)
 	Global.world.add_child(hz)
 	hz.global_position = center
-	await get_tree().create_timer(1.8).timeout
+	await get_tree().create_timer(1.5).timeout
 	if not alive:
 		return
-	# Nối liền ngay 1 đòn Ring ngay sau Judgement, không có khoảng nghỉ — tạo cảm giác dồn
-	# dập đúng chất "khoảnh khắc chung kết" thay vì nhịp độ đều đều như các boss thường.
+	# (3)+(4) 2 đòn truy đuổi nhanh, mỗi đòn chốt lại đúng vị trí Player NGAY lúc đó.
+	for i in 2:
+		if not alive:
+			return
+		var chase_pos: Vector2 = p.global_position if is_instance_valid(p) else global_position
+		var hz2 := Area2D.new()
+		hz2.set_script(BOSS_HAZARD)
+		hz2.single_shot = true
+		hz2.damage = 22
+		hz2.radius = 90.0
+		hz2.telegraph_time = 0.5
+		hz2.color = Color(1.0, 0.25, 0.1, 0.55)
+		Global.world.add_child(hz2)
+		hz2.global_position = chase_pos
+		await get_tree().create_timer(0.6).timeout
+	if not alive:
+		return
+	# Kết liễu: Ring dồn dập, nối liền không khoảng nghỉ — đúng chất "khoảnh khắc chung kết".
 	_fire_ring(14, 0.0, Color(1.0, 0.3, 0.2))
 
 
@@ -656,7 +695,10 @@ func _physics_process(delta: float) -> void:
 	if charging:
 		velocity = charge_dir * 640.0
 	elif not busy and active and is_instance_valid(p) and p.alive:
-		velocity = (p.global_position - global_position).normalized() * (55.0 + 20.0 * float(phase))
+		var chase_speed: float = 55.0 + 20.0 * float(phase)
+		if kind == "frost" and frost_enraged:
+			chase_speed += 35.0
+		velocity = (p.global_position - global_position).normalized() * chase_speed
 	else:
 		velocity = Vector2.ZERO
 	move_and_slide()
@@ -699,6 +741,10 @@ func take_damage(amount: int, _from_pos: Vector2 = Vector2.ZERO, _knock: float =
 	if new_phase > phase:
 		phase = new_phase
 		pending_roar = true
+	if kind == "frost" and not frost_enraged and ratio <= 0.25:
+		frost_enraged = true
+		Global.message.emit("%s nổi điên!" % BOSS_NAME, Color(0.4, 0.9, 1.0))
+		Global.shake(0.6, 0.4)
 	Global.boss_hp_changed.emit(hp, max_hp, phase, BOSS_NAME)
 
 

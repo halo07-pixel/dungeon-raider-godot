@@ -16,6 +16,8 @@ var boss_label: Label
 var msg_label: Label
 var minimap: Control
 var _msg_tween: Tween
+var debug_label: Label ## TẠM: hiện thông tin phòng/quái để bắt bug "spawn sai phòng". Xoá sau khi tìm ra nguyên nhân.
+var _dungeon_ref: Node = null
 
 func _ready() -> void:
 	_build_ui()
@@ -23,13 +25,14 @@ func _ready() -> void:
 	Global.boss_hp_changed.connect(_on_boss_hp)
 	Global.boss_defeated.connect(_on_boss_defeated)
 	Global.message.connect(_show_message)
-	
+
 	# Đảm bảo game chạy ngay lập tức, không bị pause
-	get_tree().paused = false 
-	
+	get_tree().paused = false
+
 	var d_node = get_tree().get_first_node_in_group("dungeon")
 	if d_node:
 		minimap.dungeon = d_node
+		_dungeon_ref = d_node
 
 func _process(_delta: float) -> void:
 	var p = Global.player
@@ -42,6 +45,34 @@ func _process(_delta: float) -> void:
 	if p.get("weapon") and p.weapon.has("name"):
 		w_name = p.weapon["name"]
 	info_label.text = "Floor %d   ·   %s   ·   Gold: %d" % [Global.floor_num, w_name, Global.coins]
+	_update_debug_label()
+
+## TẠM: debug overlay bắt bug "qua tầng mới spawn vào phòng quái thay vì phòng start"
+## và bug "quái hết mà cổng không mở". Xoá khi tìm ra nguyên nhân.
+func _update_debug_label() -> void:
+	if not is_instance_valid(debug_label):
+		return
+	if not is_instance_valid(_dungeon_ref):
+		_dungeon_ref = get_tree().get_first_node_in_group("dungeon")
+		if not is_instance_valid(_dungeon_ref):
+			debug_label.text = "DBG: no dungeon ref"
+			return
+	var cell = _dungeon_ref.current_cell
+	var rtype := "?"
+	var cleared = "?"
+	var visited = "?"
+	if _dungeon_ref.rooms.has(cell):
+		rtype = str(_dungeon_ref.rooms[cell].get("type", "?"))
+		cleared = str(_dungeon_ref.rooms[cell].get("cleared", "?"))
+		visited = str(_dungeon_ref.rooms[cell].get("visited", "?"))
+	var group_alive := 0
+	var group_total := 0
+	for e in get_tree().get_nodes_in_group("enemies"):
+		if is_instance_valid(e):
+			group_total += 1
+			if e.has_method("kill") and e.alive:
+				group_alive += 1
+	debug_label.text = "DBG room=%s type=%s cleared=%s visited=%s | counter=%d | group_alive=%d/%d" % [cell, rtype, cleared, visited, _dungeon_ref.alive_enemies, group_alive, group_total]
 
 # ------------------------------------------------------------------ Sự kiện
 func _on_boss_spawned(boss) -> void:
@@ -156,3 +187,7 @@ func _build_ui() -> void:
 
 	msg_label = _label(self, "", 28, Vector2(0.0, 110.0), Vector2(1280.0, 44.0), HORIZONTAL_ALIGNMENT_CENTER)
 	msg_label.modulate.a = 0.0
+
+	# TẠM: overlay debug góc dưới trái, màu vàng nổi bật để dễ nhận ra là tạm thời.
+	debug_label = _label(self, "", 14, Vector2(20.0, 660.0), Vector2(900.0, 24.0))
+	debug_label.add_theme_color_override("font_color", Color(1.0, 0.9, 0.2))

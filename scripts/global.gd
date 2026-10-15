@@ -90,7 +90,7 @@ const L_EBULLET: int = 16
 const L_PICKUP: int = 32
 var rarities: Dictionary = {
 	"common": {"name": "Common", "mult": 1.0, "lifesteal": 0.0, "color": Color(0.8, 0.8, 0.8), "weight": 50},
-	"rare": {"name": "Rare", "mult": 1.25, "lifesteal": 0.02, "color": Color(0.2, 0.8, 0.3), "weight": 30},
+	"rare": {"name": "Rare", "mult": 1.25, "lifesteal": 0.008, "color": Color(0.2, 0.8, 0.3), "weight": 30},
 	"epic": {"name": "Epic", "mult": 1.5, "lifesteal": 0.05, "color": Color(0.6, 0.2, 0.8), "weight": 15},
 	"legendary": {"name": "Legendary", "mult": 2.0, "lifesteal": 0.10, "color": Color(1.0, 0.8, 0.1), "weight": 5}
 }
@@ -147,6 +147,15 @@ func endless_difficulty_mult(for_floor_num: int) -> float:
 	if for_floor_num <= ENDLESS_START_FLOOR:
 		return 1.0
 	return 1.0 + ENDLESS_RATE * float(for_floor_num - ENDLESS_START_FLOOR)
+
+## Hệ số nhân SÁT THƯƠNG quái/boss gây cho Player theo tầng (trước đây chỉ HP quái
+## scale theo tầng qua floor_scale trong enemy.gd, sát thương gây ra vẫn là số cứng
+## -> quái các tầng sau "trâu" nhưng không "đau" hơn). +7%/tầng, trần +80% (tầng ~12+)
+## để tránh one-shot vô lý ở Vô Hạn. Áp dụng tập trung tại player.gd::take_damage().
+const ENEMY_DMG_PER_FLOOR: float = 0.07
+const ENEMY_DMG_MULT_CAP: float = 1.8
+func enemy_dmg_mult_for_floor(for_floor_num: int) -> float:
+	return minf(ENEMY_DMG_MULT_CAP, 1.0 + ENEMY_DMG_PER_FLOOR * float(maxi(0, for_floor_num - 1)))
 
 var _sfx: Dictionary = {}
 var _dot_tex: ImageTexture
@@ -221,6 +230,8 @@ func reset_run() -> void:
 	Engine.time_scale = 1.0
 	_hitstop_active = false
 	reset_run_buffs()
+	if PlayerProfiler:
+		PlayerProfiler.reset()
 
 
 # ---------------------------------------------------------------- Hệ thống Buff (chọn 1/3 sau khi dọn phòng)
@@ -245,7 +256,7 @@ var buff_pool: Dictionary = {
 	"buff_armor": {"name": "Giáp Dày", "desc": "Giảm 6% sát thương nhận vào (có trần 50%).", "tier": "common"},
 	"buff_speed": {"name": "Săn Sóc", "desc": "+6% tốc độ di chuyển.", "tier": "common"},
 	"buff_reach": {"name": "Tầm Đánh", "desc": "Cận chiến: +15% phạm vi chém. Tầm xa: đạn bay xa & nhanh hơn.", "tier": "common"},
-	"buff_lifesteal": {"name": "Hút Máu", "desc": "Hồi 4% sát thương gây ra thành HP.", "tier": "rare"},
+	"buff_lifesteal": {"name": "Hút Máu", "desc": "Hồi 2% sát thương gây ra thành HP.", "tier": "epic"},
 	"buff_crit": {"name": "Chí Mạng", "desc": "+8% tỉ lệ chí mạng (x2 sát thương).", "tier": "rare"},
 	"buff_bleed_proc": {"name": "Lưỡi Rỉ Máu", "desc": "+15% cơ hội gây Chảy Máu khi đánh trúng.", "tier": "rare"},
 	"buff_slow_proc": {"name": "Đạn Băng", "desc": "+20% cơ hội gây Chậm khi đánh trúng.", "tier": "rare"},
@@ -264,11 +275,13 @@ func reset_run_buffs() -> void:
 func buff_stack(id: String) -> int:
 	return int(run_buffs.get(id, 0))
 
+## Trọng số được nới lại (trước: 60/32/8) sau khi đổi sang chỉ 1 lượt chọn buff/tầng
+## (thay vì mỗi phòng) — ít lượt hơn nên cần tỉ lệ Rare/Epic cao hơn để vẫn đa dạng.
 func _buff_tier_weight(tier: String) -> float:
 	match tier:
-		"common": return 60.0
-		"rare": return 32.0
-		"epic": return 8.0
+		"common": return 50.0
+		"rare": return 33.0
+		"epic": return 17.0
 	return 0.0
 
 ## Random n lựa chọn buff (không trùng nhau trong 1 lượt, loại buff đã đạt trần stack),
@@ -469,6 +482,11 @@ func reset_run_stats() -> void:
 		"gacha_common": 0, "gacha_rare": 0, "gacha_epic": 0, "gacha_legendary": 0
 	}
 
+## AI Tầng 2 (Q-Learning, xem scripts/q_agent.gd): Q-table CHUNG cho mọi quái Tinh Anh,
+## persist qua save file -> quái "nhớ" lối chơi của Player xuyên nhiều ván, không reset
+## theo run (KHÁC run_buffs). Dictionary[String state, Dictionary[String action, float]].
+var elite_q_table: Dictionary = {}
+
 func save_game() -> void:
 	var file = FileAccess.open(save_path, FileAccess.WRITE)
 	if file != null:
@@ -476,7 +494,8 @@ func save_game() -> void:
 			"purple_gems": purple_gems,
 			"upgrades": upgrades,
 			"saved_run": saved_run, # Lưu thêm ván đang chơi
-			"settings": settings
+			"settings": settings,
+			"elite_q_table": elite_q_table
 		}
 		file.store_var(data)
 		file.close()
@@ -495,6 +514,7 @@ func load_game() -> void:
 				var loaded_settings = data.get("settings", {})
 				for k in loaded_settings.keys():
 					settings[k] = loaded_settings[k]
+				elite_q_table = data.get("elite_q_table", {})
 			file.close()
 	else:
 		save_game()
