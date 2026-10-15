@@ -224,7 +224,7 @@ func _cooldown() -> float:
 func _speed_mult() -> float:
 	var m: float = SPEED_MULT_TABLE[mini(phase - 1, SPEED_MULT_TABLE.size() - 1)]
 	if kind == "frost" and frost_enraged:
-		m *= 0.75 # telegraph ngắn hơn -> khó đọc đòn hơn ở pha nổi điên
+		m *= 0.7 # telegraph ngắn hơn -> khó đọc đòn hơn ở pha nổi điên
 	return m
 
 
@@ -271,7 +271,7 @@ func _on_attack_timer_timeout() -> void:
 		return
 	var p = Global.player
 	if not is_instance_valid(p) or not p.alive:
-		attack_timer.start(1.0)
+		attack_timer.start(0.7)
 		return
 	busy = true
 	if pending_roar:

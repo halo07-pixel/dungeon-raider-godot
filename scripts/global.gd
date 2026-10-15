@@ -169,8 +169,8 @@ func armor_reduction(armor: float) -> float:
 
 func armored_damage(amount: int, armor: float) -> int:
 	return maxi(1, roundi(float(amount) * (1.0 - armor_reduction(armor))))
-const ENEMY_DMG_PER_FLOOR: float = 0.07
-const ENEMY_DMG_MULT_CAP: float = 1.8
+const ENEMY_DMG_PER_FLOOR: float = 0.1
+const ENEMY_DMG_MULT_CAP: float = 2.5
 func enemy_dmg_mult_for_floor(for_floor_num: int) -> float:
 	return minf(ENEMY_DMG_MULT_CAP, 1.0 + ENEMY_DMG_PER_FLOOR * float(maxi(0, for_floor_num - 1)))
 
