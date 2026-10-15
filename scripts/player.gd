@@ -10,6 +10,14 @@ const KNOCK_DECAY: float = 1400.0
 var has_revived: bool = false
 var max_hp: int = 100
 var hp: int = 100
+## Giáp Ảo (kiểu Soul Knight): hấp thụ sát thương TRƯỚC máu, tự hồi sau một nhịp không bị đánh.
+const SHIELD_BASE: int = 20
+const SHIELD_PER_FLOOR: int = 4
+const SHIELD_REGEN_DELAY: float = 2.5
+const SHIELD_REGEN_RATE: float = 10.0
+var max_shield: int = 20
+var shield: float = 20.0
+var shield_delay_timer: float = 0.0
 var weapon_id: String = "pistol"
 var weapon_rarity: String = "common"
 var rarity_data: Dictionary = {}
@@ -72,6 +80,9 @@ func _ready() -> void:
 	# ÁP DỤNG KỸ NĂNG: Tăng HP tối đa
 	max_hp = cls["max_hp"] + (Global.upgrades["hp_boost"] * 10)
 	hp = max_hp
+
+	refresh_max_shield()
+	shield = float(max_shield)
 
 	set_weapon_with_rarity(cls["default_weapon"], "common")
 	dodge_timer.timeout.connect(_on_dodge_finished)
@@ -146,6 +157,7 @@ func apply_status(type: String, duration: float, amount: float = 0.0) -> void:
 
 func _physics_process(delta: float) -> void:
 	if not alive: return
+	_tick_shield(delta)
 
 	if dagger_timer > 0:
 		dagger_timer -= delta
@@ -165,7 +177,7 @@ func _physics_process(delta: float) -> void:
 			poison_ticks -= 1
 			# Độc BỎ QUA khung bất tử vật lý (hurt_timer) — venom không quan tâm bạn vừa
 			# trúng đòn thường hay chưa, khác hẳn sát thương tiếp xúc thông thường.
-			take_damage(poison_dmg, global_position, 0.0, true)
+			take_damage(poison_dmg, global_position, 0.0, true, true)
 
 	if stun_timer > 0.0:
 		stun_timer = maxf(0.0, stun_timer - delta)
@@ -321,6 +333,7 @@ func _swing() -> void:
 	var lifesteal = rarity_data["lifesteal"] # Hút máu từ Gacha
 	# Buff "Hút Máu"
 	lifesteal += 0.02 * float(Global.buff_stack("buff_lifesteal"))
+	lifesteal *= Global.MELEE_LIFESTEAL_MULT # cận chiến hút máu yếu hơn tầm xa
 
 	var is_crit = false
 	var apply_bleed = false
@@ -442,7 +455,29 @@ func set_weapon_with_rarity(id: String, rarity: String) -> void:
 	var display_name = weapon["name"] + " (" + rarity_data["name"] + ")"
 	Global.message.emit("Picked up: " + display_name, rarity_data["color"])
 
-func take_damage(amount: int, from_pos: Vector2 = Vector2.ZERO, knock: float = 300.0, ignore_invuln: bool = false) -> void:
+## Giáp tối đa tăng theo tầng; gọi lại khi sang tầng mới.
+func refresh_max_shield() -> void:
+	var new_max: int = SHIELD_BASE + SHIELD_PER_FLOOR * maxi(0, Global.floor_num - 1)
+	shield += float(new_max - max_shield) if new_max > max_shield else 0.0
+	max_shield = new_max
+	shield = minf(shield, float(max_shield))
+
+func _tick_shield(delta: float) -> void:
+	if shield_delay_timer > 0.0:
+		shield_delay_timer = maxf(0.0, shield_delay_timer - delta)
+	elif shield < float(max_shield):
+		shield = minf(float(max_shield), shield + SHIELD_REGEN_RATE * delta)
+
+## Trả về lượng sát thương còn lại sau khi giáp hấp thụ. Luôn reset nhịp hồi giáp.
+func _absorb_with_shield(amount: int) -> int:
+	shield_delay_timer = SHIELD_REGEN_DELAY
+	if shield <= 0.0:
+		return amount
+	var absorbed: int = mini(amount, int(ceil(shield)))
+	shield = maxf(0.0, shield - float(absorbed))
+	return amount - absorbed
+
+func take_damage(amount: int, from_pos: Vector2 = Vector2.ZERO, knock: float = 300.0, ignore_invuln: bool = false, bypass_shield: bool = false) -> void:
 	if not alive: return
 	if not ignore_invuln and is_invulnerable(): return
 	# Hệ số sát thương quái/boss/bẫy theo tầng (xem Global.enemy_dmg_mult_for_floor) —
@@ -452,7 +487,8 @@ func take_damage(amount: int, from_pos: Vector2 = Vector2.ZERO, knock: float = 3
 	if Global.buff_stack("buff_armor") > 0:
 		var reduction: float = minf(0.5, 0.06 * float(Global.buff_stack("buff_armor")))
 		amount = maxi(1, int(float(amount) * (1.0 - reduction)))
-	hp = maxi(hp - amount, 0)
+	var hp_damage: int = amount if bypass_shield else _absorb_with_shield(amount)
+	hp = maxi(hp - hp_damage, 0)
 	if not ignore_invuln:
 		hurt_timer.start()
 	knockback += (global_position - from_pos).normalized() * knock

@@ -90,7 +90,7 @@ const L_EBULLET: int = 16
 const L_PICKUP: int = 32
 var rarities: Dictionary = {
 	"common": {"name": "Common", "mult": 1.0, "lifesteal": 0.0, "color": Color(0.8, 0.8, 0.8), "weight": 50},
-	"rare": {"name": "Rare", "mult": 1.25, "lifesteal": 0.008, "color": Color(0.2, 0.8, 0.3), "weight": 30},
+	"rare": {"name": "Rare", "mult": 1.25, "lifesteal": 0.0, "color": Color(0.2, 0.8, 0.3), "weight": 30},
 	"epic": {"name": "Epic", "mult": 1.5, "lifesteal": 0.05, "color": Color(0.6, 0.2, 0.8), "weight": 15},
 	"legendary": {"name": "Legendary", "mult": 2.0, "lifesteal": 0.10, "color": Color(1.0, 0.8, 0.1), "weight": 5}
 }
@@ -152,6 +152,18 @@ func endless_difficulty_mult(for_floor_num: int) -> float:
 ## scale theo tầng qua floor_scale trong enemy.gd, sát thương gây ra vẫn là số cứng
 ## -> quái các tầng sau "trâu" nhưng không "đau" hơn). +7%/tầng, trần +80% (tầng ~12+)
 ## để tránh one-shot vô lý ở Vô Hạn. Áp dụng tập trung tại player.gd::take_damage().
+## HP quái/boss nhân theo tầng ĐÚNG 1 LẦN (trước đây dungeon.gd truyền 1 hệ số rồi enemy.gd/boss.gd
+## nhân thêm 1 hệ số nữa -> tầng 10 trâu gấp 6.2 lần quái / 13.7 lần boss). Chọn 0.3889/tầng
+## để tầng 10 = 1 + 0.3889*9 = x4.5 so với tầng 1 (theo yêu cầu người chơi).
+const HP_SCALE_PER_FLOOR: float = 3.5 / 9.0
+## Sàn sát thương sau giáp: 1 phát luôn gây >= 30% sát thương gốc (giáp trừ thẳng vào từng
+## phát từng làm SMG/Shotgun/Pistol chỉ còn 1 dmg/phát ở tầng cao).
+const MIN_DAMAGE_RATIO: float = 0.3
+const MELEE_LIFESTEAL_MULT: float = 0.5
+func hp_scale_for_floor(for_floor_num: int) -> float:
+	return 1.0 + HP_SCALE_PER_FLOOR * float(maxi(0, for_floor_num - 1))
+func armored_damage(amount: int, armor: float) -> int:
+	return maxi(maxi(1, ceili(float(amount) * MIN_DAMAGE_RATIO)), amount - int(armor))
 const ENEMY_DMG_PER_FLOOR: float = 0.07
 const ENEMY_DMG_MULT_CAP: float = 1.8
 func enemy_dmg_mult_for_floor(for_floor_num: int) -> float:
@@ -227,6 +239,7 @@ func _ready() -> void:
 func reset_run() -> void:
 	floor_num = 1
 	coins = 0
+	buff_picks_left = 0
 	Engine.time_scale = 1.0
 	_hitstop_active = false
 	reset_run_buffs()
@@ -256,7 +269,7 @@ var buff_pool: Dictionary = {
 	"buff_armor": {"name": "Giáp Dày", "desc": "Giảm 6% sát thương nhận vào (có trần 50%).", "tier": "common"},
 	"buff_speed": {"name": "Săn Sóc", "desc": "+6% tốc độ di chuyển.", "tier": "common"},
 	"buff_reach": {"name": "Tầm Đánh", "desc": "Cận chiến: +15% phạm vi chém. Tầm xa: đạn bay xa & nhanh hơn.", "tier": "common"},
-	"buff_lifesteal": {"name": "Hút Máu", "desc": "Hồi 2% sát thương gây ra thành HP.", "tier": "epic"},
+	"buff_lifesteal": {"name": "Hút Máu", "desc": "Hồi 2% sát thương gây ra thành HP (cận chiến: chỉ còn một nửa).", "tier": "epic"},
 	"buff_crit": {"name": "Chí Mạng", "desc": "+8% tỉ lệ chí mạng (x2 sát thương).", "tier": "rare"},
 	"buff_bleed_proc": {"name": "Lưỡi Rỉ Máu", "desc": "+15% cơ hội gây Chảy Máu khi đánh trúng.", "tier": "rare"},
 	"buff_slow_proc": {"name": "Đạn Băng", "desc": "+20% cơ hội gây Chậm khi đánh trúng.", "tier": "rare"},
@@ -310,10 +323,26 @@ func roll_buff_choices(n: int = 3) -> Array:
 	return choices
 
 ## Gọi khi dọn xong phòng (thường/boss) để yêu cầu UI hiện 3 lựa chọn Pick-1.
+const BUFF_PICKS_PER_BOSS: int = 2
+var buff_picks_left: int = 0
+
 func request_buff_choice() -> void:
+	buff_picks_left = BUFF_PICKS_PER_BOSS
+	_offer_next_buff_pick()
+
+## Phát 3 lựa chọn cho lượt kế tiếp (nếu còn lượt). buff_picker gọi lại sau mỗi lần chọn.
+func _offer_next_buff_pick() -> void:
+	if buff_picks_left <= 0:
+		return
 	var choices: Array = roll_buff_choices(3)
-	if not choices.is_empty():
-		buff_choice_requested.emit(choices)
+	if choices.is_empty():
+		buff_picks_left = 0
+		return
+	buff_choice_requested.emit(choices)
+
+func consume_buff_pick() -> void:
+	buff_picks_left = maxi(0, buff_picks_left - 1)
+	_offer_next_buff_pick()
 
 ## Áp dụng buff đã chọn: +1 stack. Chỉ "buff_hp" cần xử lý NGAY (cộng thẳng max_hp/hp) —
 ## mọi buff khác đọc Global.buff_stack(id) trực tiếp tại điểm hook (player.gd/bullet.gd/

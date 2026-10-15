@@ -487,7 +487,7 @@ func _spawn_wave(cell: Vector2i) -> void:
 
 func _spawn_enemy(kind: String, pos: Vector2, cell: Vector2i) -> void:
 	var e = ENEMY.instantiate()
-	e.setup(kind, 1.0 + 0.18 * float(Global.floor_num - 1))
+	e.setup(kind) # HP theo tầng do enemy.gd::setup() nhân đúng 1 lần (Global.hp_scale_for_floor)
 	e.died.connect(_on_enemy_died.bind(cell))
 	entities.add_child(e)
 	e.global_position = pos
@@ -522,7 +522,7 @@ func _boss_kind_for_floor(floor_num: int) -> String:
 func _spawn_boss(cell: Vector2i) -> void:
 	var b = BOSS.instantiate()
 	var kind: String = _boss_kind_for_floor(Global.floor_num)
-	b.setup(1.0 + 0.3 * float(Global.floor_num - 1), kind)
+	b.setup(1.0, kind) # HP theo tầng do boss.gd::setup() nhân đúng 1 lần
 	b.died.connect(_on_boss_died.bind(cell))
 	b.summon_requested.connect(_on_summon.bind(cell))
 	entities.add_child(b)

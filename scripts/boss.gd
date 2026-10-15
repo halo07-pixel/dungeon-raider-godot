@@ -115,7 +115,7 @@ func setup(hp_mult: float = 1.0, p_kind: String = "warden") -> void:
 	kind = p_kind if BOSS_DATA.has(p_kind) else "warden"
 	var cfg: Dictionary = BOSS_DATA[kind]
 	BOSS_NAME = cfg["name"]
-	var floor_scale: float = 1.0 + 0.3 * float(Global.floor_num - 1)
+	var floor_scale: float = Global.hp_scale_for_floor(Global.floor_num)
 	var endless_mult: float = Global.endless_difficulty_mult(Global.floor_num) # >1.0 chỉ khi tầng > 10 (Vô Hạn)
 	max_hp = float(cfg["base_hp"]) * hp_mult * floor_scale * endless_mult
 	hp = max_hp
@@ -720,7 +720,7 @@ func take_damage(amount: int, _from_pos: Vector2 = Vector2.ZERO, _knock: float =
 	if phase >= max_phase:
 		current_armor += 3.0
 
-	var actual_damage = maxi(1, amount - int(current_armor))
+	var actual_damage = Global.armored_damage(amount, current_armor)
 	if sunder_stacks > 0:
 		actual_damage = int(float(actual_damage) * (1.0 + SUNDER_PER_STACK * float(sunder_stacks)))
 	hp = maxf(hp - float(actual_damage), 0.0)

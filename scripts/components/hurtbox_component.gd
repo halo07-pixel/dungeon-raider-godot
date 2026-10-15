@@ -80,7 +80,7 @@ func take_hit(amount: int, from_pos: Vector2 = Vector2.ZERO, knock: float = 200.
 		return 0
 	var actual_damage: int = amount
 	if not true_dmg:
-		actual_damage = maxi(1, amount - int(armor))
+		actual_damage = Global.armored_damage(amount, armor)
 	if sunder_stacks > 0:
 		actual_damage = int(float(actual_damage) * (1.0 + SUNDER_PER_STACK * float(sunder_stacks)))
 	hp = maxf(hp - float(actual_damage), 0.0)

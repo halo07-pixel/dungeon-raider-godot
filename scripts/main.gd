@@ -31,6 +31,10 @@ func _ready() -> void:
 		if Global.has_method("reset_run"): Global.reset_run()
 		if Global.has_method("reset_run_stats"): Global.reset_run_stats()
 		
+	# Player._ready chạy trước main._ready (lúc đó floor_num có thể còn của ván cũ) -> tính lại giáp
+	player.refresh_max_shield()
+	player.shield = float(player.max_shield)
+
 	Global.portal_entered.connect(_on_portal_entered)
 	Global.player_died.connect(_on_player_died)
 	
@@ -87,6 +91,11 @@ func _restore_player_state() -> void:
 		var w_rarity = Global.saved_run.get("weapon_rarity", "common")
 		if player.has_method("set_weapon_with_rarity"):
 			player.set_weapon_with_rarity(w_id, w_rarity)
+		# Buff phải được khôi phục TRƯỚC (một số buff đổi max_hp / giáp)
+		Global.run_buffs = Dictionary(Global.saved_run.get("run_buffs", {})).duplicate()
+		player.max_hp = int(Global.saved_run.get("max_hp", player.max_hp))
+		player.refresh_max_shield()
+		player.shield = minf(float(player.max_shield), float(Global.saved_run.get("shield", player.max_shield)))
 		player.hp = Global.saved_run.get("hp", player.max_hp)
 		
 		# KHÔI PHỤC TRẠNG THÁI HỒI SINH
@@ -132,6 +141,8 @@ func _next_floor() -> void:
 	
 	# Xây xong xuôi mới đặt vào phòng Start
 	player.global_position = dungeon.room_center(dungeon.start_cell)
+	if player.has_method("refresh_max_shield"):
+		player.refresh_max_shield()
 	_spawn_npc_if_needed()
 	
 	player.knockback = Vector2.ZERO
@@ -184,16 +195,23 @@ func _add_btn(text: String, action: Callable) -> void:
 	btn.pressed.connect(action)
 	pause_ui.add_child(btn)
 
+## Gói trạng thái ván hiện tại để lưu (tách riêng khỏi việc đổi scene để test được).
+func _build_saved_run() -> Dictionary:
+	return {
+		"class": Global.current_class,
+		"hp": player.hp,
+		"weapon_id": player.weapon_id,
+		"weapon_rarity": player.weapon_rarity,
+		"has_revived": player.has_revived, # LƯU TRẠNG THÁI HỒI SINH
+		"max_hp": player.max_hp,
+		"shield": player.shield,
+		"run_buffs": Global.run_buffs.duplicate(),
+		"stats": Global.run_stats.duplicate() if Global.get("run_stats") else {}
+	}
+
 func _save_and_quit() -> void:
 	if is_instance_valid(player) and player.alive:
-		Global.saved_run = {
-			"class": Global.current_class,
-			"hp": player.hp,
-			"weapon_id": player.weapon_id,
-			"weapon_rarity": player.weapon_rarity,
-			"has_revived": player.has_revived, # LƯU TRẠNG THÁI HỒI SINH
-			"stats": Global.run_stats.duplicate() if Global.get("run_stats") else {}
-		}
+		Global.saved_run = _build_saved_run()
 		Global.save_game()
 	get_tree().paused = false
 	get_tree().change_scene_to_file("res://scenes/main_menu.tscn")

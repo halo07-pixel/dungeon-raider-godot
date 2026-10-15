@@ -9,6 +9,7 @@ var heart_icons: Array = []
 var heart_tex: Dictionary = {}
 var _hearts_max_hp: float = -1.0
 var dodge_bar: ProgressBar
+var shield_bar: ProgressBar
 var info_label: Label
 var boss_box: Control
 var boss_bar: ProgressBar
@@ -40,6 +41,7 @@ func _process(_delta: float) -> void:
 		return
 	_update_hearts(float(p.hp), float(p.max_hp))
 	dodge_bar.value = p.dodge_ratio() * 100.0
+	_update_shield(p)
 	
 	var w_name = "None"
 	if p.get("weapon") and p.weapon.has("name"):
@@ -161,6 +163,10 @@ func _update_hearts(hp: float, max_hp: float) -> void:
 			heart_icons[i].texture = heart_tex[state]
 
 
+func _update_shield(p) -> void:
+	shield_bar.max_value = float(maxi(1, p.max_shield))
+	shield_bar.value = p.shield
+
 func _build_ui() -> void:
 	_load_heart_tex()
 	hearts_box = HBoxContainer.new()
@@ -169,6 +175,7 @@ func _build_ui() -> void:
 	add_child(hearts_box)
 	dodge_bar = _bar(self, Vector2(20.0, 50.0), Vector2(280.0, 8.0), Color(0.4, 0.8, 1.0))
 	dodge_bar.max_value = 100.0
+	shield_bar = _bar(self, Vector2(20.0, 40.0), Vector2(280.0, 8.0), Color(0.55, 0.75, 1.0))
 	info_label = _label(self, "", 16, Vector2(20.0, 64.0), Vector2(500.0, 26.0))
 
 	minimap = Control.new()
