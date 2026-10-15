@@ -596,6 +596,7 @@ func _room_cleared(cell: Vector2i) -> void:
 	room["cleared"] = true
 	_unlock_doors(room)
 	rooms_updated.emit()
+	Global.room_cleared.emit()
 	if room["type"] == "boss":
 		_spawn_pickup("portal", "", room_center(cell))
 		Global.message.emit("The stairs down have opened!", Color(0.6, 0.6, 1.0))

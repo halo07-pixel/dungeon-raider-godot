@@ -249,6 +249,8 @@ func reset_run() -> void:
 
 # ---------------------------------------------------------------- Hệ thống Buff (chọn 1/3 sau khi dọn phòng)
 signal buff_choice_requested(choices: Array)
+## Dungeon phát khi một phòng thường/boss vừa dọn sạch (các buff như Thực Khách lắng nghe).
+signal room_cleared
 
 const BUFF_TIER_COLOR: Dictionary = {
 	"common": Color(0.85, 0.85, 0.85),
@@ -258,32 +260,64 @@ const BUFF_TIER_COLOR: Dictionary = {
 ## Trần số lần stack cho từng buff — Thường/Hiếm stack nhiều lần (có trần chống phá cân
 ## bằng), Sử Thi độc nhất (max 1), đổi hẳn lối chơi nên không cộng dồn.
 const BUFF_MAX_STACK: Dictionary = {
-	"buff_hp": 10, "buff_dmg": 5, "buff_haste": 5, "buff_armor": 5, "buff_speed": 5, "buff_reach": 5,
-	"buff_lifesteal": 5, "buff_crit": 5, "buff_bleed_proc": 3, "buff_slow_proc": 3, "buff_dodge_heal": 5,
-	"buff_deathnova": 1, "buff_momentum": 1, "buff_sunder": 1, "buff_berserk": 1, "buff_sweep": 1,
+	# Dùng chung
+	"buff_dmg": 5, "buff_haste": 5, "buff_reach": 5, "buff_crit": 5, "buff_bleed_proc": 3, "buff_slow_proc": 3,
+	"buff_dodge_heal": 5, "buff_gourmand": 3, "buff_sense": 1,
+	"buff_lifesteal": 5, "buff_deathnova": 1, "buff_momentum": 1, "buff_sunder": 1, "buff_berserk": 1, "buff_sweep": 1,
+	# Giáp ảo
+	"buff_shield_cap": 5, "buff_shield_regen": 4, "buff_shield_nova": 1,
+	# Cận chiến
+	"buff_deflect": 1, "buff_wave": 3, "buff_rollslash": 3, "buff_counter": 1, "buff_whirl": 1,
+	# Tầm xa
+	"buff_bounce": 2, "buff_split": 1, "buff_focus": 3, "buff_homing": 1, "buff_ring": 1, "buff_super": 1,
 }
+## "class": "any" (mọi vũ khí) | "melee" (chỉ khi đang cầm vũ khí cận chiến) | "ranged" (chỉ tầm xa).
+## Buff bị lọc khỏi lượt chọn nếu không hợp loại vũ khí đang cầm (xem roll_buff_choices).
 var buff_pool: Dictionary = {
-	"buff_hp": {"name": "Máu Dồi Dào", "desc": "+20 Max HP, hồi đầy phần tăng thêm.", "tier": "common"},
-	"buff_dmg": {"name": "Sức Mạnh", "desc": "+8% sát thương mọi nguồn.", "tier": "common"},
-	"buff_haste": {"name": "Nhanh Nhẹn", "desc": "-10% thời gian hồi chiêu vũ khí.", "tier": "common"},
-	"buff_armor": {"name": "Giáp Dày", "desc": "Giảm 6% sát thương nhận vào (có trần 50%).", "tier": "common"},
-	"buff_speed": {"name": "Săn Sóc", "desc": "+6% tốc độ di chuyển.", "tier": "common"},
-	"buff_reach": {"name": "Tầm Đánh", "desc": "Cận chiến: +15% phạm vi chém. Tầm xa: đạn bay xa & nhanh hơn.", "tier": "common"},
-	"buff_lifesteal": {"name": "Hút Máu", "desc": "Hồi 2% sát thương gây ra thành HP (cận chiến: chỉ còn một nửa).", "tier": "epic"},
-	"buff_crit": {"name": "Chí Mạng", "desc": "+8% tỉ lệ chí mạng (x2 sát thương).", "tier": "rare"},
-	"buff_bleed_proc": {"name": "Lưỡi Rỉ Máu", "desc": "+15% cơ hội gây Chảy Máu khi đánh trúng.", "tier": "rare"},
-	"buff_slow_proc": {"name": "Đạn Băng", "desc": "+20% cơ hội gây Chậm khi đánh trúng.", "tier": "rare"},
-	"buff_dodge_heal": {"name": "Né Hồi Phục", "desc": "Né thành công hồi 3 HP.", "tier": "rare"},
-	"buff_deathnova": {"name": "Nổ Tử Thi", "desc": "Quái chết sẽ nổ, lan sát thương cho quái gần đó.", "tier": "epic"},
-	"buff_momentum": {"name": "Đà Chiến Đấu", "desc": "Tấn công liên tục tăng dần sát thương, tối đa +25%.", "tier": "epic"},
-	"buff_sunder": {"name": "Phá Giáp", "desc": "Đòn trúng cộng dồn khiến quái đó nhận thêm sát thương.", "tier": "epic"},
-	"buff_berserk": {"name": "Cuồng Nộ", "desc": "Máu càng thấp, sát thương gây ra càng cao (tối đa +40%).", "tier": "epic"},
-	"buff_sweep": {"name": "Vung Kiếm Càn Quét", "desc": "Cận chiến: +50% phạm vi, +40% góc chém. Tầm xa: đạn xuyên vĩnh viễn.", "tier": "epic"},
+	# ---- Dùng chung
+	"buff_dmg": {"name": "Sức Mạnh", "desc": "+8% sát thương mọi nguồn.", "tier": "common", "class": "any"},
+	"buff_haste": {"name": "Nhanh Nhẹn", "desc": "-10% thời gian hồi chiêu vũ khí.", "tier": "common", "class": "any"},
+	"buff_reach": {"name": "Tầm Đánh", "desc": "Cận chiến: +15% phạm vi chém. Tầm xa: đạn bay xa & nhanh hơn.", "tier": "common", "class": "any"},
+	"buff_gourmand": {"name": "Thực Khách Hầm Ngục", "desc": "Dọn sạch phòng: hồi 8% máu tối đa.", "tier": "common", "class": "any"},
+	"buff_crit": {"name": "Chí Mạng", "desc": "+8% tỉ lệ chí mạng (x2 sát thương).", "tier": "rare", "class": "any"},
+	"buff_bleed_proc": {"name": "Lưỡi Rỉ Máu", "desc": "+15% cơ hội gây Chảy Máu khi đánh trúng.", "tier": "rare", "class": "any"},
+	"buff_slow_proc": {"name": "Đạn Băng", "desc": "+20% cơ hội gây Chậm khi đánh trúng.", "tier": "rare", "class": "any"},
+	"buff_dodge_heal": {"name": "Né Hồi Phục", "desc": "Né thành công hồi 3 HP.", "tier": "rare", "class": "any"},
+	"buff_sense": {"name": "Linh Cảm", "desc": "Bản đồ nhỏ hiện toàn bộ các phòng của tầng.", "tier": "rare", "class": "any"},
+	"buff_lifesteal": {"name": "Hút Máu", "desc": "Hồi 2% sát thương gây ra thành HP (cận chiến: chỉ còn một nửa).", "tier": "epic", "class": "any"},
+	"buff_deathnova": {"name": "Nổ Tử Thi", "desc": "Quái chết sẽ nổ, lan sát thương cho quái gần đó.", "tier": "epic", "class": "any"},
+	"buff_momentum": {"name": "Đà Chiến Đấu", "desc": "Tấn công liên tục tăng dần sát thương, tối đa +25%.", "tier": "epic", "class": "any"},
+	"buff_sunder": {"name": "Phá Giáp", "desc": "Đòn trúng cộng dồn khiến quái đó nhận thêm sát thương.", "tier": "epic", "class": "any"},
+	"buff_berserk": {"name": "Cuồng Nộ", "desc": "Máu càng thấp, sát thương gây ra càng cao (tối đa +40%).", "tier": "epic", "class": "any"},
+	"buff_sweep": {"name": "Vung Kiếm Càn Quét", "desc": "Cận chiến: +50% phạm vi, +40% góc chém. Tầm xa: đạn xuyên vĩnh viễn.", "tier": "epic", "class": "any"},
+	# ---- Giáp ảo
+	"buff_shield_cap": {"name": "Lá Chắn Lớn", "desc": "+10 giáp ảo tối đa.", "tier": "common", "class": "any"},
+	"buff_shield_regen": {"name": "Hồi Giáp Nhanh", "desc": "Giáp ảo hồi nhanh hơn 25% và bắt đầu hồi sớm hơn 0.4s.", "tier": "rare", "class": "any"},
+	"buff_shield_nova": {"name": "Giáp Phản Chấn", "desc": "Khi giáp ảo vỡ: xung chấn đẩy lùi, gây sát thương & xóa đạn quanh bạn (hồi 6s).", "tier": "epic", "class": "any"},
+	# ---- Cận chiến
+	"buff_deflect": {"name": "Phản Đạn", "desc": "Đòn chém xóa đạn địch trong vùng chém. Dao Găm: phản đạn lại thành đạn của bạn (x1.5 sát thương).", "tier": "rare", "class": "melee"},
+	"buff_wave": {"name": "Kiếm Khí", "desc": "Mỗi đòn chém phóng thêm 1 luồng kiếm khí xuyên (35% sát thương mỗi cấp).", "tier": "rare", "class": "melee"},
+	"buff_rollslash": {"name": "Lăn Chém", "desc": "Kết thúc cú lăn: chém vòng quanh gây 120% sát thương và đẩy lùi quái.", "tier": "rare", "class": "melee"},
+	"buff_counter": {"name": "Phản Công", "desc": "Sau khi bị đánh trúng, đòn chém kế tiếp trong 3s gây x2 sát thương.", "tier": "epic", "class": "melee"},
+	"buff_whirl": {"name": "Lốc Xoáy", "desc": "Mỗi đòn chém thứ 4 là một vòng chém 360 độ.", "tier": "epic", "class": "melee"},
+	# ---- Tầm xa
+	"buff_bounce": {"name": "Đạn Nảy", "desc": "Đạn nảy lại khi chạm tường (+1 lần nảy mỗi cấp).", "tier": "rare", "class": "ranged"},
+	"buff_split": {"name": "Đạn Phân Tách", "desc": "Đạn trúng quái tách thành 2 mảnh nhỏ (40% sát thương).", "tier": "rare", "class": "ranged"},
+	"buff_focus": {"name": "Tập Trung", "desc": "Đứng yên 0.6s: +20% sát thương mỗi cấp cho đến khi di chuyển.", "tier": "rare", "class": "ranged"},
+	"buff_homing": {"name": "Đạn Tầm Nhiệt", "desc": "Đạn tự bẻ hướng về phía quái gần nhất.", "tier": "epic", "class": "ranged"},
+	"buff_ring": {"name": "Loạt Đạn Vòng", "desc": "Mỗi phát bắn thứ 5 bắn thêm vòng 8 viên đạn (50% sát thương).", "tier": "epic", "class": "ranged"},
+	"buff_super": {"name": "Siêu Đạn", "desc": "Mỗi phát bắn thứ 6 là viên đạn khổng lồ xuyên, x3 sát thương.", "tier": "epic", "class": "ranged"},
 }
 var run_buffs: Dictionary = {}
 
 func reset_run_buffs() -> void:
 	run_buffs.clear()
+
+## "melee" / "ranged" theo vũ khí Player đang cầm (mặc định ranged nếu chưa có Player).
+func player_weapon_class() -> String:
+	if is_instance_valid(player) and player.get("weapon") != null and player.weapon.get("is_melee", false):
+		return "melee"
+	return "ranged"
 
 func buff_stack(id: String) -> int:
 	return int(run_buffs.get(id, 0))
@@ -301,7 +335,11 @@ func _buff_tier_weight(tier: String) -> float:
 ## random có trọng số theo tier (common > rare > epic).
 func roll_buff_choices(n: int = 3) -> Array:
 	var candidates: Array = []
+	var wclass: String = player_weapon_class()
 	for id in buff_pool:
+		var bclass: String = String(buff_pool[id].get("class", "any"))
+		if bclass != "any" and bclass != wclass:
+			continue
 		if buff_stack(id) < int(BUFF_MAX_STACK.get(id, 1)):
 			candidates.append(id)
 	var choices: Array = []
@@ -344,16 +382,16 @@ func consume_buff_pick() -> void:
 	buff_picks_left = maxi(0, buff_picks_left - 1)
 	_offer_next_buff_pick()
 
-## Áp dụng buff đã chọn: +1 stack. Chỉ "buff_hp" cần xử lý NGAY (cộng thẳng max_hp/hp) —
+## Áp dụng buff đã chọn: +1 stack. Chỉ "buff_shield_cap" cần xử lý NGAY (cộng giáp) —
 ## mọi buff khác đọc Global.buff_stack(id) trực tiếp tại điểm hook (player.gd/bullet.gd/
 ## enemy.gd/boss.gd) mỗi lần bắn/chém/nhận dmg, không cần cache lại giá trị ở đây.
 func apply_buff(id: String) -> void:
 	if not buff_pool.has(id):
 		return
 	run_buffs[id] = buff_stack(id) + 1
-	if id == "buff_hp" and is_instance_valid(player):
-		player.max_hp += 20
-		player.hp += 20
+	if id == "buff_shield_cap" and is_instance_valid(player):
+		player.refresh_max_shield()
+		player.shield += 10.0 # phần giáp tăng thêm được tặng đầy ngay
 	message.emit("Buff: " + buff_pool[id]["name"], BUFF_TIER_COLOR.get(buff_pool[id]["tier"], Color.WHITE))
 
 

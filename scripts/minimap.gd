@@ -17,7 +17,7 @@ func _draw() -> void:
 	draw_rect(Rect2(Vector2.ZERO, size), Color(0.0, 0.0, 0.0, 0.5))
 	for c in dungeon.rooms:
 		var room: Dictionary = dungeon.rooms[c]
-		var known: bool = room["visited"]
+		var known: bool = room["visited"] or Global.buff_stack("buff_sense") > 0
 		if not known:
 			for d in room["doors"]:
 				if dungeon.rooms[c + d]["visited"]:
