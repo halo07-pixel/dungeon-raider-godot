@@ -399,7 +399,7 @@ func roll_buff_choices(n: int = 3) -> Array:
 	return choices
 
 ## Gọi khi dọn xong phòng (thường/boss) để yêu cầu UI hiện 3 lựa chọn Pick-1.
-const BUFF_PICKS_PER_BOSS: int = 2
+const BUFF_PICKS_PER_BOSS: int = 1
 var buff_picks_left: int = 0
 
 func request_buff_choice() -> void:
