@@ -366,6 +366,13 @@ func _on_room_body_entered(_body: Node, cell: Vector2i) -> void:
 func _enter_room(cell: Vector2i) -> void:
 	if not rooms.has(cell):
 		return
+	# Chống tín hiệu "ma": khi qua tầng/dịch chuyển, vị trí vật lý của Player còn cũ thêm 1
+	# nhịp nên vùng kích hoạt của phòng MỚI (trùng ô lưới với chỗ Player vừa đứng) bắn
+	# body_entered nhầm -> kéo Player vào góc phòng đó + khoá cửa/sinh quái. Chỉ xử lý nếu
+	# Player THỰC SỰ đang nằm trong phòng này tại thời điểm xử lý (call_deferred đã chờ xong).
+	var pl = Global.player
+	if is_instance_valid(pl) and not _room_rect(cell, 0).has_point(pl.global_position):
+		return
 	current_cell = cell
 	var room: Dictionary = rooms[cell]
 	if room["visited"]:
