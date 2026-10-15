@@ -89,6 +89,14 @@ func _make_card(parent: Control) -> Dictionary:
 	desc_label.add_theme_font_size_override("font_size", 14)
 	vbox.add_child(desc_label)
 
+	var synergy_label := Label.new()
+	synergy_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	synergy_label.autowrap_mode = TextServer.AUTOWRAP_WORD
+	synergy_label.add_theme_font_size_override("font_size", 12)
+	synergy_label.add_theme_color_override("font_color", Color(1.0, 0.78, 0.2))
+	synergy_label.visible = false
+	vbox.add_child(synergy_label)
+
 	var stack_label := Label.new()
 	stack_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	stack_label.add_theme_font_size_override("font_size", 12)
@@ -102,7 +110,7 @@ func _make_card(parent: Control) -> Dictionary:
 
 	return {
 		"panel": p, "style": style, "tier_label": tier_label, "name_label": name_label,
-		"desc_label": desc_label, "stack_label": stack_label, "btn": btn,
+		"desc_label": desc_label, "synergy_label": synergy_label, "stack_label": stack_label, "btn": btn,
 	}
 
 
@@ -131,6 +139,10 @@ func _on_buff_choice_requested(choices: Array) -> void:
 		c["name_label"].text = info["name"]
 		c["name_label"].add_theme_color_override("font_color", color)
 		c["desc_label"].text = info["desc"]
+		var partners: Array = Global.synergy_owned_partner_names(id)
+		var syn: Label = c["synergy_label"]
+		syn.visible = not partners.is_empty()
+		syn.text = ("★ Kết hợp: " + ", ".join(partners)) if not partners.is_empty() else ""
 		var cur_stack: int = Global.buff_stack(id)
 		c["stack_label"].text = ("Đã có: %d" % cur_stack) if cur_stack > 0 else ""
 

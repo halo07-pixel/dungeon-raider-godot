@@ -23,6 +23,8 @@ var shot_count: int = 0          # Loạt Đạn Vòng / Siêu Đạn
 var still_time: float = 0.0      # Tập Trung
 var arc_timer: float = 0.0       # Sét Lan
 const ARC_INTERVAL: float = 2.5
+const RING_HOMING_DELAY: float = 0.12
+const WHIRL_WAVE_COUNT: int = 6
 var shield: float = 20.0
 var shield_delay_timer: float = 0.0
 var weapon_id: String = "pistol"
@@ -349,6 +351,11 @@ func _shoot() -> void:
 		for k in 8:
 			var rb = BULLET.instantiate()
 			rb.setup(true, Vector2.from_angle(TAU * float(k) / 8.0), maxi(1, int(float(dmg) * 0.5)), speed * 0.8, life * 0.8, Color(0.6, 0.9, 1.0), 5.0)
+			# Synergy Loạt Đạn Vòng + Tầm Nhiệt / Đạn Nảy: bung ra 0.12s rồi mới chụm vào quái
+			if Global.buff_stack("buff_homing") > 0:
+				rb.homing = true
+				rb.homing_delay = RING_HOMING_DELAY
+			rb.bounces_left = Global.buff_stack("buff_bounce")
 			Global.world.add_child(rb)
 			rb.global_position = global_position
 		
@@ -426,7 +433,8 @@ func _swing() -> void:
 		Global.float_text(global_position + Vector2(0, -36), "PHẢN CÔNG!", Color(1.0, 0.6, 0.2), 18)
 	# Lốc Xoáy: mỗi đòn thứ 4 chém vòng 360 độ
 	swing_count += 1
-	if Global.buff_stack("buff_whirl") > 0 and swing_count % 4 == 0:
+	var is_whirl: bool = Global.buff_stack("buff_whirl") > 0 and swing_count % 4 == 0
+	if is_whirl:
 		aoe_angle = 360.0
 		aoe_range *= 1.15
 
@@ -462,6 +470,8 @@ func _swing() -> void:
 					Global.burst(b.global_position, Color.WHITE, 4, 60.0, 0.6)
 					if can_deflect and weapon_id == "daggers" and b.has_method("reflect"):
 						b.reflect(aim_dir, 1.5) # Phản đạn!
+						if Global.buff_stack("buff_homing") > 0:
+							b.homing = true # Synergy Phản Đạn + Tầm Nhiệt: đạn phản tự đuổi quái
 					else:
 						b.queue_free() # Xóa đạn!
 					Global.sfx("dodge")
@@ -501,10 +511,18 @@ func _swing() -> void:
 
 	# Buff Kiếm Khí: mỗi đòn chém phóng thêm luồng kiếm khí xuyên
 	if Global.buff_stack("buff_wave") > 0:
-		var wb = BULLET.instantiate()
-		wb.setup(true, aim_dir, maxi(1, int(float(dmg) * 0.35 * float(Global.buff_stack("buff_wave")))), 480.0, 0.4, Color(0.7, 0.9, 1.0), 9.0, true)
-		Global.world.add_child(wb)
-		wb.global_position = global_position + aim_dir * 25.0
+		# Synergy Lốc Xoáy + Kiếm Khí: nhát 360° phóng 6 luồng tỏa đều thay vì 1 luồng phía trước
+		var wave_dirs: Array = [aim_dir]
+		if is_whirl:
+			wave_dirs.clear()
+			for k in WHIRL_WAVE_COUNT:
+				wave_dirs.append(aim_dir.rotated(TAU * float(k) / float(WHIRL_WAVE_COUNT)))
+		for wd in wave_dirs:
+			var wb = BULLET.instantiate()
+			wb.setup(true, wd, maxi(1, int(float(dmg) * 0.35 * float(Global.buff_stack("buff_wave")))), 480.0, 0.4, Color(0.7, 0.9, 1.0), 9.0, true)
+			wb.is_crit = is_crit
+			Global.world.add_child(wb)
+			wb.global_position = global_position + wd * 25.0
 
 	# Kiếm Dài Sử Thi: Phóng Kiếm Khí
 	if weapon_id == "broadsword" and (weapon_rarity == "epic" or weapon_rarity == "legendary"):
@@ -547,13 +565,18 @@ func _tick_arc(delta: float) -> void:
 	arc_timer -= delta
 	if arc_timer > 0.0:
 		return
+	_arc_strike()
+
+## Một nhịp Sét Lan (đánh tối đa 3 quái gần nhất trong 220px). Trả về true nếu có mục tiêu.
+## Giáp Phản Chấn cũng gọi hàm này để phóng sét ngay khi giáp vỡ.
+func _arc_strike() -> bool:
 	var cands: Array = []
 	for e in get_tree().get_nodes_in_group("enemies"):
 		if is_instance_valid(e) and e.alive and e.global_position.distance_to(global_position) <= 220.0:
 			cands.append(e)
 	if cands.is_empty():
 		arc_timer = 0.3 # chưa có mục tiêu: thử lại sớm
-		return
+		return false
 	arc_timer = ARC_INTERVAL
 	cands.sort_custom(func(a, b): return a.global_position.distance_to(global_position) < b.global_position.distance_to(global_position))
 	var dmg: int = maxi(6, int(float(weapon["damage"]) * rarity_data["mult"] * 0.8))
@@ -561,6 +584,7 @@ func _tick_arc(delta: float) -> void:
 		cands[i].take_damage(dmg, global_position, 100.0)
 		Global.burst(cands[i].global_position, Color(1.0, 0.95, 0.3), 6, 140.0, 1.2)
 	Global.shake(0.1, 0.08)
+	return true
 
 ## Buff Thực Khách Hầm Ngục: dọn sạch phòng hồi % máu tối đa.
 func _on_room_cleared() -> void:
@@ -601,6 +625,12 @@ func _on_shield_broken() -> void:
 	for e in get_tree().get_nodes_in_group("enemies"):
 		if is_instance_valid(e) and e.alive and e.global_position.distance_to(global_position) <= 140.0:
 			e.take_damage(dmg, global_position, 450.0)
+			# Synergy Giáp Phản Chấn + Băng Giá: xung chấn đóng băng mọi quái trúng
+			var freeze_lv: int = Global.buff_stack("buff_freeze")
+			if freeze_lv > 0 and e.alive and e.has_method("apply_element"):
+				var need: int = 3 if freeze_lv < 2 else 2
+				for k in need:
+					e.apply_element("frost", 0, need)
 	for b in get_tree().get_nodes_in_group("boss"):
 		if is_instance_valid(b) and b.alive and b.global_position.distance_to(global_position) <= 160.0:
 			b.take_damage(dmg, global_position, 0.0)
@@ -609,6 +639,9 @@ func _on_shield_broken() -> void:
 			eb.queue_free()
 	Global.burst(global_position, Color(0.55, 0.75, 1.0), 30, 320.0, 2.0)
 	Global.shake(0.4, 0.2)
+	# Synergy Giáp Phản Chấn + Sét Lan: phóng ngay một nhịp sét, không chờ timer 2.5s
+	if Global.buff_stack("buff_arc") > 0:
+		_arc_strike()
 
 func take_damage(amount: int, from_pos: Vector2 = Vector2.ZERO, knock: float = 300.0, ignore_invuln: bool = false, bypass_shield: bool = false) -> void:
 	if not alive: return

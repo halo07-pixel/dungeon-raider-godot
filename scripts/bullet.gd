@@ -22,6 +22,19 @@ var _q_reward_sent: bool = false
 var bounces_left: int = 0
 var split_on_hit: bool = false
 var is_crit: bool = false
+## Đạn Tầm Nhiệt của Player
+var homing_delay: float = 0.0          # giây bay thẳng trước khi bắt đầu bẻ lái
+var lock_target: Node = null           # mục tiêu đã khóa (giữ đến khi chết)
+var homing_exclude: Node = null        # quái KHÔNG được khóa (mảnh tách ra không quay lại quái vừa trúng)
+const HOMING_RANGE: float = 360.0
+const HOMING_CONE_COS: float = 0.5     # cos(60°): nón ưu tiên phía trước
+const HOMING_BASE_TURN: float = 5.0    # rad/s khi ở xa
+const HOMING_LEAD: float = 0.12        # đón đầu: cộng velocity * 0.12s
+const HOMING_FAR: float = 140.0
+const HOMING_NEAR: float = 120.0
+const HOMING_MAX_TURN: float = 60.0
+const HOMING_ORBIT_FACTOR: float = 0.5 # bán kính vòng cua tối đa = 0.5 * khoảng cách
+const HOMING_LEAD_FADE_NEAR: float = 40.0 # dưới 40px: nhắm thẳng tâm, bỏ đón đầu
 var is_fragment: bool = false # mảnh tách ra từ Đạn Phân Tách — không tách tiếp
 const HOMING_TURN_RATE: float = 2.2 # rad/s - bẻ hướng từ từ, không phải dính chắc chắn
 
@@ -62,6 +75,8 @@ func reflect(new_dir: Vector2, dmg_mult: float) -> void:
 	remove_from_group("enemy_bullets")
 	source_q_agent = null
 	_q_reward_sent = true
+	homing = false # bỏ tầm nhiệt kiểu địch (nhắm Player); player có thể bật lại sau khi phản
+	homing_target = null
 	dir = new_dir.normalized()
 	rotation = dir.angle()
 	damage = maxi(1, int(float(damage) * dmg_mult))
@@ -73,27 +88,74 @@ func reflect(new_dir: Vector2, dmg_mult: float) -> void:
 	color = Color(0.6, 1.0, 0.7)
 	queue_redraw()
 
-func _nearest_enemy_pos(max_dist: float) -> Variant:
-	var best: Variant = null
-	var best_d: float = max_dist
+# ---------------------------------------------------------------- Đạn Tầm Nhiệt (buff_homing)
+## Khóa mục tiêu (ưu tiên quái trong góc nón phía trước), nhắm tâm hitbox + đón đầu nhẹ, tăng
+## tốc độ bẻ lái khi vào gần (chống bay vòng quanh), và có thể trễ kích hoạt (homing_delay).
+func _target_alive(t) -> bool:
+	return is_instance_valid(t) and bool(t.get("alive"))
+
+## Điểm nhắm: tâm hitbox thật + vận tốc * HOMING_LEAD (đón đầu chuyển động ngang).
+## lead_weight 0..1: gần mục tiêu thì giảm dần phần đón đầu để găm thẳng vào tâm hitbox.
+func _aim_point(t: Node2D, lead_weight: float = 1.0) -> Vector2:
+	var pos: Vector2 = t.hurt_center() if t.has_method("hurt_center") else t.global_position
+	var v: Variant = t.get("velocity")
+	if v is Vector2:
+		pos += (v as Vector2) * HOMING_LEAD * lead_weight
+	return pos
+
+func _acquire_lock() -> Node:
+	var best_cone: Node = null
+	var best_cone_d: float = INF
+	var best_any: Node = null
+	var best_any_d: float = INF
 	for e in get_tree().get_nodes_in_group("enemies") + get_tree().get_nodes_in_group("boss"):
-		if not is_instance_valid(e) or not e.get("alive"):
+		if not _target_alive(e) or e == homing_exclude or e.get("active") == false:
 			continue
-		var pos: Vector2 = e.hurt_center() if e.has_method("hurt_center") else e.global_position
-		var dd: float = global_position.distance_to(pos)
-		if dd < best_d:
-			best_d = dd
-			best = pos
-	return best
+		var to: Vector2 = _aim_point(e) - global_position
+		var d: float = to.length()
+		if d > HOMING_RANGE or d < 0.001:
+			continue
+		if d < best_any_d:
+			best_any_d = d
+			best_any = e
+		if dir.dot(to / d) >= HOMING_CONE_COS and d < best_cone_d:
+			best_cone_d = d
+			best_cone = e
+	return best_cone if best_cone != null else best_any
+
+## Hệ số tốc độ xoay theo khoảng cách: xa (>140px) = 1x mượt; vào gần (<120px) tăng dần 2.5x -> 3x.
+func _turn_mult(d: float) -> float:
+	if d >= HOMING_FAR:
+		return 1.0
+	if d >= HOMING_NEAR:
+		return lerpf(1.0, 2.5, (HOMING_FAR - d) / (HOMING_FAR - HOMING_NEAR))
+	return lerpf(2.5, 3.0, 1.0 - d / HOMING_NEAR)
+
+func _steer_player_homing(delta: float) -> void:
+	if homing_delay > 0.0:
+		homing_delay -= delta # bay thẳng trước (đạn vòng bung ra rồi mới chụm vào)
+		return
+	if not _target_alive(lock_target):
+		lock_target = _acquire_lock() # chỉ chọn lại khi mục tiêu cũ đã chết
+	if lock_target == null:
+		return
+	var center_d: float = (_aim_point(lock_target, 0.0) - global_position).length()
+	var lead_w: float = clampf((center_d - HOMING_LEAD_FADE_NEAR) / (HOMING_FAR - HOMING_LEAD_FADE_NEAR), 0.0, 1.0)
+	var to: Vector2 = _aim_point(lock_target, lead_w) - global_position
+	var d: float = to.length()
+	if d < 1.0:
+		return
+	var rate: float = HOMING_BASE_TURN * _turn_mult(d)
+	if d < HOMING_NEAR:
+		# Chống orbit: bán kính vòng cua (speed/rate) luôn nhỏ hơn khoảng cách tới mục tiêu.
+		rate = maxf(rate, minf(HOMING_MAX_TURN, speed / (HOMING_ORBIT_FACTOR * d)))
+	var diff: float = wrapf(to.angle() - dir.angle(), -PI, PI)
+	dir = dir.rotated(clampf(diff, -rate * delta, rate * delta))
+	rotation = dir.angle()
 
 func _physics_process(delta: float) -> void:
 	if homing and from_player:
-		# Đạn Tầm Nhiệt của Player: tự dò quái gần nhất trong 320px
-		var tp: Variant = _nearest_enemy_pos(320.0)
-		if tp != null:
-			var want: Vector2 = ((tp as Vector2) - global_position).normalized()
-			dir = dir.slerp(want, minf(1.0, 4.0 * delta))
-			rotation = dir.angle()
+		_steer_player_homing(delta)
 	elif homing and is_instance_valid(homing_target):
 		var target_pos = homing_target.hurt_center() if homing_target.has_method("hurt_center") else homing_target.global_position
 		var want_dir: Vector2 = (target_pos - global_position).normalized()
@@ -142,7 +204,7 @@ func _on_body_entered(body: Node) -> void:
 				body.apply_status("poison", 3, 4)
 				
 		if from_player and split_on_hit and not is_fragment:
-			_spawn_fragments()
+			_spawn_fragments(body)
 		if not pierce:
 			_impact()
 	elif from_player and bounces_left > 0 and _try_bounce():
@@ -169,11 +231,17 @@ func _try_bounce() -> bool:
 	Global.burst(global_position, color, 3, 70.0, 0.8)
 	return true
 
-func _spawn_fragments() -> void:
+## Đạn Phân Tách: 2 mảnh (40% sát thương). Thừa hưởng Tầm Nhiệt (khóa quái KHÁC con vừa trúng)
+## và Đạn Nảy của Player. Siêu Đạn (xuyên) gọi hàm này ở MỖI quái nó xuyên qua.
+func _spawn_fragments(hit_body: Node = null) -> void:
 	for off in [-0.6, 0.6]:
 		var nb = load("res://scenes/bullet.tscn").instantiate()
 		nb.setup(true, dir.rotated(off), maxi(1, int(float(damage) * 0.4)), speed, 0.45, color, maxf(3.0, radius * 0.6))
 		nb.is_fragment = true
+		nb.bounces_left = Global.buff_stack("buff_bounce")
+		if Global.buff_stack("buff_homing") > 0:
+			nb.homing = true
+			nb.homing_exclude = hit_body
 		_add_deferred(nb, global_position)
 
 ## Không được add_child ngay trong callback va chạm (đang flush physics).
