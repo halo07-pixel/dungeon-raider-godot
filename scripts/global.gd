@@ -316,10 +316,36 @@ var buff_pool: Dictionary = {
 	"buff_bounce": {"name": "Đạn Nảy", "desc": "Đạn nảy lại khi chạm tường (+1 lần nảy mỗi cấp).", "tier": "rare", "class": "ranged"},
 	"buff_split": {"name": "Đạn Phân Tách", "desc": "Đạn trúng quái tách thành 2 mảnh nhỏ (40% sát thương).", "tier": "rare", "class": "ranged"},
 	"buff_focus": {"name": "Tập Trung", "desc": "Đứng yên 0.6s: +20% sát thương mỗi cấp cho đến khi di chuyển.", "tier": "rare", "class": "ranged"},
-	"buff_homing": {"name": "Đạn Tầm Nhiệt", "desc": "Đạn tự bẻ hướng về phía quái gần nhất.", "tier": "epic", "class": "ranged"},
+	"buff_homing": {"name": "Đạn Tầm Nhiệt", "desc": "Đạn khóa một quái (ưu tiên phía trước) và tự bẻ hướng găm vào tâm, đón đầu chuyển động.", "tier": "epic", "class": "ranged"},
 	"buff_ring": {"name": "Loạt Đạn Vòng", "desc": "Mỗi phát bắn thứ 5 bắn thêm vòng 8 viên đạn (50% sát thương).", "tier": "epic", "class": "ranged"},
 	"buff_super": {"name": "Siêu Đạn", "desc": "Mỗi phát bắn thứ 6 là viên đạn khổng lồ xuyên, x3 sát thương.", "tier": "epic", "class": "ranged"},
 }
+## Bảng buff có tương tác chéo (đối xứng): id -> các buff đối tác. buff_picker hiện nhãn ★ khi đã có đối tác.
+const SYNERGY_MAP: Dictionary = {
+	"buff_ring": ["buff_homing", "buff_bounce"],
+	"buff_homing": ["buff_ring", "buff_split", "buff_deflect"],
+	"buff_bounce": ["buff_ring", "buff_split"],
+	"buff_split": ["buff_homing", "buff_bounce", "buff_super"],
+	"buff_super": ["buff_split"],
+	"buff_whirl": ["buff_wave"],
+	"buff_wave": ["buff_whirl"],
+	"buff_deflect": ["buff_homing"],
+	"buff_deathnova": ["buff_burn", "buff_poison", "buff_freeze"],
+	"buff_burn": ["buff_deathnova"],
+	"buff_poison": ["buff_deathnova"],
+	"buff_freeze": ["buff_deathnova", "buff_shield_nova"],
+	"buff_shield_nova": ["buff_freeze", "buff_arc"],
+	"buff_arc": ["buff_shield_nova"],
+}
+
+## Danh sách tên các buff đối tác mà Player ĐÃ sở hữu của buff `id` (rỗng = không có kết hợp).
+func synergy_owned_partner_names(id: String) -> Array:
+	var out: Array = []
+	for partner in SYNERGY_MAP.get(id, []):
+		if buff_stack(partner) > 0 and buff_pool.has(partner):
+			out.append(String(buff_pool[partner]["name"]))
+	return out
+
 var run_buffs: Dictionary = {}
 
 func reset_run_buffs() -> void:

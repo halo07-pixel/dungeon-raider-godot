@@ -381,12 +381,17 @@ func _death_nova() -> void:
 			continue
 		if e.has_method("take_damage") and e.alive and e.global_position.distance_to(global_position) < DEATH_NOVA_RADIUS:
 			e.take_damage(DEATH_NOVA_DMG, global_position, 80.0, true)
+			# Synergy Nổ Tử Thi + Nguyên Tố: vụ nổ lan Cháy/Độc/Lạnh sang đám quái xung quanh
+			Global.on_player_hit(e, DEATH_NOVA_DMG, false)
+
+## Tỉ lệ rớt bình máu (giảm để cân bằng với Giáp Ảo hồi lại được).
+const HEAL_DROP_CHANCE: float = 0.06
 
 func _drop_and_free() -> void:
 	var n: int = data["coins"]
 	for i in n:
 		_spawn_pickup("coin")
-	if randf() < 0.05:
+	if randf() < HEAL_DROP_CHANCE:
 		_spawn_pickup("heal")
 	queue_free()
 
