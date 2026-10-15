@@ -386,7 +386,7 @@ func _drop_and_free() -> void:
 	var n: int = data["coins"]
 	for i in n:
 		_spawn_pickup("coin")
-	if randf() < 0.12:
+	if randf() < 0.05:
 		_spawn_pickup("heal")
 	queue_free()
 

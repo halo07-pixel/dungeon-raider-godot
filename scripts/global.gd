@@ -155,7 +155,7 @@ func endless_difficulty_mult(for_floor_num: int) -> float:
 ## HP quái/boss nhân theo tầng ĐÚNG 1 LẦN (trước đây dungeon.gd truyền 1 hệ số rồi enemy.gd/boss.gd
 ## nhân thêm 1 hệ số nữa -> tầng 10 trâu gấp 6.2 lần quái / 13.7 lần boss). Chọn 0.3889/tầng
 ## để tầng 10 = 1 + 0.3889*9 = x4.5 so với tầng 1 (theo yêu cầu người chơi).
-const HP_SCALE_PER_FLOOR: float = 3.5 / 9.0
+const HP_SCALE_PER_FLOOR: float = 5 / 9.0
 ## Giáp quái/boss giảm sát thương theo PHẦN TRĂM: giảm = giáp / (giáp + ARMOR_K). Trước đây giáp
 ## trừ thẳng vào từng phát nên đạn nhỏ (Pistol 10, SMG 5) bị phạt nặng hơn nhiều so với đòn to.
 ## K=30: giáp 10 (quái tầng 10) giảm 25%, giáp 19 (Dungeon Lord) giảm ~39%, mọi vũ khí như nhau.

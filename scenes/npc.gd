@@ -281,7 +281,7 @@ func _roll_gacha(cost: int, is_premium: bool) -> void:
 	Global.run_stats["gacha_" + win_rarity] += 1
 	
 	# Xác định Vũ khí theo Class
-	var w_pool = ["pistol", "laser", "shotgun"] if Global.current_class == "ranger" else ["broadsword", "daggers", "hammer"]
+	var w_pool = ["pistol", "laser", "shotgun","smg"] if Global.current_class == "ranger" else ["broadsword", "daggers", "hammer"]
 	win_id = w_pool.pick_random()
 	
 	# ----------------------------------------------------
