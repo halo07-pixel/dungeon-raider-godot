@@ -156,14 +156,19 @@ func endless_difficulty_mult(for_floor_num: int) -> float:
 ## nhân thêm 1 hệ số nữa -> tầng 10 trâu gấp 6.2 lần quái / 13.7 lần boss). Chọn 0.3889/tầng
 ## để tầng 10 = 1 + 0.3889*9 = x4.5 so với tầng 1 (theo yêu cầu người chơi).
 const HP_SCALE_PER_FLOOR: float = 3.5 / 9.0
-## Sàn sát thương sau giáp: 1 phát luôn gây >= 30% sát thương gốc (giáp trừ thẳng vào từng
-## phát từng làm SMG/Shotgun/Pistol chỉ còn 1 dmg/phát ở tầng cao).
-const MIN_DAMAGE_RATIO: float = 0.3
+## Giáp quái/boss giảm sát thương theo PHẦN TRĂM: giảm = giáp / (giáp + ARMOR_K). Trước đây giáp
+## trừ thẳng vào từng phát nên đạn nhỏ (Pistol 10, SMG 5) bị phạt nặng hơn nhiều so với đòn to.
+## K=30: giáp 10 (quái tầng 10) giảm 25%, giáp 19 (Dungeon Lord) giảm ~39%, mọi vũ khí như nhau.
+const ARMOR_K: float = 30.0
 const MELEE_LIFESTEAL_MULT: float = 0.5
 func hp_scale_for_floor(for_floor_num: int) -> float:
 	return 1.0 + HP_SCALE_PER_FLOOR * float(maxi(0, for_floor_num - 1))
+func armor_reduction(armor: float) -> float:
+	var a: float = maxf(0.0, armor)
+	return a / (a + ARMOR_K)
+
 func armored_damage(amount: int, armor: float) -> int:
-	return maxi(maxi(1, ceili(float(amount) * MIN_DAMAGE_RATIO)), amount - int(armor))
+	return maxi(1, roundi(float(amount) * (1.0 - armor_reduction(armor))))
 const ENEMY_DMG_PER_FLOOR: float = 0.07
 const ENEMY_DMG_MULT_CAP: float = 1.8
 func enemy_dmg_mult_for_floor(for_floor_num: int) -> float:
