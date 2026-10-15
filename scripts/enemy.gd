@@ -87,7 +87,7 @@ func setup(p_kind: String, hp_mult: float = 1.0) -> void:
 	if (kind == "archer" or kind == "shaman") and randf() < ELITE_CHANCE:
 		is_elite = true
 		hp_mult *= ELITE_HP_MULT
-	var floor_scale: float = 1.0 + 0.15 * float(Global.floor_num - 1)
+	var floor_scale: float = Global.hp_scale_for_floor(Global.floor_num)
 	var endless_mult: float = Global.endless_difficulty_mult(Global.floor_num) # >1.0 chỉ khi tầng > 10 (Vô Hạn)
 	var computed_max_hp: float = float(data["hp"]) * hp_mult * floor_scale * endless_mult
 	var computed_armor: float = floor((Global.floor_num - 1) * 1.2) + floor((endless_mult - 1.0) * 8.0)

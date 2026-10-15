@@ -2,6 +2,7 @@ extends CanvasLayer
 ## Buff Picker: hiện 3 lựa chọn buff ngẫu nhiên sau khi dọn phòng thường/boss (Pick 1 of 3
 ## kiểu Soul Knight). Tạm dừng game khi đang chọn, tiếp tục ngay sau khi người chơi bấm chọn.
 
+var _title: Label
 var _bg: ColorRect
 var _cards: Array = [] # Array[Dictionary]: panel/style/tier_label/name_label/desc_label/stack_label/btn
 
@@ -30,6 +31,7 @@ func _build_ui() -> void:
 
 	var title := Label.new()
 	title.text = "CHỌN 1 BUFF"
+	_title = title
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title.add_theme_font_size_override("font_size", 28)
 	title.add_theme_color_override("font_color", Color(1.0, 0.9, 0.3))
@@ -105,6 +107,8 @@ func _make_card(parent: Control) -> Dictionary:
 
 
 func _on_buff_choice_requested(choices: Array) -> void:
+	if _title:
+		_title.text = "CHỌN 1 BUFF (%d/%d)" % [Global.BUFF_PICKS_PER_BOSS - Global.buff_picks_left + 1, Global.BUFF_PICKS_PER_BOSS]
 	for i in _cards.size():
 		var c: Dictionary = _cards[i]
 		var btn: Button = c["btn"]
@@ -140,3 +144,4 @@ func _on_card_chosen(id: String) -> void:
 	Global.apply_buff(id)
 	_bg.hide()
 	get_tree().paused = false
+	Global.consume_buff_pick() # còn lượt thứ 2 thì hiện tiếp

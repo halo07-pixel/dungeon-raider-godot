@@ -60,4 +60,4 @@ func _process(delta: float) -> void:
 			var p = Global.player
 			if is_instance_valid(p) and p.has_method("take_damage"):
 				if not (p.has_method("is_invulnerable") and p.is_invulnerable()):
-					p.take_damage(DAMAGE, global_position, 0.0)
+					p.take_damage(DAMAGE, global_position, 0.0, false, true)
