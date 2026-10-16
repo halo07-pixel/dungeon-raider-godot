@@ -9,8 +9,8 @@ const TICK: float = 0.5
 const BURN_DURATION: float = 3.0
 const POISON_DURATION: float = 4.0
 const FROST_DECAY: float = 3.0
-const FREEZE_DURATION: float = 1.5
-const FREEZE_IMMUNE: float = 3.0
+const FREEZE_DURATION: float = 1.2   # thời gian GỐC; hurtbox nhân CC_DURATION_MULT (0.5) -> ~0.6s ở tầng 1
+const FREEZE_IMMUNE: float = 4.0
 
 var dot_cb: Callable
 var slow_cb: Callable

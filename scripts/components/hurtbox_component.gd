@@ -28,6 +28,16 @@ var weight: float = 1.0
 
 var stun_timer: float = 0.0
 var slow_timer: float = 0.0
+var stun_immune_timer: float = 0.0 # sau khi hết choáng: miễn choáng tiếp (chống khóa cứng bằng Búa)
+
+## Giảm khống chế lên QUÁI (choáng/chậm/đóng băng do Player gây ra). Thời gian hiệu lực thật =
+## thời gian gốc x CC_DURATION_MULT x (1 - cc_resist) — cc_resist của quái tăng theo tầng.
+## ĐỔI 3 hằng số này để chỉnh độ mạnh của khống chế trên toàn bộ quái.
+const CC_DURATION_MULT: float = 0.5
+const CC_MIN_DURATION: float = 0.15
+const STUN_IMMUNE_TIME: float = 1.0
+## Hệ số tốc độ khi bị chậm (enemy.gd đọc: trước đây 0.5 = chậm 50%, nay 0.75 = chậm 25%).
+const SLOW_MOVE_MULT: float = 0.75
 var bleed_ticks: int = 0
 var bleed_timer: float = 0.0
 
@@ -129,11 +139,17 @@ func mark_dead() -> void:
 	alive = false
 	died.emit()
 
+## Thời gian khống chế thực sự sau khi áp giảm khống chế (xem CC_DURATION_MULT).
+func effective_cc_duration(duration: float) -> float:
+	return maxf(CC_MIN_DURATION, duration * CC_DURATION_MULT * (1.0 - cc_resist))
+
 func apply_status(type: String, duration: float) -> void:
 	if type == "stun":
-		stun_timer = maxf(stun_timer, duration)
+		if stun_immune_timer > 0.0:
+			return # vừa hết choáng: miễn choáng tạm thời
+		stun_timer = maxf(stun_timer, effective_cc_duration(duration))
 	elif type == "slow":
-		slow_timer = maxf(slow_timer, duration)
+		slow_timer = maxf(slow_timer, effective_cc_duration(duration))
 	elif type == "bleed":
 		bleed_ticks = 4 # Chảy máu 4 nhịp
 		bleed_timer = BLEED_TICK_INTERVAL
@@ -163,8 +179,12 @@ func tick_bleed(delta: float) -> void:
 ## Trả về true nếu đang choáng NGAY TRƯỚC khi trừ delta (khớp semantics gốc: frame
 ## cuối cùng còn choáng vẫn được coi là choáng), đồng thời tự trừ timer.
 func consume_stun(delta: float) -> bool:
+	if stun_immune_timer > 0.0:
+		stun_immune_timer = maxf(0.0, stun_immune_timer - delta)
 	if stun_timer > 0.0:
 		stun_timer -= delta
+		if stun_timer <= 0.0:
+			stun_immune_timer = STUN_IMMUNE_TIME
 		return true
 	return false
 

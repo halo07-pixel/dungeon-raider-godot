@@ -86,7 +86,8 @@ var _t: float = 0.0
 var armor: float = 0.0
 var cc_resist: float = 0.0
 var slow_timer: float = 0.0
-const BOSS_SLOW_STRENGTH: float = 0.4   # chậm tối đa 40% khi kháng khống chế = 0
+const BOSS_SLOW_STRENGTH: float = 0.2   # chậm tối đa 20% khi kháng khống chế = 0 (trước đây 40%)
+const BOSS_CC_DURATION_MULT: float = 0.5
 var is_boss: bool = true
 var blink_cd: float = 0.0 # riêng Necromancer: hồi chiêu dịch chuyển né cận chiến
 ## Riêng Frost: khi máu <=25%, vào pha "nổi điên" — đánh nhanh hơn, telegraph ngắn hơn,
@@ -127,7 +128,7 @@ func apply_element(kind: String, power: int, cap: int) -> void:
 func apply_status(type: String, duration: float, _extra: float = 0.0) -> void:
 	if type != "slow" or not alive:
 		return
-	slow_timer = maxf(slow_timer, duration)
+	slow_timer = maxf(slow_timer, duration * BOSS_CC_DURATION_MULT)
 
 func _slow_factor() -> float:
 	if slow_timer <= 0.0:
