@@ -14,6 +14,22 @@ const BULLET = preload("res://scenes/bullet.tscn")
 const RLControllerScript = preload("res://scripts/rl_controller.gd")
 const BOSS_HAZARD = preload("res://scripts/boss_hazard.gd")
 const SLAM_RADIUS: float = 150.0
+## --- Dungeon Lord "khó hơn" (chỉ áp dụng khi kind == "lord"; các boss khác giữ nguyên) ---
+const LORD_RING_COUNT: int = 14                       # đạn mỗi vòng (Warden vẫn 12)
+const LORD_RING_VOLLEYS: Array = [3, 4, 5, 5]         # số vòng đạn theo pha 1..4
+const LORD_RING_GAP: float = 0.3                      # giây giữa các vòng (đủ để đọc mẫu đạn)
+const LORD_AOE_MULT: float = 1.35                     # nhân bán kính các vùng AOE của Lord
+const LORD_JUDGE_RADIUS: float = 230.0
+const LORD_JUDGE_DAMAGE: int = 55
+const LORD_JUDGE_TELEGRAPH: float = 1.3
+const LORD_JUDGE_FOLLOW: float = 0.8                  # vùng nổ bám theo Player trong 0.8s đầu rồi chốt
+const LORD_JUDGE_CHASES: int = 3
+const LORD_JUDGE_CHASE_RADIUS: float = 110.0
+const LORD_JUDGE_CHASE_DAMAGE: int = 28
+const LORD_JUDGE_CHASE_TELEGRAPH: float = 0.4
+const LORD_JUDGE_CHASE_LEAD: float = 0.4              # đón đầu theo vận tốc Player (giây)
+const LORD_JUDGE_FINAL_RINGS: int = 2
+const LORD_JUDGE_FINAL_COUNT: int = 16
 const BODY_RADIUS_BASE: float = 34.0
 
 ## Cấu hình riêng từng loại boss. "sprite" phải khớp tên file trong assets/dungeon/.
@@ -417,6 +433,9 @@ func _atk_ring() -> void:
 	await _telegraph("flash", 0.7 * _speed_mult())
 	if not alive:
 		return
+	if kind == "lord":
+		await _lord_ring_volleys()
+		return
 	_fire_ring(12, 0.0, Color(1.0, 0.7, 0.2))
 	if phase >= 2:
 		await get_tree().create_timer(0.35).timeout
@@ -424,6 +443,19 @@ func _atk_ring() -> void:
 			return
 		_fire_ring(12, PI / 12.0, Color(1.0, 0.7, 0.2))
 	await get_tree().create_timer(0.3).timeout
+
+
+## Dungeon Lord: nhiều vòng đạn liên tiếp, mỗi vòng lệch góc khác nhau (chu kỳ 0 / nửa khoảng / 1/4
+## khoảng) nên lỗ hổng xoay vị trí qua từng vòng — phải di chuyển liên tục thay vì đứng 1 chỗ.
+func _lord_ring_volleys() -> void:
+	var volleys: int = int(LORD_RING_VOLLEYS[clampi(phase - 1, 0, LORD_RING_VOLLEYS.size() - 1)])
+	var step: float = TAU / float(LORD_RING_COUNT)
+	var offsets: Array = [0.0, step * 0.5, step * 0.25]
+	for v in volleys:
+		if not alive:
+			return
+		_fire_ring(LORD_RING_COUNT, float(offsets[v % offsets.size()]), Color(1.0, 0.7, 0.2))
+		await get_tree().create_timer(LORD_RING_GAP).timeout
 
 
 func _fire_ring(count: int, angle_offset: float, color: Color) -> void:
@@ -511,7 +543,7 @@ func _atk_necro_curse() -> void:
 	hz.damage = 8
 	hz.tick_interval = 0.6
 	hz.duration = 3.2
-	hz.radius = 70.0
+	hz.radius = 70.0 * (LORD_AOE_MULT if kind == "lord" else 1.0)
 	hz.telegraph_time = 0.7 * _speed_mult()
 	hz.color = Color(0.55, 0.15, 0.75, 0.45)
 	Global.world.add_child(hz)
@@ -586,15 +618,16 @@ func _atk_frost_spike_field() -> void:
 	if is_instance_valid(p):
 		center = p.global_position + p.velocity * 0.65
 	Global.sfx("slam")
-	var n: int = 5
+	var is_lord: bool = kind == "lord"
+	var n: int = 7 if is_lord else 5
 	for i in n:
 		var ang: float = TAU * float(i) / float(n) + randf() * 0.4
-		var pos: Vector2 = center + Vector2.from_angle(ang) * randf_range(20.0, 110.0)
+		var pos: Vector2 = center + Vector2.from_angle(ang) * randf_range(20.0, 150.0 if is_lord else 110.0)
 		var hz := Area2D.new()
 		hz.set_script(BOSS_HAZARD)
 		hz.single_shot = true
 		hz.damage = 18
-		hz.radius = 34.0
+		hz.radius = 34.0 * (LORD_AOE_MULT if is_lord else 1.0)
 		hz.telegraph_time = 0.65
 		hz.color = Color(0.5, 0.9, 1.0, 0.55)
 		Global.world.add_child(hz)
@@ -656,12 +689,26 @@ func _atk_ice_prison() -> void:
 	hz.set_script(BOSS_HAZARD)
 	hz.single_shot = true
 	hz.damage = 24
-	hz.radius = 46.0
+	hz.radius = 46.0 * (LORD_AOE_MULT if kind == "lord" else 1.0)
 	hz.telegraph_time = 0.85 * _speed_mult()
 	hz.apply_stun_duration = 1.3
 	hz.color = Color(0.6, 0.95, 1.0, 0.6)
 	Global.world.add_child(hz)
 	hz.global_position = target_pos
+	if kind == "lord":
+		# Cụm 3 vòng: dưới chân + 2 bên (vuông góc hướng boss -> Player) — chặn đường né ngang.
+		var side: Vector2 = (target_pos - global_position).normalized().orthogonal() * 120.0
+		for sgn in [-1.0, 1.0]:
+			var hz2 := Area2D.new()
+			hz2.set_script(BOSS_HAZARD)
+			hz2.single_shot = true
+			hz2.damage = 24
+			hz2.radius = 46.0 * LORD_AOE_MULT
+			hz2.telegraph_time = 0.85 * _speed_mult()
+			hz2.apply_stun_duration = 1.3
+			hz2.color = Color(0.6, 0.95, 1.0, 0.6)
+			Global.world.add_child(hz2)
+			hz2.global_position = target_pos + side * sgn
 	await get_tree().create_timer(0.85 * _speed_mult() + 0.2).timeout
 
 
@@ -687,26 +734,32 @@ func _atk_judgement() -> void:
 	var hz := Area2D.new()
 	hz.set_script(BOSS_HAZARD)
 	hz.single_shot = true
-	hz.damage = 38
-	hz.radius = 170.0
-	hz.telegraph_time = 1.3
+	hz.damage = LORD_JUDGE_DAMAGE
+	hz.radius = LORD_JUDGE_RADIUS
+	hz.telegraph_time = LORD_JUDGE_TELEGRAPH
 	hz.color = Color(1.0, 0.15, 0.15, 0.5)
+	# Vùng nổ BÁM theo Player trong LORD_JUDGE_FOLLOW giây đầu rồi mới chốt vị trí.
+	hz.follow_target = p if is_instance_valid(p) else null
+	hz.follow_time = LORD_JUDGE_FOLLOW
 	Global.world.add_child(hz)
 	hz.global_position = center
 	await get_tree().create_timer(1.5).timeout
 	if not alive:
 		return
 	# (3)+(4) 2 đòn truy đuổi nhanh, mỗi đòn chốt lại đúng vị trí Player NGAY lúc đó.
-	for i in 2:
+	for i in LORD_JUDGE_CHASES:
 		if not alive:
 			return
-		var chase_pos: Vector2 = p.global_position if is_instance_valid(p) else global_position
+		# Đón đầu theo vận tốc Player (không chỉ vị trí hiện tại)
+		var chase_pos: Vector2 = global_position
+		if is_instance_valid(p):
+			chase_pos = p.global_position + p.velocity * LORD_JUDGE_CHASE_LEAD
 		var hz2 := Area2D.new()
 		hz2.set_script(BOSS_HAZARD)
 		hz2.single_shot = true
-		hz2.damage = 22
-		hz2.radius = 90.0
-		hz2.telegraph_time = 0.5
+		hz2.damage = LORD_JUDGE_CHASE_DAMAGE
+		hz2.radius = LORD_JUDGE_CHASE_RADIUS
+		hz2.telegraph_time = LORD_JUDGE_CHASE_TELEGRAPH
 		hz2.color = Color(1.0, 0.25, 0.1, 0.55)
 		Global.world.add_child(hz2)
 		hz2.global_position = chase_pos
@@ -714,7 +767,11 @@ func _atk_judgement() -> void:
 	if not alive:
 		return
 	# Kết liễu: Ring dồn dập, nối liền không khoảng nghỉ — đúng chất "khoảnh khắc chung kết".
-	_fire_ring(14, 0.0, Color(1.0, 0.3, 0.2))
+	for r in LORD_JUDGE_FINAL_RINGS:
+		if not alive:
+			return
+		_fire_ring(LORD_JUDGE_FINAL_COUNT, (PI / float(LORD_JUDGE_FINAL_COUNT)) * float(r), Color(1.0, 0.3, 0.2))
+		await get_tree().create_timer(LORD_RING_GAP).timeout
 
 
 ## "Tổng Triệu Hồi" — đòn độc quyền Dungeon Lord (pha 4): triệu hồi cùng lúc 1 quái mỗi
