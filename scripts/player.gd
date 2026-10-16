@@ -421,8 +421,6 @@ func _swing() -> void:
 	var aoe_angle = float(w["cleave_angle"])
 	var knock = float(w["knock"])
 	var lifesteal = rarity_data["lifesteal"] # Hút máu từ Gacha
-	# Buff "Hút Máu"
-	lifesteal += 0.02 * float(Global.buff_stack("buff_lifesteal"))
 	lifesteal *= Global.MELEE_LIFESTEAL_MULT # cận chiến hút máu yếu hơn tầm xa
 
 	var is_crit = false
@@ -614,7 +612,7 @@ func _arc_strike() -> bool:
 	var dmg: int = maxi(6, int(float(weapon["damage"]) * rarity_data["mult"] * 0.8 * _secondary_dmg_mult()))
 	for i in mini(3, cands.size()):
 		cands[i].take_damage(dmg, global_position, 100.0)
-		Global.on_secondary_hit(cands[i], dmg, false, bool(weapon.get("is_melee", false)))
+		Global.on_secondary_hit(cands[i], dmg, false)
 		Global.burst(cands[i].global_position, Color(1.0, 0.95, 0.3), 6, 140.0, 1.2)
 	Global.shake(0.1, 0.08)
 	return true
@@ -658,7 +656,7 @@ func _on_shield_broken() -> void:
 	for e in get_tree().get_nodes_in_group("enemies"):
 		if is_instance_valid(e) and e.alive and e.global_position.distance_to(global_position) <= 140.0:
 			e.take_damage(dmg, global_position, 450.0)
-			Global.on_secondary_hit(e, dmg, false, bool(weapon.get("is_melee", false)))
+			Global.on_secondary_hit(e, dmg, false)
 			# Synergy Giáp Phản Chấn + Băng Giá: xung chấn đóng băng mọi quái trúng
 			var freeze_lv: int = Global.buff_stack("buff_freeze")
 			if freeze_lv > 0 and e.alive and e.has_method("apply_element"):
@@ -668,7 +666,7 @@ func _on_shield_broken() -> void:
 	for b in get_tree().get_nodes_in_group("boss"):
 		if is_instance_valid(b) and b.alive and b.global_position.distance_to(global_position) <= 160.0:
 			b.take_damage(dmg, global_position, 0.0)
-			Global.on_secondary_hit(b, dmg, false, bool(weapon.get("is_melee", false)))
+			Global.on_secondary_hit(b, dmg, false)
 	for eb in get_tree().get_nodes_in_group("enemy_bullets"):
 		if is_instance_valid(eb) and eb.global_position.distance_to(global_position) <= 160.0:
 			eb.queue_free()

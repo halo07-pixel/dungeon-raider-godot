@@ -268,7 +268,7 @@ const BUFF_MAX_STACK: Dictionary = {
 	# Dùng chung
 	"buff_dmg": 5, "buff_haste": 5, "buff_reach": 5, "buff_crit": 5, "buff_bleed_proc": 3, "buff_slow_proc": 3,
 	"buff_dodge_heal": 5, "buff_gourmand": 3, "buff_sense": 1,
-	"buff_lifesteal": 5, "buff_deathnova": 1, "buff_momentum": 1, "buff_sunder": 1, "buff_berserk": 1, "buff_sweep": 1,
+	"buff_deathnova": 1, "buff_momentum": 1, "buff_sunder": 1, "buff_berserk": 1, "buff_sweep": 1,
 	# Giáp ảo
 	"buff_burn": 3, "buff_poison": 3, "buff_freeze": 2, "buff_arc": 1, "buff_chain": 1,
 	"buff_shield_cap": 5, "buff_shield_regen": 4, "buff_shield_nova": 1,
@@ -290,7 +290,6 @@ var buff_pool: Dictionary = {
 	"buff_slow_proc": {"name": "Đạn Băng", "desc": "+20% cơ hội gây Chậm khi đánh trúng.", "tier": "rare", "class": "any"},
 	"buff_dodge_heal": {"name": "Né Hồi Phục", "desc": "Né thành công hồi 3 HP.", "tier": "rare", "class": "any"},
 	"buff_sense": {"name": "Linh Cảm", "desc": "Bản đồ nhỏ hiện toàn bộ các phòng của tầng.", "tier": "rare", "class": "any"},
-	"buff_lifesteal": {"name": "Hút Máu", "desc": "Hồi 2% sát thương gây ra thành HP (cận chiến: chỉ còn một nửa).", "tier": "epic", "class": "any"},
 	"buff_deathnova": {"name": "Nổ Tử Thi", "desc": "Quái chết sẽ nổ, lan sát thương cho quái gần đó.", "tier": "epic", "class": "any"},
 	"buff_momentum": {"name": "Đà Chiến Đấu", "desc": "Tấn công liên tục tăng dần sát thương, tối đa +25%.", "tier": "epic", "class": "any"},
 	"buff_sunder": {"name": "Phá Giáp", "desc": "Đòn trúng cộng dồn khiến quái đó nhận thêm sát thương.", "tier": "epic", "class": "any"},
@@ -438,18 +437,13 @@ func on_player_hit(target: Node, dmg: int, is_crit: bool) -> void:
 		chain_lightning(target, int(float(dmg) * 0.6), 3)
 
 ## Nguồn sát thương PHỤ (Lăn Chém / Sét Lan / Giáp Phản Chấn...): áp dụng cùng bộ hiệu ứng như một đòn
-## đánh trúng thường — nguyên tố (Thiêu Đốt/Độc/Băng/Chớp Giật), Phá Giáp và Hút Máu.
-## `melee_lifesteal`: true thì hút máu bị giảm như cận chiến (MELEE_LIFESTEAL_MULT).
-func on_secondary_hit(target: Node, dmg: int, is_crit: bool = false, melee_lifesteal: bool = true) -> void:
+## đánh trúng thường — nguyên tố (Thiêu Đốt/Độc/Băng/Chớp Giật) và Phá Giáp.
+func on_secondary_hit(target: Node, dmg: int, is_crit: bool = false) -> void:
 	if not is_instance_valid(target):
 		return
 	on_player_hit(target, dmg, is_crit)
 	if buff_stack("buff_sunder") > 0 and target.has_method("apply_sunder"):
 		target.apply_sunder()
-	var ls: int = buff_stack("buff_lifesteal")
-	if ls > 0 and is_instance_valid(player) and player.has_method("heal"):
-		var f: float = 0.02 * float(ls) * (MELEE_LIFESTEAL_MULT if melee_lifesteal else 1.0)
-		player.heal(maxi(1, int(float(dmg) * f)))
 
 ## Sét nảy từ `origin_target` sang tối đa n quái gần nhất (bán kính 200px). Gây sát thương trực tiếp
 ## (không gọi lại on_player_hit nên không đệ quy).

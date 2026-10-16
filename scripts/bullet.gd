@@ -184,8 +184,6 @@ func _on_body_entered(body: Node) -> void:
 			Global.on_player_hit(body, damage, is_crit)
 			if Global.buff_stack("buff_sunder") > 0 and body.has_method("apply_sunder"):
 				body.apply_sunder()
-			if Global.buff_stack("buff_lifesteal") > 0 and is_instance_valid(Global.player):
-				Global.player.heal(maxi(1, int(float(damage) * 0.02 * float(Global.buff_stack("buff_lifesteal")))))
 
 		if body.has_method("apply_status"):
 			if from_player:
