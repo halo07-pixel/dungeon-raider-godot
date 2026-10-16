@@ -94,7 +94,14 @@ func _draw() -> void:
 	if not _armed:
 		# Báo trước: viền nhấp nháy dần đậm theo thời gian chờ
 		var ratio: float = clampf(_t / maxf(telegraph_time, 0.01), 0.0, 1.0)
-		draw_arc(Vector2.ZERO, radius, 0.0, TAU, 40, Color(color, 0.25 + 0.5 * ratio), 3.0)
-		draw_circle(Vector2.ZERO, radius * ratio, Color(color, 0.18))
+		var pulse: float = 0.5 + 0.5 * sin(_t * (8.0 + 14.0 * ratio))
+		draw_circle(Vector2.ZERO, radius, Color(color, 0.06 + 0.06 * pulse))
+		draw_circle(Vector2.ZERO, radius * ratio, Color(color, 0.22))
+		# vòng ngoài nhấp nháy + viền dày
+		draw_arc(Vector2.ZERO, radius + 5.0 + 3.0 * pulse, 0.0, TAU, 48, Color(color, 0.2 + 0.4 * pulse), 2.0)
+		draw_arc(Vector2.ZERO, radius, 0.0, TAU, 48, Color(color, 0.45 + 0.5 * ratio), 5.0)
+		if ratio > 0.7:
+			var k: float = (ratio - 0.7) / 0.3
+			draw_arc(Vector2.ZERO, radius, 0.0, TAU, 48, Color(1.0, 1.0, 1.0, 0.35 + 0.55 * k * pulse), 2.5)
 	else:
 		draw_circle(Vector2.ZERO, radius, color)

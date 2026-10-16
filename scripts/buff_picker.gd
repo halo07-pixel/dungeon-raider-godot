@@ -142,6 +142,24 @@ func _on_card_input(event: InputEvent, index: int) -> void:
 			_on_card_chosen(id)
 
 
+func _input(event: InputEvent) -> void:
+	if _choosing or not _bg.visible:
+		return
+	if not (event is InputEventKey) or not event.pressed or event.echo:
+		return
+	var idx: int = -1
+	match event.keycode:
+		KEY_1, KEY_KP_1: idx = 0
+		KEY_2, KEY_KP_2: idx = 1
+		KEY_3, KEY_KP_3: idx = 2
+	if idx < 0 or idx >= _cards.size() or not _cards[idx]["panel"].visible:
+		return
+	var id: String = _cards[idx]["id"]
+	if id != "":
+		get_viewport().set_input_as_handled()
+		_on_card_chosen(id)
+
+
 func _on_buff_choice_requested(choices: Array) -> void:
 	if _title:
 		_title.text = "CHOOSE A BUFF"
@@ -163,7 +181,7 @@ func _on_buff_choice_requested(choices: Array) -> void:
 		var style: StyleBoxFlat = c["style"]
 		style.border_color = color
 
-		c["tier_label"].text = tier.to_upper()
+		c["tier_label"].text = "[%d]  %s" % [i + 1, tier.to_upper()]
 		c["tier_label"].add_theme_color_override("font_color", color)
 		c["name_label"].text = info["name"]
 		c["name_label"].add_theme_color_override("font_color", color)
