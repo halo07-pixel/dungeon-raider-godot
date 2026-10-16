@@ -740,7 +740,7 @@ func _atk_ice_prison() -> void:
 ## liên tục chứ không phải "thấy vòng tròn, bước ra 1 lần là xong" -> kết bằng Ring dồn dập.
 func _atk_judgement() -> void:
 	var p = Global.player
-	Global.message.emit("Dungeon Lord đang tụ sức mạnh...!", Color(1.0, 0.2, 0.2))
+	Global.message.emit("Dungeon Lord is charging", Color(1.0, 0.2, 0.2))
 	Global.sfx("roar")
 	# (1) Đòn giả: lóe sáng nhanh, KHÔNG spawn hazard — chỉ để nhử phản xạ né sớm của người chơi.
 	await _telegraph("flash", 0.4)
@@ -908,7 +908,7 @@ func take_damage(amount: int, _from_pos: Vector2 = Vector2.ZERO, _knock: float =
 		pending_roar = true
 	if kind == "frost" and not frost_enraged and ratio <= 0.25:
 		frost_enraged = true
-		Global.message.emit("%s nổi điên!" % BOSS_NAME, Color(0.4, 0.9, 1.0))
+		Global.message.emit("%s enrages" % BOSS_NAME, Color(0.4, 0.9, 1.0))
 		Global.shake(0.6, 0.4)
 	Global.boss_hp_changed.emit(hp, max_hp, phase, BOSS_NAME)
 

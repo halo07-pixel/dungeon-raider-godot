@@ -460,7 +460,7 @@ func _swing() -> void:
 	if Global.buff_stack("buff_counter") > 0 and counter_timer > 0.0:
 		dmg *= 2
 		counter_timer = 0.0
-		Global.float_text(global_position + Vector2(0, -36), "PHẢN CÔNG!", Color(1.0, 0.6, 0.2), 18)
+		Global.float_text(global_position + Vector2(0, -36), "COUNTER", Color(1.0, 0.6, 0.2), 18)
 	# Lốc Xoáy: mỗi đòn thứ 4 chém vòng 360 độ
 	swing_count += 1
 	var is_whirl: bool = Global.buff_stack("buff_whirl") > 0 and swing_count % 4 == 0

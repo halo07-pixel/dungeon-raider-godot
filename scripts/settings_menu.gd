@@ -6,11 +6,11 @@ extends CanvasLayer
 signal closed
 
 const ACTION_LABELS: Dictionary = {
-	"move_up": "Di chuyển lên",
-	"move_down": "Di chuyển xuống",
-	"move_left": "Di chuyển trái",
-	"move_right": "Di chuyển phải",
-	"dodge": "Né (Dodge)",
+	"move_up": "Move Up",
+	"move_down": "Move Down",
+	"move_left": "Move Left",
+	"move_right": "Move Right",
+	"dodge": "Dodge",
 }
 
 var _awaiting_action: String = ""
@@ -82,7 +82,7 @@ func _build_ui() -> void:
 	vbox.add_child(HSeparator.new())
 
 	var keys_title := Label.new()
-	keys_title.text = "Điều khiển (bấm nút rồi gõ phím mới)"
+	keys_title.text = "Controls"
 	keys_title.add_theme_font_size_override("font_size", 14)
 	vbox.add_child(keys_title)
 
