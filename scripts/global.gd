@@ -437,6 +437,20 @@ func on_player_hit(target: Node, dmg: int, is_crit: bool) -> void:
 	if is_crit and buff_stack("buff_chain") > 0:
 		chain_lightning(target, int(float(dmg) * 0.6), 3)
 
+## Nguồn sát thương PHỤ (Lăn Chém / Sét Lan / Giáp Phản Chấn...): áp dụng cùng bộ hiệu ứng như một đòn
+## đánh trúng thường — nguyên tố (Thiêu Đốt/Độc/Băng/Chớp Giật), Phá Giáp và Hút Máu.
+## `melee_lifesteal`: true thì hút máu bị giảm như cận chiến (MELEE_LIFESTEAL_MULT).
+func on_secondary_hit(target: Node, dmg: int, is_crit: bool = false, melee_lifesteal: bool = true) -> void:
+	if not is_instance_valid(target):
+		return
+	on_player_hit(target, dmg, is_crit)
+	if buff_stack("buff_sunder") > 0 and target.has_method("apply_sunder"):
+		target.apply_sunder()
+	var ls: int = buff_stack("buff_lifesteal")
+	if ls > 0 and is_instance_valid(player) and player.has_method("heal"):
+		var f: float = 0.02 * float(ls) * (MELEE_LIFESTEAL_MULT if melee_lifesteal else 1.0)
+		player.heal(maxi(1, int(float(dmg) * f)))
+
 ## Sét nảy từ `origin_target` sang tối đa n quái gần nhất (bán kính 200px). Gây sát thương trực tiếp
 ## (không gọi lại on_player_hit nên không đệ quy).
 func chain_lightning(origin_target: Node, dmg: int, n: int) -> int:

@@ -85,6 +85,8 @@ var tele_t: float = 0.0
 var _t: float = 0.0
 var armor: float = 0.0
 var cc_resist: float = 0.0
+var slow_timer: float = 0.0
+const BOSS_SLOW_STRENGTH: float = 0.4   # chậm tối đa 40% khi kháng khống chế = 0
 var is_boss: bool = true
 var blink_cd: float = 0.0 # riêng Necromancer: hồi chiêu dịch chuyển né cận chiến
 ## Riêng Frost: khi máu <=25%, vào pha "nổi điên" — đánh nhanh hơn, telegraph ngắn hơn,
@@ -114,7 +116,23 @@ func apply_element(kind: String, power: int, cap: int) -> void:
 	match kind:
 		"burn": elements.apply_burn(power)
 		"poison": elements.apply_poison(power, cap)
-		"frost": pass # boss miễn nhiễm đóng băng
+		"frost":
+			# Boss KHÔNG bị đóng băng cứng, chỉ bị chậm theo từng stack Lạnh (xem apply_status("slow")).
+			if not elements.slow_cb.is_valid():
+				elements.slow_cb = func(d: float): apply_status("slow", d)
+			elements.apply_frost(cap, false)
+
+## Boss chỉ nhận trạng thái "slow" (các trạng thái khác — choáng, chảy máu... — bị bỏ qua như trước).
+## Mức chậm giảm theo cc_resist (kháng khống chế tăng theo tầng).
+func apply_status(type: String, duration: float, _extra: float = 0.0) -> void:
+	if type != "slow" or not alive:
+		return
+	slow_timer = maxf(slow_timer, duration)
+
+func _slow_factor() -> float:
+	if slow_timer <= 0.0:
+		return 1.0
+	return 1.0 - BOSS_SLOW_STRENGTH * (1.0 - cc_resist)
 
 func apply_sunder() -> void:
 	if not alive:
@@ -811,6 +829,8 @@ func _physics_process(delta: float) -> void:
 			sunder_stacks = 0
 	if elements.is_active():
 		elements.tick(delta)
+	if slow_timer > 0.0:
+		slow_timer = maxf(0.0, slow_timer - delta)
 	_tick_rl(delta)
 	var p = Global.player
 
@@ -843,7 +863,7 @@ func _physics_process(delta: float) -> void:
 		var steer: Vector2 = chase_dir
 		if _rl_move.length() > 0.05:
 			steer = (chase_dir * (1.0 - RL_MOVE_BLEND) + _rl_move.normalized() * RL_MOVE_BLEND).normalized()
-		velocity = steer * chase_speed
+		velocity = steer * chase_speed * _slow_factor()
 	else:
 		velocity = Vector2.ZERO
 	move_and_slide()
