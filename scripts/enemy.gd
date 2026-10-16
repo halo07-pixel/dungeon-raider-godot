@@ -384,7 +384,7 @@ func _physics_process(delta: float) -> void:
 			move = (-dir + dir.orthogonal() * strafe_sign).normalized()
 
 	if hurtbox.consume_slow(delta):
-		move *= 0.5
+		move *= hurtbox.SLOW_MOVE_MULT # chậm 25% (trước đây 50%) — xem HurtboxComponent.CC_*
 
 	velocity = move * float(data["speed"]) + knockback
 	knockback = knockback.move_toward(Vector2.ZERO, 900.0 * delta)
