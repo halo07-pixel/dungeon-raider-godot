@@ -67,6 +67,7 @@ func _build_ui() -> void:
 
 	vbox.add_child(_build_slider_row("Master Volume", float(Global.settings.get("master_volume", 1.0)), Global.set_master_volume))
 	vbox.add_child(_build_slider_row("SFX Volume", float(Global.settings.get("sfx_volume", 1.0)), Global.set_sfx_volume))
+	vbox.add_child(_build_slider_row("Music Volume", float(Global.settings.get("music_volume", 1.0)), MusicManager.set_music_volume))
 
 	var fs_row := HBoxContainer.new()
 	var fs_label := Label.new()

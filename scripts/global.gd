@@ -8,6 +8,8 @@ signal portal_entered
 signal boss_spawned(boss)
 signal boss_hp_changed(hp: float, max_hp: float, phase: int, boss_name: String)
 signal boss_defeated
+## Dungeon phát ngay khi bắt đầu dựng một tầng (mọi tầng, kể cả tầng Lord). MusicManager chọn nhạc theo biome.
+signal floor_started(floor_num: int)
 
 const TILE: int = 32
 

@@ -22,6 +22,7 @@ config/features=PackedStringArray("4.7", "GL Compatibility")
 
 Global="*res://scripts/global.gd"
 PlayerProfiler="*res://scripts/player_profiler.gd"
+MusicManager="*res://scripts/music_manager.gd"
 
 [display]
 

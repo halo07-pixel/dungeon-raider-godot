@@ -178,6 +178,7 @@ func _generate_lord_floor() -> void:
 
 # ------------------------------------------------------------------ Sinh tầng
 func generate(floor_number: int) -> void:
+	Global.floor_started.emit(floor_number) # đặt trước nhánh tầng 10 (return sớm) để mọi tầng đều phát
 	if floor_number == 10:
 		_generate_lord_floor()
 		return
