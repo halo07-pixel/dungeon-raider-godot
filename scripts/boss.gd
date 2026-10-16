@@ -11,6 +11,7 @@ signal died
 signal summon_requested(kind: String, pos: Vector2)
 
 const BULLET = preload("res://scenes/bullet.tscn")
+const RLControllerScript = preload("res://scripts/rl_controller.gd")
 const BOSS_HAZARD = preload("res://scripts/boss_hazard.gd")
 const SLAM_RADIUS: float = 150.0
 const BODY_RADIUS_BASE: float = 34.0
@@ -110,6 +111,20 @@ func apply_sunder() -> void:
 ## (spawn test/debug không gọi set_arena_bounds) không bị ảnh hưởng. Chỉ dùng để chặn
 ## _necro_blink() dịch chuyển xuyên tường ra ngoài bản đồ (BUG: global_position += ...
 ## gán thẳng toạ độ, bỏ qua va chạm vật lý mà move_and_slide() vẫn tự chặn được).
+## AI Tầng 3: RLController (chính sách nội bộ thích nghi nhẹ) — xem rl_controller.gd.
+## Dùng để (1) thiên lệch chọn đòn trong _attack_pool(), (2) pha trộn nhẹ vào hướng đuổi Player
+## (lách ngang + tránh tường). KHÔNG thay thế chuỗi đòn/telegraph đã tinh chỉnh của từng boss.
+var rl: Node = null
+const RL_DECISION_INTERVAL: float = 0.25
+const RL_MOVE_BLEND: float = 0.35      # 0 = đuổi thẳng như cũ, 1 = hoàn toàn theo chính sách
+const RL_PICK_BIAS: float = 0.7        # độ mạnh thiên lệch chọn đòn (exp(±pick*BIAS))
+## Đòn diện rộng/đón đầu (ưu tiên khi Player ở xa/chạy nhanh) và đòn trực diện (ưu tiên khi gần).
+const AREA_ATTACKS: Array = ["ring", "slam", "blizzard", "spike_field", "ice_prison", "judgement", "frost_breath", "necro_curse"]
+const DIRECT_ATTACKS: Array = ["charge", "necro_bolt", "frost_charge"]
+var _rl_timer: float = 0.0
+var _rl_move: Vector2 = Vector2.ZERO
+var _rl_prev_player_total: float = -1.0
+var _rl_prev_hp: float = -1.0
 var arena_rect: Rect2 = Rect2()
 
 func set_arena_bounds(rect: Rect2) -> void:
@@ -151,6 +166,11 @@ func activate_boss() -> void:
 func _ready() -> void:
 	motion_mode = CharacterBody2D.MOTION_MODE_FLOATING
 	add_to_group("boss")
+	rl = Node.new()
+	rl.set_script(RLControllerScript)
+	rl.name = "RLController"
+	add_child(rl)
+	rl.attach(self)
 
 	var cfg: Dictionary = BOSS_DATA[kind]
 	var body_mult: float = float(cfg["body_mult"])
@@ -266,6 +286,51 @@ func _attack_pool() -> Array:
 			return pool
 
 
+## Giá trị PICK [-1,1] mới nhất của RLController (0 nếu chưa có).
+func _rl_pick_value() -> float:
+	if rl == null:
+		return 0.0
+	return float(rl.last_action[rl.ACTION_PICK])
+
+## Chọn đòn có trọng số: mỗi lần xuất hiện trong pool = 1 phiếu (như pick_random cũ), nhân thêm
+## exp(±pick * RL_PICK_BIAS) — đòn diện rộng được tăng khi pick > 0, đòn trực diện khi pick < 0.
+## pick = 0 -> đúng phân phối cũ.
+func _weighted_attack(pool: Array, pick: float) -> String:
+	var weights: Array = []
+	var total: float = 0.0
+	for a in pool:
+		var sign_f: float = 1.0 if AREA_ATTACKS.has(a) else (-1.0 if DIRECT_ATTACKS.has(a) else 0.0)
+		var w: float = exp(pick * sign_f * RL_PICK_BIAS)
+		weights.append(w)
+		total += w
+	var roll: float = randf() * total
+	for i in pool.size():
+		roll -= float(weights[i])
+		if roll <= 0.0:
+			return pool[i]
+	return pool[pool.size() - 1]
+
+## Nhịp quyết định của RLController: chấm reward cho nhịp trước (Player mất bao nhiêu HP+giáp,
+## Boss mất bao nhiêu HP) rồi decide_action() mới. Tách riêng khỏi vật lý di chuyển.
+func _tick_rl(delta: float) -> void:
+	if rl == null or not active:
+		return
+	_rl_timer -= delta
+	if _rl_timer > 0.0:
+		return
+	_rl_timer = RL_DECISION_INTERVAL
+	var p = Global.player
+	if not is_instance_valid(p) or not p.alive:
+		return
+	var p_total: float = float(p.hp) + float(p.shield)
+	var dealt: float = maxf(0.0, _rl_prev_player_total - p_total) if _rl_prev_player_total >= 0.0 else 0.0
+	var taken: float = maxf(0.0, _rl_prev_hp - hp) if _rl_prev_hp >= 0.0 else 0.0
+	_rl_prev_player_total = p_total
+	_rl_prev_hp = hp
+	rl.reward_step(dealt, taken)
+	var act: PackedFloat32Array = rl.decide_action()
+	_rl_move = Vector2(act[rl.ACTION_MOVE_X], act[rl.ACTION_MOVE_Y])
+
 func _on_attack_timer_timeout() -> void:
 	if not alive or busy or not active:
 		return
@@ -279,7 +344,7 @@ func _on_attack_timer_timeout() -> void:
 		await _roar()
 		if not alive:
 			return
-	var attack: String = _attack_pool().pick_random()
+	var attack: String = _weighted_attack(_attack_pool(), _rl_pick_value())
 	match attack:
 		"charge": await _atk_charge()
 		"ring": await _atk_ring()
@@ -689,6 +754,7 @@ func _physics_process(delta: float) -> void:
 			sunder_stacks = 0
 	if elements.is_active():
 		elements.tick(delta)
+	_tick_rl(delta)
 	var p = Global.player
 
 	# === CƠ CHẾ CHỐNG ÔM BOSS ===
@@ -716,7 +782,11 @@ func _physics_process(delta: float) -> void:
 		var chase_speed: float = 55.0 + 20.0 * float(phase)
 		if kind == "frost" and frost_enraged:
 			chase_speed += 35.0
-		velocity = (p.global_position - global_position).normalized() * chase_speed
+		var chase_dir: Vector2 = (p.global_position - global_position).normalized()
+		var steer: Vector2 = chase_dir
+		if _rl_move.length() > 0.05:
+			steer = (chase_dir * (1.0 - RL_MOVE_BLEND) + _rl_move.normalized() * RL_MOVE_BLEND).normalized()
+		velocity = steer * chase_speed
 	else:
 		velocity = Vector2.ZERO
 	move_and_slide()

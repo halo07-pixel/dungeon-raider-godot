@@ -11,6 +11,15 @@ extends Node
 ##
 ## Observation vector cố định độ dài OBS_SIZE (chuẩn hoá về ~[-1, 1] để mạng học ổn định).
 ## Action là vector liên tục ACTION_SIZE phần tử trong [-1, 1] (xem ACTION_* bên dưới).
+##
+## NÂNG CẤP — Bộ điều khiển chiến thuật tự vận hành (không cần file .onnx):
+##   decide_action() là CHÍNH SÁCH NỘI BỘ: tầng tuyến tính nhỏ (4 x FEAT_SIZE trọng số + bias, qua tanh)
+##   trên vector get_obs() (+2 đặc trưng dẫn xuất: tốc độ Player, khoảng cách), khởi tạo bằng bộ
+##   trọng số "tiên nghiệm" viết tay (lò xo giữ khoảng cách + lách ngang + né tường + thiên lệch chọn
+##   đòn) rồi tự tinh chỉnh nhẹ sau mỗi nhịp bằng Policy Gradient kiểu Bandit (adapt()) dựa trên
+##   compute_reward(). Độ lệch so với tiên nghiệm bị chặn (MAX_DELTA) để Boss không bao giờ "hỏng".
+##   Thành thật về giới hạn: 1 trận boss chỉ có vài chục nhịp, nên đây là "thích nghi nhẹ" chứ
+##   không phải học sâu — mô hình .onnx thật sau này vẫn cắm vào qua get_obs()/set_action().
 
 const OBS_SIZE: int = 16
 const ACTION_SIZE: int = 4
@@ -22,6 +31,12 @@ const RAY_LENGTH: float = 400.0
 ## Chỉ số action: [0]=hướng di chuyển x, [1]=hướng y, [2]=ngưỡng "ra đòn" (>0 = tấn công),
 ## [3]=chọn đòn (map về index trong attack pool của boss, do nơi áp dụng quyết định).
 enum {ACTION_MOVE_X, ACTION_MOVE_Y, ACTION_ATTACK, ACTION_PICK}
+
+const FEAT_SIZE: int = OBS_SIZE + 2  # obs + [tốc độ Player, khoảng cách tới Player]
+const NOISE_STD: float = 0.12        # nhiễu khám phá của chính sách
+const LEARN_RATE: float = 0.08
+const MAX_DELTA: float = 0.6         # |trọng số - tiên nghiệm| tối đa
+const BASELINE_EMA: float = 0.1
 
 var owner_body: CharacterBody2D = null
 var last_action: PackedFloat32Array = PackedFloat32Array([0.0, 0.0, 0.0, 0.0])
@@ -108,3 +123,123 @@ func compute_reward(damage_dealt: float, damage_taken: float) -> float:
 func reset_episode() -> void:
 	episode_reward = 0.0
 	last_action = PackedFloat32Array([0.0, 0.0, 0.0, 0.0])
+
+
+# ==============================================================================
+# CHÍNH SÁCH NỘI BỘ (Built-in Policy / Contextual Bandit)
+# ==============================================================================
+## weights[k] = PackedFloat32Array(FEAT_SIZE) cho action k; bias[k] là hệ số tự do.
+var weights: Array = []
+var bias: PackedFloat32Array = PackedFloat32Array([0.0, 0.0, 0.0, 0.0])
+var _prior_weights: Array = []
+var _prior_bias: PackedFloat32Array = PackedFloat32Array([0.0, 0.0, 0.0, 0.0])
+var _last_feat: PackedFloat32Array = PackedFloat32Array()
+var _last_noise: PackedFloat32Array = PackedFloat32Array([0.0, 0.0, 0.0, 0.0])
+var _have_step: bool = false
+var baseline: float = 0.0
+var decisions: int = 0
+var adapt_steps: int = 0
+
+
+func _init() -> void:
+	reset_policy()
+
+
+## Đưa chính sách về bộ trọng số tiên nghiệm viết tay.
+func reset_policy() -> void:
+	weights.clear()
+	for k in ACTION_SIZE:
+		var w := PackedFloat32Array()
+		w.resize(FEAT_SIZE)
+		weights.append(w)
+	bias = PackedFloat32Array([0.0, 0.0, 0.0, 0.0])
+	# Chỉ số đặc trưng: 0,1 = vị trí tương đối Player; 6 = máu quái; 7 = máu Player; 8 = Player né;
+	# 10,11 = hướng Player; 12..15 = tia tường (phải, dưới, trái, trên); 16 = tốc độ Player; 17 = khoảng cách.
+	# MOVE: lò xo (kéo về Player theo khoảng cách, đẩy ra theo hướng đơn vị => cân bằng ~200px)
+	#       + lách ngang (xoay vector tương đối) + đẩy tránh tường gần.
+	const SPRING: float = 1.5
+	const PUSH: float = 0.5
+	const STRAFE: float = 0.4
+	const WALL: float = 0.6
+	weights[ACTION_MOVE_X][0] = SPRING
+	weights[ACTION_MOVE_X][1] = -STRAFE
+	weights[ACTION_MOVE_X][10] = -PUSH
+	weights[ACTION_MOVE_X][12] = WALL
+	weights[ACTION_MOVE_X][14] = -WALL
+	weights[ACTION_MOVE_Y][1] = SPRING
+	weights[ACTION_MOVE_Y][0] = STRAFE
+	weights[ACTION_MOVE_Y][11] = -PUSH
+	weights[ACTION_MOVE_Y][13] = WALL
+	weights[ACTION_MOVE_Y][15] = -WALL
+	# ATTACK: mặc định hơi dương; Player đang né thì kìm lại; Player yếu máu thì hung hăng hơn.
+	bias[ACTION_ATTACK] = 0.3
+	weights[ACTION_ATTACK][8] = -0.8
+	weights[ACTION_ATTACK][7] = -0.3
+	# PICK (>0 = ưu tiên đòn diện rộng/đón đầu, <0 = đòn trực diện): Player ở xa hoặc chạy nhanh -> dương.
+	bias[ACTION_PICK] = -1.02
+	weights[ACTION_PICK][16] = 1.5
+	weights[ACTION_PICK][17] = 2.0
+	_prior_weights.clear()
+	for k in ACTION_SIZE:
+		_prior_weights.append(PackedFloat32Array(weights[k]))
+	_prior_bias = PackedFloat32Array(bias)
+	baseline = 0.0
+	_have_step = false
+
+
+## Vector đặc trưng = get_obs() + [tốc độ Player, khoảng cách tới Player] (suy ra từ chính obs).
+func _features(obs: PackedFloat32Array) -> PackedFloat32Array:
+	var f := PackedFloat32Array()
+	f.resize(FEAT_SIZE)
+	for i in OBS_SIZE:
+		f[i] = obs[i]
+	f[OBS_SIZE] = Vector2(obs[2], obs[3]).length()
+	f[OBS_SIZE + 1] = Vector2(obs[0], obs[1]).length()
+	return f
+
+
+## Quyết định action từ chính sách nội bộ: tanh(W·f + b) + nhiễu nhỏ, kẹp [-1, 1].
+## Đồng thời lưu (đặc trưng, nhiễu) để adapt() cập nhật. Trả về và đặt last_action.
+func decide_action() -> PackedFloat32Array:
+	var feat: PackedFloat32Array = _features(get_obs())
+	var out := PackedFloat32Array([0.0, 0.0, 0.0, 0.0])
+	var noise := PackedFloat32Array([0.0, 0.0, 0.0, 0.0])
+	for k in ACTION_SIZE:
+		var z: float = bias[k]
+		var w: PackedFloat32Array = weights[k]
+		for i in FEAT_SIZE:
+			z += w[i] * feat[i]
+		var n: float = randfn(0.0, NOISE_STD)
+		noise[k] = n
+		out[k] = clampf(tanh(z) + n, -1.0, 1.0)
+	_last_feat = feat
+	_last_noise = noise
+	_have_step = true
+	decisions += 1
+	last_action = out
+	return out
+
+
+## Tự tinh chỉnh nhẹ: Policy Gradient kiểu Bandit với nhiễu Gauss (REINFORCE, baseline = EMA reward).
+## Trọng số không bao giờ lệch quá MAX_DELTA so với bộ tiên nghiệm.
+func adapt(reward: float) -> void:
+	if not _have_step:
+		return
+	var adv: float = reward - baseline
+	baseline = lerpf(baseline, reward, BASELINE_EMA)
+	for k in ACTION_SIZE:
+		var w: PackedFloat32Array = weights[k]
+		var pw: PackedFloat32Array = _prior_weights[k]
+		var g: float = LEARN_RATE * adv * (_last_noise[k] / NOISE_STD)
+		for i in FEAT_SIZE:
+			w[i] = clampf(w[i] + g * _last_feat[i], pw[i] - MAX_DELTA, pw[i] + MAX_DELTA)
+		weights[k] = w
+		bias[k] = clampf(bias[k] + g, _prior_bias[k] - MAX_DELTA, _prior_bias[k] + MAX_DELTA)
+	adapt_steps += 1
+
+
+## Một nhịp học trọn vẹn: tính reward rồi adapt(). Gọi trước decide_action() của nhịp kế tiếp.
+func reward_step(damage_dealt: float, damage_taken: float) -> float:
+	var r: float = compute_reward(damage_dealt, damage_taken)
+	adapt(r)
+	return r
