@@ -25,6 +25,8 @@ var arc_timer: float = 0.0       # Sét Lan
 const ARC_INTERVAL: float = 2.5
 const RING_HOMING_DELAY: float = 0.12
 const WHIRL_WAVE_COUNT: int = 6
+const ROLL_SLASH_BASE_RADIUS: float = 85.0   # tầm Lăn Chém tối thiểu (như bản cũ)
+const ROLL_SLASH_RANGE_FACTOR: float = 1.55  # bán kính = tầm chém hiện tại x hệ số này (nếu lớn hơn mức tối thiểu)
 var shield: float = 20.0
 var shield_delay_timer: float = 0.0
 var weapon_id: String = "pistol"
@@ -247,18 +249,48 @@ func _on_dodge_finished() -> void:
 	rolling = false
 	_roll_slash()
 
+## Hệ số sát thương cộng thêm từ buff dùng chung (Sức Mạnh / Đà Chiến Đấu / Cuồng Nộ) — cho các
+## nguồn sát thương PHỤ (Lăn Chém, Sét Lan, Giáp Phản Chấn) để buff không bị bỏ qua.
+func _secondary_dmg_mult() -> float:
+	var m: float = 1.0 + 0.08 * float(Global.buff_stack("buff_dmg"))
+	if Global.buff_stack("buff_momentum") > 0:
+		m += MOMENTUM_PER_STACK * float(momentum_stacks)
+	if Global.buff_stack("buff_berserk") > 0 and max_hp > 0:
+		m += 0.4 * (1.0 - float(hp) / float(max_hp))
+	return m
+
+## Tầm chém hiện tại của vũ khí cận chiến (đã cộng độ hiếm + Tầm Đánh + Càn Quét) — cùng công thức _swing().
+func current_melee_range() -> float:
+	var r: float = float(weapon.get("range", 40.0))
+	if weapon_id == "broadsword" and weapon_rarity == "rare": r *= 1.2
+	elif weapon_id == "hammer":
+		if weapon_rarity == "rare": r *= 1.25
+		elif weapon_rarity == "legendary": r *= 1.5
+	if Global.buff_stack("buff_reach") > 0:
+		r *= 1.0 + 0.15 * float(Global.buff_stack("buff_reach"))
+	if Global.buff_stack("buff_sweep") > 0:
+		r *= 1.5
+	return r
+
+## Bán kính Lăn Chém: tối thiểu 85 như cũ, nhưng tăng theo tầm chém (Tầm Đánh / Càn Quét / độ hiếm).
+func roll_slash_radius() -> float:
+	return maxf(ROLL_SLASH_BASE_RADIUS, current_melee_range() * ROLL_SLASH_RANGE_FACTOR)
+
 ## Buff Lăn Chém (cận chiến): kết thúc cú lăn chém vòng quanh.
 func _roll_slash() -> void:
 	var stacks: int = Global.buff_stack("buff_rollslash")
 	if stacks <= 0 or not weapon.get("is_melee", false):
 		return
-	var dmg: int = maxi(1, int(float(weapon["damage"]) * rarity_data["mult"] * 1.2 * (1.0 + 0.25 * float(stacks - 1))))
+	var dmg: int = maxi(1, int(float(weapon["damage"]) * rarity_data["mult"] * 1.2 * (1.0 + 0.25 * float(stacks - 1)) * _secondary_dmg_mult()))
+	var rad: float = roll_slash_radius()
 	for e in get_tree().get_nodes_in_group("enemies"):
-		if is_instance_valid(e) and e.alive and e.global_position.distance_to(global_position) <= 85.0:
+		if is_instance_valid(e) and e.alive and e.global_position.distance_to(global_position) <= rad:
 			e.take_damage(dmg, global_position, 320.0)
+			Global.on_secondary_hit(e, dmg)
 	for b in get_tree().get_nodes_in_group("boss"):
-		if is_instance_valid(b) and b.alive and b.global_position.distance_to(global_position) <= 110.0:
+		if is_instance_valid(b) and b.alive and b.global_position.distance_to(global_position) <= rad + 25.0:
 			b.take_damage(dmg, global_position, 0.0)
+			Global.on_secondary_hit(b, dmg)
 	Global.burst(global_position, Color(0.8, 0.9, 1.0), 14, 220.0, 1.5)
 
 # ==============================================================================
@@ -571,17 +603,18 @@ func _tick_arc(delta: float) -> void:
 ## Giáp Phản Chấn cũng gọi hàm này để phóng sét ngay khi giáp vỡ.
 func _arc_strike() -> bool:
 	var cands: Array = []
-	for e in get_tree().get_nodes_in_group("enemies"):
-		if is_instance_valid(e) and e.alive and e.global_position.distance_to(global_position) <= 220.0:
+	for e in get_tree().get_nodes_in_group("enemies") + get_tree().get_nodes_in_group("boss"):
+		if is_instance_valid(e) and e.alive and e.get("active") != false and e.global_position.distance_to(global_position) <= 220.0:
 			cands.append(e)
 	if cands.is_empty():
 		arc_timer = 0.3 # chưa có mục tiêu: thử lại sớm
 		return false
 	arc_timer = ARC_INTERVAL
 	cands.sort_custom(func(a, b): return a.global_position.distance_to(global_position) < b.global_position.distance_to(global_position))
-	var dmg: int = maxi(6, int(float(weapon["damage"]) * rarity_data["mult"] * 0.8))
+	var dmg: int = maxi(6, int(float(weapon["damage"]) * rarity_data["mult"] * 0.8 * _secondary_dmg_mult()))
 	for i in mini(3, cands.size()):
 		cands[i].take_damage(dmg, global_position, 100.0)
+		Global.on_secondary_hit(cands[i], dmg, false, bool(weapon.get("is_melee", false)))
 		Global.burst(cands[i].global_position, Color(1.0, 0.95, 0.3), 6, 140.0, 1.2)
 	Global.shake(0.1, 0.08)
 	return true
@@ -621,10 +654,11 @@ func _on_shield_broken() -> void:
 	if Global.buff_stack("buff_shield_nova") <= 0 or shield_nova_cd > 0.0:
 		return
 	shield_nova_cd = 6.0
-	var dmg: int = 25 + 3 * Global.floor_num
+	var dmg: int = int(float(25 + 3 * Global.floor_num) * _secondary_dmg_mult())
 	for e in get_tree().get_nodes_in_group("enemies"):
 		if is_instance_valid(e) and e.alive and e.global_position.distance_to(global_position) <= 140.0:
 			e.take_damage(dmg, global_position, 450.0)
+			Global.on_secondary_hit(e, dmg, false, bool(weapon.get("is_melee", false)))
 			# Synergy Giáp Phản Chấn + Băng Giá: xung chấn đóng băng mọi quái trúng
 			var freeze_lv: int = Global.buff_stack("buff_freeze")
 			if freeze_lv > 0 and e.alive and e.has_method("apply_element"):
@@ -634,6 +668,7 @@ func _on_shield_broken() -> void:
 	for b in get_tree().get_nodes_in_group("boss"):
 		if is_instance_valid(b) and b.alive and b.global_position.distance_to(global_position) <= 160.0:
 			b.take_damage(dmg, global_position, 0.0)
+			Global.on_secondary_hit(b, dmg, false, bool(weapon.get("is_melee", false)))
 	for eb in get_tree().get_nodes_in_group("enemy_bullets"):
 		if is_instance_valid(eb) and eb.global_position.distance_to(global_position) <= 160.0:
 			eb.queue_free()
