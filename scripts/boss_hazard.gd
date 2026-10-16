@@ -13,6 +13,8 @@ var radius: float = 60.0
 var telegraph_time: float = 0.0 # >0: chờ bấy nhiêu giây rồi mới kích hoạt (đòn 1 lần)
 var single_shot: bool = false
 var apply_slow: bool = false # true: ngoài sát thương còn làm chậm Player khi đứng trong vùng
+var follow_target: Node2D = null # != null: vùng báo trước bám theo mục tiêu trong follow_time giây đầu (Phán Quyết)
+var follow_time: float = 0.0
 var apply_stun_duration: float = 0.0 # >0: ngoài sát thương còn gây Choáng bấy nhiêu giây (đòn "Giam Băng")
 
 var _t: float = 0.0
@@ -49,6 +51,11 @@ func _process(delta: float) -> void:
 	queue_redraw()
 
 	if not _armed:
+		if follow_target != null and _t < follow_time:
+			if is_instance_valid(follow_target):
+				global_position = follow_target.global_position
+			else:
+				follow_target = null
 		if _t >= telegraph_time:
 			_armed = true
 			_t = 0.0
