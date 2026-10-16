@@ -13,6 +13,7 @@ signal died(enemy)
 const PICKUP = preload("res://scenes/pickup.tscn")
 const BULLET = preload("res://scenes/bullet.tscn")
 const QAgentScript = preload("res://scripts/q_agent.gd")
+const HpBarScript = preload("res://scripts/enemy_hp_bar.gd")
 
 ## AI Tầng 2 (Q-Learning): % quái tầm xa (archer/shaman) trở thành "Tinh Anh" mỗi lần spawn —
 ## HP cao hơn, tint tím nhận diện, và dùng QAgent (scripts/q_agent.gd) để quyết định hành vi
@@ -131,6 +132,7 @@ func _ready() -> void:
 	spawn_timer.timeout.connect(_on_spawn_done)
 	modulate.a = 0.35
 	_setup_sprite()
+	_add_hp_bar()
 
 
 ## Cache SpriteFrames theo "kind" — dựng 1 lần duy nhất cho mỗi loại quái rồi
@@ -139,6 +141,21 @@ func _ready() -> void:
 ## spawn quái đều load lại ~8 ảnh từ đĩa + tạo ImageTexture mới, khá tốn khi một
 ## đợt wave sinh tới 10 quái cùng lúc và lặp lại ở mọi phòng/mọi tầng.
 static var _frames_cache: Dictionary = {}
+
+## Thanh máu nổi: node riêng z cao, đặt ngay trên ĐỈNH sprite thật (đọc chiều cao khung hình).
+func _add_hp_bar() -> void:
+	var top: float = -float(data["radius"]) - 10.0
+	var frames: SpriteFrames = sprite.sprite_frames
+	if frames != null and frames.has_animation("idle") and frames.get_frame_count("idle") > 0:
+		var tex: Texture2D = frames.get_frame_texture("idle", 0)
+		if tex != null:
+			top = (sprite.offset.y - float(tex.get_height()) * 0.5) * sprite.scale.y - 6.0
+	var bar: Node2D = Node2D.new()
+	bar.set_script(HpBarScript)
+	bar.name = "HpBar"
+	add_child(bar)
+	bar.setup(self, top, float(data["radius"]), is_elite)
+
 
 func _setup_sprite() -> void:
 	var cfg: Dictionary = ENEMY_SPRITES.get(kind, ENEMY_SPRITES["slime"])
@@ -446,8 +463,5 @@ func _spawn_pickup(k: String) -> void:
 	p.global_position = global_position + Vector2(randf_range(-14.0, 14.0), randf_range(-14.0, 14.0))
 
 func _draw() -> void:
-	# Thân quái giờ do $Sprite (AnimatedSprite2D) vẽ; _draw() chỉ còn thanh máu nổi phía trên.
-	var r: float = data["radius"]
-	if hp < max_hp and alive:
-		draw_rect(Rect2(-r, -r - 10.0, r * 2.0, 4.0), Color(0.15, 0.0, 0.0))
-		draw_rect(Rect2(-r, -r - 10.0, r * 2.0 * clampf(hp / max_hp, 0.0, 1.0), 4.0), Color(0.9, 0.2, 0.2))
+	# Thân quái do $Sprite vẽ; thanh máu nổi giờ là node riêng (enemy_hp_bar.gd) để không bị sprite che.
+	pass

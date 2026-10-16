@@ -54,6 +54,11 @@ var swing_progress: float = 0.0
 ## để vệt chém hiển thị luôn khớp vùng gây sát thương thật. Set lại mỗi lần _swing().
 var display_swing_range: float = 0.0
 var display_swing_half_angle: float = 0.0
+## Vệt chém phai dần sau khi vung xong (chỉ hiển thị).
+const SLASH_FADE_TIME: float = 0.14
+const HEAVY_HIT_RATIO: float = 0.25 # đòn >= 25% máu tối đa = "nặng": rung mạnh + khựng + nháy viền đỏ
+var _slash_fade: float = 0.0
+var _slash_ang: float = 0.0
 var dagger_combo: int = 0
 var dagger_timer: float = 0.0
 
@@ -516,6 +521,7 @@ func _swing() -> void:
 					e.take_damage(dmg, global_position, knock)
 					Global.on_player_hit(e, dmg, is_crit)
 					hit_something = true
+					Global.burst(e_center, Color(1.0, 0.95, 0.7), 5, 150.0, 1.2) # tia lửa chỗ trúng
 					if apply_bleed and e.has_method("apply_status"): e.apply_status("bleed", 0.0)
 					if apply_stun and e.has_method("apply_status"): e.apply_status("stun", stun_duration)
 					if lifesteal > 0.0: total_heal += maxi(1, int(float(dmg) * lifesteal))
@@ -536,6 +542,7 @@ func _swing() -> void:
 					b.take_damage(dmg, global_position, knock)
 					Global.on_player_hit(b, dmg, is_crit)
 					hit_something = true
+					Global.burst(b_center, Color(1.0, 0.95, 0.7), 5, 150.0, 1.2) # tia lửa chỗ trúng
 					if lifesteal > 0.0: total_heal += maxi(1, int(float(dmg) * lifesteal * 0.5))
 					if Global.buff_stack("buff_sunder") > 0 and b.has_method("apply_sunder"): b.apply_sunder()
 
@@ -683,6 +690,10 @@ func take_damage(amount: int, from_pos: Vector2 = Vector2.ZERO, knock: float = 3
 	# chặn điểm chung duy nhất mà MỌI nguồn sát thương từ môi trường đổ vào Player.
 	amount = maxi(1, int(float(amount) * Global.enemy_dmg_mult_for_floor(Global.floor_num)))
 	counter_timer = 3.0 # Phản Công: bị đánh trúng mở cửa sổ x2 sát thương
+	Global.player_damaged.emit(amount, max_hp) # HUD nghe: nháy viền đỏ khi đòn nặng
+	if max_hp > 0 and float(amount) >= HEAVY_HIT_RATIO * float(max_hp):
+		Global.shake(0.9, 0.35)
+		Global.hitstop(0.05)
 	var hp_damage: int = amount if bypass_shield else _absorb_with_shield(amount)
 	hp = maxi(hp - hp_damage, 0)
 	if not ignore_invuln:
@@ -758,6 +769,11 @@ func _melee_half_angle() -> float:
 ## theo hướng ngắm mỗi khung hình tại đây. Vẽ chếch phải lúc 0 độ nên chỉ cần rotation =
 ## góc ngắm; flip_v khi hướng ngả sang trái (cos < 0) để báng/chuôi không bị lộn ngược.
 func _update_weapon_visual() -> void:
+	if swinging and weapon.get("is_melee", false):
+		_slash_ang = aim_dir.angle()
+		_slash_fade = SLASH_FADE_TIME
+	elif _slash_fade > 0.0:
+		_slash_fade = maxf(0.0, _slash_fade - get_physics_process_delta_time())
 	var ang: float = aim_dir.angle()
 	if weapon.get("is_melee", false) and swinging:
 		var half_angle = _melee_half_angle()
@@ -770,12 +786,54 @@ func _update_weapon_visual() -> void:
 	weapon_sprite.position = Vector2.from_angle(ang) * offset
 
 func _draw() -> void:
-	if weapon.get("is_melee", false) and swinging:
+	if weapon.get("is_melee", false) and (swinging or _slash_fade > 0.0):
 		var gun_c: Color = weapon.get("color", Color.WHITE)
 		if rarity_data.has("color"): gun_c = rarity_data["color"].lerp(gun_c, 0.5)
 		var r = display_swing_range if display_swing_range > 0.0 else float(weapon["range"])
-		var half_angle = _melee_half_angle()
-		var start_ang = aim_dir.angle() - half_angle
-		var end_ang = aim_dir.angle() + half_angle
-		# Cung tròn mờ = vệt chém (hiệu ứng), icon lưỡi thật đã nằm trên WeaponSprite.
-		draw_arc(Vector2.ZERO, r, start_ang, end_ang, 16, Color(gun_c, 0.25), 16.0)
+		var half_angle: float = _melee_half_angle() if swinging else display_swing_half_angle
+		var center_ang: float = aim_dir.angle() if swinging else _slash_ang
+		var progress: float = swing_progress if swinging else 1.0
+		var alpha: float = 1.0 if swinging else clampf(_slash_fade / SLASH_FADE_TIME, 0.0, 1.0)
+		_draw_slash(r, center_ang, half_angle, progress, gun_c, alpha)
+
+## Vệt chém hình lưỡi liềm: đuôi mảnh + mờ, đầu dày + sáng, quét theo tiến độ vung. Tầm ngoài đúng
+## bằng tầm gây sát thương (display_swing_range) nên vệt luôn khớp vùng trúng thật.
+func _draw_slash(r: float, center_ang: float, half_angle: float, progress: float, col: Color, alpha: float) -> void:
+	var start_ang: float = center_ang - half_angle
+	var span: float = half_angle * 2.0 * clampf(progress, 0.0, 1.0)
+	if span < 0.05 or r <= 1.0:
+		return
+	var steps: int = clampi(int(span / 0.1) + 2, 6, 40)
+	var max_thick: float = clampf(r * 0.5, 10.0, 30.0)
+	for layer in 2: # 0 = quầng sáng ngoài, 1 = vệt chính
+		var grow: float = 1.35 if layer == 0 else 1.0
+		var outer_extra: float = 3.0 if layer == 0 else 0.0
+		var pts := PackedVector2Array()
+		var cols := PackedColorArray()
+		var inner_pts: Array = []
+		var inner_cols: Array = []
+		for i in steps + 1:
+			var u: float = float(i) / float(steps)
+			var ang: float = start_ang + span * u
+			var thick: float = max_thick * grow * pow(u, 0.9)
+			var a_u: float = pow(u, 1.4) * alpha
+			var dir: Vector2 = Vector2.from_angle(ang)
+			var base_a: float = 0.22 if layer == 0 else 0.6
+			pts.append(dir * (r + outer_extra))
+			cols.append(Color(col.lerp(Color.WHITE, 0.35 * u), base_a * a_u))
+			inner_pts.append(dir * maxf(2.0, r - thick))
+			inner_cols.append(Color(col, 0.04 * a_u))
+		for i in range(steps, -1, -1):
+			pts.append(inner_pts[i])
+			cols.append(inner_cols[i])
+		draw_polygon(pts, cols)
+	# lõi sáng mảnh dọc mép ngoài + vạch sáng ở đầu lưỡi
+	var core := PackedVector2Array()
+	var core_cols := PackedColorArray()
+	for i in steps + 1:
+		var u2: float = float(i) / float(steps)
+		core.append(Vector2.from_angle(start_ang + span * u2) * (r - 1.0))
+		core_cols.append(Color(1.0, 1.0, 1.0, 0.85 * pow(u2, 1.6) * alpha))
+	draw_polyline_colors(core, core_cols, 2.0)
+	var head: Vector2 = Vector2.from_angle(start_ang + span)
+	draw_line(head * maxf(2.0, r - max_thick), head * (r + 2.0), Color(1.0, 1.0, 1.0, 0.9 * alpha), 2.5)

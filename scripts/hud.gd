@@ -3,13 +3,20 @@ extends CanvasLayer
 ## Đã gỡ bỏ màn hình Title và Game Over (chuyển sang main.gd quản lý).
 
 const MinimapScript = preload("res://scripts/minimap.gd")
+const ShieldBarScript = preload("res://scripts/shield_bar.gd")
+const BOSS_PHASE_COLORS: Array = [Color(0.7, 0.25, 0.85), Color(0.95, 0.55, 0.15), Color(0.95, 0.2, 0.2), Color(0.95, 0.95, 1.0)]
 
 var hearts_box: HBoxContainer
 var heart_icons: Array = []
 var heart_tex: Dictionary = {}
 var _hearts_max_hp: float = -1.0
 var dodge_bar: ProgressBar
-var shield_bar: ProgressBar
+var shield_bar: Control
+var vignette: TextureRect
+var _vignette_tween: Tween
+var boss_fill: StyleBoxFlat
+var boss_ticks: Control
+var _boss_phases: int = 3
 var info_label: Label
 var boss_box: Control
 var boss_bar: ProgressBar
@@ -26,6 +33,7 @@ func _ready() -> void:
 	Global.boss_hp_changed.connect(_on_boss_hp)
 	Global.boss_defeated.connect(_on_boss_defeated)
 	Global.message.connect(_show_message)
+	Global.player_damaged.connect(_on_player_damaged)
 
 	# Đảm bảo game chạy ngay lập tức, không bị pause
 	get_tree().paused = false
@@ -82,11 +90,32 @@ func _on_boss_spawned(boss) -> void:
 	boss_label.text = "%s" % [boss.BOSS_NAME]
 	boss_bar.max_value = boss.max_hp
 	boss_bar.value = boss.hp
+	var cfg = boss.BOSS_DATA.get(boss.kind, null)
+	_boss_phases = int(cfg["phases"]) if cfg != null else 3
+	boss_fill.bg_color = BOSS_PHASE_COLORS[0]
+	boss_ticks.queue_redraw()
 
 func _on_boss_hp(hp: float, max_hp: float, phase: int, boss_name: String) -> void:
 	boss_bar.max_value = max_hp
 	boss_bar.value = hp
 	boss_label.text = "%s" % [boss_name]
+	boss_fill.bg_color = BOSS_PHASE_COLORS[clampi(phase - 1, 0, BOSS_PHASE_COLORS.size() - 1)]
+
+## Đòn nặng (>= 25% máu tối đa) → nháy viền đỏ quanh màn hình.
+func _on_player_damaged(amount: int, max_hp: int) -> void:
+	if max_hp <= 0 or float(amount) < 0.25 * float(max_hp):
+		return
+	vignette.modulate.a = 0.9
+	if _vignette_tween: _vignette_tween.kill()
+	_vignette_tween = create_tween()
+	_vignette_tween.tween_property(vignette, "modulate:a", 0.0, 0.5)
+
+func _draw_boss_ticks() -> void:
+	var w: float = boss_ticks.size.x
+	var h: float = boss_ticks.size.y
+	for i in range(1, _boss_phases):
+		var x: float = w * (1.0 - float(i) / float(_boss_phases))
+		boss_ticks.draw_line(Vector2(x, 0.0), Vector2(x, h), Color(1, 1, 1, 0.75), 2.0)
 
 func _on_boss_defeated() -> void:
 	boss_box.visible = false
@@ -173,10 +202,33 @@ func _build_ui() -> void:
 	hearts_box.position = Vector2(20.0, 16.0)
 	hearts_box.add_theme_constant_override("separation", 2)
 	add_child(hearts_box)
-	dodge_bar = _bar(self, Vector2(20.0, 50.0), Vector2(280.0, 8.0), Color(0.4, 0.8, 1.0))
+	shield_bar = Control.new()
+	shield_bar.set_script(ShieldBarScript)
+	shield_bar.position = Vector2(20.0, 48.0)
+	shield_bar.size = Vector2(280.0, 12.0)
+	add_child(shield_bar)
+	dodge_bar = _bar(self, Vector2(20.0, 64.0), Vector2(280.0, 4.0), Color(0.4, 0.8, 1.0))
 	dodge_bar.max_value = 100.0
-	shield_bar = _bar(self, Vector2(20.0, 40.0), Vector2(280.0, 8.0), Color(0.55, 0.75, 1.0))
-	info_label = _label(self, "", 16, Vector2(20.0, 64.0), Vector2(500.0, 26.0))
+	info_label = _label(self, "", 16, Vector2(20.0, 72.0), Vector2(500.0, 26.0))
+
+	var grad := Gradient.new()
+	grad.set_color(0, Color(0.9, 0.0, 0.0, 0.0))
+	grad.set_color(1, Color(0.9, 0.0, 0.0, 0.85))
+	grad.set_offset(0, 0.55)
+	var gt := GradientTexture2D.new()
+	gt.gradient = grad
+	gt.fill = GradientTexture2D.FILL_RADIAL
+	gt.fill_from = Vector2(0.5, 0.5)
+	gt.fill_to = Vector2(1.0, 0.5)
+	gt.width = 256
+	gt.height = 256
+	vignette = TextureRect.new()
+	vignette.texture = gt
+	vignette.stretch_mode = TextureRect.STRETCH_SCALE
+	vignette.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	vignette.set_anchors_preset(Control.PRESET_FULL_RECT)
+	vignette.modulate.a = 0.0
+	add_child(vignette)
 
 	minimap = Control.new()
 	minimap.set_script(MinimapScript)
@@ -191,6 +243,13 @@ func _build_ui() -> void:
 	add_child(boss_box)
 	boss_label = _label(boss_box, "", 16, Vector2(0.0, 0.0), Vector2(600.0, 22.0), HORIZONTAL_ALIGNMENT_CENTER)
 	boss_bar = _bar(boss_box, Vector2(0.0, 24.0), Vector2(600.0, 16.0), Color(0.7, 0.2, 0.8))
+	boss_fill = boss_bar.get_theme_stylebox("fill") as StyleBoxFlat
+	boss_ticks = Control.new()
+	boss_ticks.position = Vector2(0.0, 24.0)
+	boss_ticks.size = Vector2(600.0, 16.0)
+	boss_ticks.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	boss_ticks.draw.connect(_draw_boss_ticks)
+	boss_box.add_child(boss_ticks)
 
 	msg_label = _label(self, "", 28, Vector2(0.0, 110.0), Vector2(1280.0, 44.0), HORIZONTAL_ALIGNMENT_CENTER)
 	msg_label.modulate.a = 0.0
