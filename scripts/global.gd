@@ -627,6 +627,15 @@ func reset_run_stats() -> void:
 ## theo run (KHÁC run_buffs). Dictionary[String state, Dictionary[String action, float]].
 var elite_q_table: Dictionary = {}
 
+## Q-table cũ (state 3 yếu tố, trước khi thêm "Player đang di chuyển") không còn khớp -> bỏ.
+## State hợp lệ hiện tại có đúng 4 phần ngăn bởi "|".
+func _migrate_q_table(t: Dictionary) -> Dictionary:
+	var out: Dictionary = {}
+	for state in t:
+		if String(state).split("|").size() == 4:
+			out[state] = t[state]
+	return out
+
 func save_game() -> void:
 	var file = FileAccess.open(save_path, FileAccess.WRITE)
 	if file != null:
@@ -654,7 +663,7 @@ func load_game() -> void:
 				var loaded_settings = data.get("settings", {})
 				for k in loaded_settings.keys():
 					settings[k] = loaded_settings[k]
-				elite_q_table = data.get("elite_q_table", {})
+				elite_q_table = _migrate_q_table(data.get("elite_q_table", {}))
 			file.close()
 	else:
 		save_game()

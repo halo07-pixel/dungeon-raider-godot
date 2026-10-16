@@ -30,6 +30,15 @@ var facing: Vector2 = Vector2.RIGHT
 var player_too_close: bool = false
 var player_in_range: bool = false
 var has_los: bool = false
+## AI Tầng 2: hold/retreat của QAgent chạy trong cửa sổ PASSIVE_WINDOW giây rồi tự chấm điểm.
+const PASSIVE_WINDOW: float = 0.6
+const PASSIVE_DODGE_REWARD: float = 4.0   # Player đang lăn né trong lúc nhịn = nhịn đúng lúc
+const PASSIVE_MISSED_PENALTY: float = -3.0 # Player đứng im mà mình bỏ lỡ cơ hội bắn
+const PASSIVE_STILL_SPEED: float = 40.0
+var retreat_timer: float = 0.0
+var passive_timer: float = 0.0
+var _passive_saw_roll: bool = false
+var _passive_still_time: float = 0.0
 var strafe_sign: float = 1.0
 var _t: float = 0.0
 
@@ -212,8 +221,8 @@ func _on_action_timer_timeout() -> void:
 	if not active or not alive or hurtbox.is_stunned():
 		return
 	if kind == "archer" or kind == "shaman":
-		if player_in_range and has_los:
-			_shoot()
+		if player_in_range and has_los and passive_timer <= 0.0:
+			_shoot() # đang trong cửa sổ hold/retreat thì không mở quyết định mới
 	elif kind == "frost_big_zombie":
 		_frost_slam()
 
@@ -235,7 +244,8 @@ func _shoot() -> void:
 	if is_elite and q_agent:
 		q_action = q_agent.choose_action()
 		if q_action == "hold" or q_action == "retreat":
-			return # Bỏ lượt bắn này — QAgent học dần khi nào "nhịn" có lợi hơn là xả liên tục.
+			_begin_passive(q_action) # không bắn; sau PASSIVE_WINDOW sẽ tự chấm điểm -> learn()
+			return
 
 	# Vector "đón đầu": kết hợp vận tốc thực tế của Player + xu hướng né ngang đã quan sát
 	# (AI Tầng 1, PlayerProfiler). Quái Tinh Anh chọn "shoot_straight" thì bỏ qua đón đầu hẳn.
@@ -258,6 +268,35 @@ func _shoot() -> void:
 	Global.world.add_child(b)
 	b.global_position = global_position + dir * 18.0
 	Global.sfx("enemy_shoot")
+
+## Bắt đầu cửa sổ "nhịn" của QAgent. retreat -> còn chủ động lùi + lách ngang trong cửa sổ.
+func _begin_passive(action: String) -> void:
+	passive_timer = PASSIVE_WINDOW
+	_passive_saw_roll = false
+	_passive_still_time = 0.0
+	if action == "retreat":
+		retreat_timer = PASSIVE_WINDOW
+
+## Theo dõi cửa sổ hold/retreat và chấm điểm khi hết giờ (tách riêng khỏi vật lý di chuyển).
+func _tick_passive(delta: float) -> void:
+	if passive_timer <= 0.0:
+		return
+	var p = Global.player
+	if is_instance_valid(p) and p.alive:
+		if bool(p.get("rolling")):
+			_passive_saw_roll = true
+		if has_los and p.velocity.length() < PASSIVE_STILL_SPEED:
+			_passive_still_time += delta
+	passive_timer -= delta
+	if passive_timer > 0.0:
+		return
+	var reward: float = 0.0
+	if _passive_saw_roll:
+		reward = PASSIVE_DODGE_REWARD
+	elif _passive_still_time >= PASSIVE_WINDOW * 0.5:
+		reward = PASSIVE_MISSED_PENALTY
+	if is_elite and q_agent:
+		q_agent.learn(reward)
 
 ## Băng Giáng (Frost Big Zombie) — dộng đất định kỳ (action_timer lặp, xem
 ## _on_action_timer_timeout), gây SLOW nếu người chơi đang đứng gần thay vì đánh cận trực tiếp.
@@ -322,6 +361,7 @@ func _physics_process(delta: float) -> void:
 		queue_redraw()
 		return
 
+	_tick_passive(delta)
 	var move: Vector2 = Vector2.ZERO
 	var p = Global.player
 	if active and is_instance_valid(p) and p.alive:
@@ -338,6 +378,10 @@ func _physics_process(delta: float) -> void:
 				else: move = dir
 			"slime": move = dir * (0.55 + 0.45 * absf(sin(_t * 4.0)))
 			_: move = dir
+		# QAgent chọn "retreat": chủ động lùi ra xa Player và lách ngang (ghi đè hướng thường)
+		if retreat_timer > 0.0:
+			retreat_timer -= delta
+			move = (-dir + dir.orthogonal() * strafe_sign).normalized()
 
 	if hurtbox.consume_slow(delta):
 		move *= 0.5
