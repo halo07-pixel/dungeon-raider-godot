@@ -3,3 +3,6 @@
 - Nguồn: bộ "DungeonTilesetII" của tác giả 0x72 (itch.io: 0x72.itch.io/dungeontileset-ii), license CC0 1.0 Universal.
 - Lấy qua bản mirror công khai trên GitHub (repo iTzTalha/Dino-Run, nhúng nguyên file PNG gốc của pack), vì môi trường build không truy cập trực tiếp itch.io được.
 - Không bắt buộc ghi công nhưng tác giả khuyến khích nên ghi lại ở đây.
+
+## Phòng sự kiện (Altar, Shrine)
+- Sprite altar_idle/used.png và shrine_idle/used.png là pixel-art tự tạo (script tools/gen_event_sprites.py), bảng màu khớp tileset; không dùng asset ngoài. Rương/Mimic vẫn dùng sprite 0x72 ở trên.
