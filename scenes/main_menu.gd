@@ -548,8 +548,7 @@ func _start_new_game(c_id: String) -> void:
 	Global.saved_run.clear()
 	Global.save_game()
 	Global.current_class = c_id
-	# ÁP DỤNG KỸ NĂNG: Cấp tiền khởi điểm
-	Global.coins = Global.upgrades["start_coin"] * 10
+	# (Tiền khởi điểm của Starting Capital được cấp trong main.gd sau reset_run().)
 	get_tree().change_scene_to_file("res://scenes/main.tscn")
 
 func _continue_game() -> void:
