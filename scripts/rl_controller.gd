@@ -139,6 +139,10 @@ var _have_step: bool = false
 var baseline: float = 0.0
 var decisions: int = 0
 var adapt_steps: int = 0
+## Hệ số riêng từ file chính sách đã huấn luyện (< 0 = không có -> boss dùng hằng số mặc định của nó).
+var move_blend: float = -1.0
+var pick_bias: float = -1.0
+var policy_loaded: bool = false
 
 
 func _init() -> void:
@@ -185,6 +189,45 @@ func reset_policy() -> void:
 	_prior_bias = PackedFloat32Array(bias)
 	baseline = 0.0
 	_have_step = false
+
+
+## Nạp chính sách đã huấn luyện offline (tools/rl/train_lord.py -> assets/ai/*.json) làm ĐIỂM XUẤT PHÁT mới
+## thay cho bộ tiên nghiệm viết tay; adapt() trong trận vẫn tinh chỉnh quanh bộ này (kẹp MAX_DELTA).
+## Trả về false (và giữ nguyên chính sách hiện tại) nếu thiếu file hoặc file sai kích thước.
+func load_policy(path: String) -> bool:
+	var data = null
+	if ResourceLoader.exists(path):
+		var res = load(path)
+		if res is JSON:
+			data = (res as JSON).data
+	elif FileAccess.file_exists(path):
+		data = JSON.parse_string(FileAccess.get_file_as_string(path))
+	if typeof(data) != TYPE_DICTIONARY:
+		return false
+	var w_in = data.get("weights")
+	var b_in = data.get("bias")
+	if typeof(w_in) != TYPE_ARRAY or typeof(b_in) != TYPE_ARRAY or w_in.size() != ACTION_SIZE or b_in.size() != ACTION_SIZE:
+		push_warning("RLController: file chính sách sai kích thước: " + path)
+		return false
+	var new_w: Array = []
+	for k in ACTION_SIZE:
+		var row = w_in[k]
+		if typeof(row) != TYPE_ARRAY or row.size() != FEAT_SIZE:
+			push_warning("RLController: file chính sách sai kích thước: " + path)
+			return false
+		new_w.append(PackedFloat32Array(row))
+	weights = new_w
+	bias = PackedFloat32Array(b_in)
+	_prior_weights.clear()
+	for k in ACTION_SIZE:
+		_prior_weights.append(PackedFloat32Array(weights[k]))
+	_prior_bias = PackedFloat32Array(bias)
+	baseline = 0.0
+	_have_step = false
+	move_blend = clampf(float(data.get("move_blend", -1.0)), -1.0, 1.0)
+	pick_bias = clampf(float(data.get("pick_bias", -1.0)), -1.0, 3.0)
+	policy_loaded = true
+	return true
 
 
 ## Vector đặc trưng = get_obs() + [tốc độ Player, khoảng cách tới Player] (suy ra từ chính obs).

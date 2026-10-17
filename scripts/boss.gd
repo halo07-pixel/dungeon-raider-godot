@@ -153,6 +153,8 @@ var rl: Node = null
 const RL_DECISION_INTERVAL: float = 0.25
 const RL_MOVE_BLEND: float = 0.35      # 0 = đuổi thẳng như cũ, 1 = hoàn toàn theo chính sách
 const RL_PICK_BIAS: float = 0.7        # độ mạnh thiên lệch chọn đòn (exp(±pick*BIAS))
+## Chính sách đã huấn luyện offline cho Dungeon Lord (tools/rl/train_lord.py). Thiếu file -> chạy như cũ.
+const LORD_POLICY_PATH: String = "res://assets/ai/lord_policy.json"
 ## Đòn diện rộng/đón đầu (ưu tiên khi Player ở xa/chạy nhanh) và đòn trực diện (ưu tiên khi gần).
 const AREA_ATTACKS: Array = ["ring", "slam", "blizzard", "spike_field", "ice_prison", "judgement", "frost_breath", "necro_curse"]
 const DIRECT_ATTACKS: Array = ["charge", "necro_bolt", "frost_charge"]
@@ -206,6 +208,8 @@ func _ready() -> void:
 	rl.name = "RLController"
 	add_child(rl)
 	rl.attach(self)
+	if kind == "lord":
+		rl.load_policy(LORD_POLICY_PATH)
 
 	var cfg: Dictionary = BOSS_DATA[kind]
 	var body_mult: float = float(cfg["body_mult"])
@@ -321,6 +325,19 @@ func _attack_pool() -> Array:
 			return pool
 
 
+## Hệ số pha trộn hướng đi / độ mạnh thiên lệch chọn đòn: lấy từ chính sách đã huấn luyện nếu có.
+func _rl_move_blend() -> float:
+	if rl != null and rl.move_blend >= 0.0:
+		return rl.move_blend
+	return RL_MOVE_BLEND
+
+
+func _rl_pick_bias() -> float:
+	if rl != null and rl.pick_bias >= 0.0:
+		return rl.pick_bias
+	return RL_PICK_BIAS
+
+
 ## Giá trị PICK [-1,1] mới nhất của RLController (0 nếu chưa có).
 func _rl_pick_value() -> float:
 	if rl == null:
@@ -335,7 +352,7 @@ func _weighted_attack(pool: Array, pick: float) -> String:
 	var total: float = 0.0
 	for a in pool:
 		var sign_f: float = 1.0 if AREA_ATTACKS.has(a) else (-1.0 if DIRECT_ATTACKS.has(a) else 0.0)
-		var w: float = exp(pick * sign_f * RL_PICK_BIAS)
+		var w: float = exp(pick * sign_f * _rl_pick_bias())
 		weights.append(w)
 		total += w
 	var roll: float = randf() * total
@@ -863,7 +880,8 @@ func _physics_process(delta: float) -> void:
 		var chase_dir: Vector2 = (p.global_position - global_position).normalized()
 		var steer: Vector2 = chase_dir
 		if _rl_move.length() > 0.05:
-			steer = (chase_dir * (1.0 - RL_MOVE_BLEND) + _rl_move.normalized() * RL_MOVE_BLEND).normalized()
+			var blend: float = _rl_move_blend()
+			steer = (chase_dir * (1.0 - blend) + _rl_move.normalized() * blend).normalized()
 		velocity = steer * chase_speed * _slow_factor()
 	else:
 		velocity = Vector2.ZERO
