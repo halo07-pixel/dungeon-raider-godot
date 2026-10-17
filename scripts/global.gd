@@ -247,6 +247,38 @@ func _ready() -> void:
 		"boss_charge": _tone(90.0, 0.35, 0.32, 250.0),
 		"slam": _tone(70.0, 0.40, 0.40, -40.0, true),
 		"roar": _tone(80.0, 0.70, 0.36, 60.0, true),
+		# Âm nhiều lớp cho Barrage / Shockwave / Altar / Mimic (xem _mix)
+		"barrage_cast": _mix(0.22, [
+			{"freq": 300.0, "slide": 900.0, "vol": 0.18, "dur": 0.20, "wave": "sine"},
+			{"freq": 0.0, "vol": 0.14, "dur": 0.10, "wave": "noise", "lp": 0.35}]),
+		"barrage_volley": _mix(0.20, [
+			{"freq": 0.0, "vol": 0.34, "dur": 0.16, "wave": "noise", "lp": 0.55, "decay": 2.2},
+			{"freq": 1100.0, "slide": -800.0, "vol": 0.16, "dur": 0.14, "wave": "saw"},
+			{"freq": 150.0, "slide": -70.0, "vol": 0.22, "dur": 0.12, "wave": "square"}]),
+		"shockwave": _mix(0.75, [
+			{"freq": 95.0, "slide": -55.0, "vol": 0.42, "dur": 0.55, "wave": "sine", "decay": 1.4},
+			{"freq": 0.0, "vol": 0.40, "dur": 0.40, "wave": "noise", "lp": 0.12, "decay": 1.8},
+			{"freq": 180.0, "slide": 700.0, "vol": 0.16, "dur": 0.30, "wave": "saw", "delay": 0.04},
+			{"freq": 0.0, "vol": 0.18, "dur": 0.40, "wave": "noise", "lp": 0.7, "delay": 0.18, "decay": 2.5}]),
+		"altar_offer": _mix(1.1, [
+			{"freq": 110.0, "slide": -20.0, "vol": 0.30, "dur": 0.70, "wave": "sine", "decay": 0.9},
+			{"freq": 1300.0, "slide": -900.0, "vol": 0.16, "dur": 0.10, "wave": "sine", "delay": 0.04},
+			{"freq": 1100.0, "slide": -800.0, "vol": 0.12, "dur": 0.10, "wave": "sine", "delay": 0.22},
+			{"freq": 523.0, "vol": 0.15, "dur": 0.80, "wave": "sine", "delay": 0.20, "decay": 1.6},
+			{"freq": 659.0, "vol": 0.12, "dur": 0.80, "wave": "sine", "delay": 0.28, "decay": 1.6},
+			{"freq": 784.0, "vol": 0.12, "dur": 0.80, "wave": "sine", "delay": 0.36, "decay": 1.6}]),
+		"altar_deny": _mix(0.30, [
+			{"freq": 160.0, "slide": -50.0, "vol": 0.22, "dur": 0.14, "wave": "square"},
+			{"freq": 120.0, "slide": -40.0, "vol": 0.22, "dur": 0.14, "wave": "square", "delay": 0.14}]),
+		"mimic_reveal": _mix(0.95, [
+			{"freq": 170.0, "slide": 260.0, "vol": 0.20, "dur": 0.24, "wave": "saw", "decay": 0.7},
+			{"freq": 0.0, "vol": 0.14, "dur": 0.20, "wave": "noise", "lp": 0.3},
+			{"freq": 85.0, "slide": -35.0, "vol": 0.34, "dur": 0.65, "wave": "saw", "delay": 0.20, "decay": 1.1},
+			{"freq": 0.0, "vol": 0.26, "dur": 0.55, "wave": "noise", "lp": 0.2, "delay": 0.20, "decay": 1.3}]),
+		"mimic_die": _mix(0.55, [
+			{"freq": 320.0, "slide": -260.0, "vol": 0.30, "dur": 0.45, "wave": "saw", "decay": 1.2},
+			{"freq": 0.0, "vol": 0.26, "dur": 0.30, "wave": "noise", "lp": 0.4},
+			{"freq": 60.0, "vol": 0.28, "dur": 0.30, "wave": "sine", "delay": 0.20}]),
 	}
 
 
@@ -550,11 +582,57 @@ func _tone(freq: float, dur: float, vol: float, slide: float = 0.0, noise: bool 
 	return w
 
 
-func sfx(sfx_name: String) -> void:
+## Trộn nhiều lớp âm thành một AudioStreamWAV. Mỗi lớp: freq, slide (Hz trượt hết lớp), vol, dur (s),
+## wave ("sine"|"square"|"saw"|"noise"), delay (s, mặc định 0), decay (số mũ tắt dần, mặc định 1),
+## lp (0..1, bộ lọc thông thấp cho noise; càng nhỏ càng trầm). total = độ dài tổng của clip.
+func _mix(total: float, layers: Array) -> AudioStreamWAV:
+	var rate: int = 22050
+	var n: int = int(float(rate) * total)
+	var buf := PackedFloat32Array()
+	buf.resize(n)
+	for L in layers:
+		var start: int = int(float(rate) * float(L.get("delay", 0.0)))
+		var len_s: int = mini(int(float(rate) * float(L["dur"])), n - start)
+		if len_s <= 0:
+			continue
+		var wave: String = L.get("wave", "sine")
+		var freq: float = float(L.get("freq", 0.0))
+		var slide: float = float(L.get("slide", 0.0))
+		var vol: float = float(L["vol"])
+		var decay: float = float(L.get("decay", 1.0))
+		var lp: float = float(L.get("lp", 1.0))
+		var phase: float = 0.0
+		var lp_state: float = 0.0
+		for i in len_s:
+			var k: float = float(i) / float(len_s)
+			phase += TAU * (freq + slide * k) / float(rate)
+			var v: float = 0.0
+			match wave:
+				"sine": v = sin(phase)
+				"square": v = 1.0 if sin(phase) > 0.0 else -1.0
+				"saw": v = fmod(phase / TAU, 1.0) * 2.0 - 1.0
+				_:
+					lp_state += lp * (randf_range(-1.0, 1.0) - lp_state)
+					v = lp_state * (1.0 + (1.0 - lp) * 1.5)
+			var env: float = pow(1.0 - k, decay) * minf(1.0, float(i) / 66.0) # attack ~3 ms chống lách tách
+			buf[start + i] += v * env * vol
+	var data := PackedByteArray()
+	data.resize(n * 2)
+	for i in n:
+		data.encode_s16(i * 2, int(clampf(buf[i], -1.0, 1.0) * 32767.0))
+	var w := AudioStreamWAV.new()
+	w.format = AudioStreamWAV.FORMAT_16_BITS
+	w.mix_rate = rate
+	w.data = data
+	return w
+
+
+func sfx(sfx_name: String, pitch: float = 1.0) -> void:
 	if not _sfx.has(sfx_name):
 		return
 	var p := AudioStreamPlayer.new()
 	p.stream = _sfx[sfx_name]
+	p.pitch_scale = pitch
 	p.volume_db = -6.0
 	p.bus = BUS_SFX
 	add_child(p)

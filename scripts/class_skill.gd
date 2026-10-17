@@ -57,15 +57,18 @@ const BARRAGE_BULLETS: int = 9
 const BARRAGE_FAN_DEG: float = 72.0
 const BARRAGE_GAP: float = 0.12
 
+const BARRAGE_PITCH: Array = [1.0, 1.1, 0.92] # cao độ từng loạt đạn khác nhau để không nghe lặp
+
 func _barrage() -> void:
 	Global.shake(0.35, 0.3)
+	Global.sfx("barrage_cast")
 	for v in BARRAGE_VOLLEYS:
 		if not is_instance_valid(player) or not player.alive:
 			return
-		_fire_volley()
+		_fire_volley(float(BARRAGE_PITCH[v % BARRAGE_PITCH.size()]))
 		await get_tree().create_timer(BARRAGE_GAP).timeout
 
-func _fire_volley() -> void:
+func _fire_volley(pitch: float = 1.0) -> void:
 	var dmg: int = maxi(1, int((8.0 + 1.2 * float(Global.floor_num)) * _dmg_mult()))
 	var base: float = player.aim_dir.angle()
 	var fan: float = deg_to_rad(BARRAGE_FAN_DEG)
@@ -75,7 +78,7 @@ func _fire_volley() -> void:
 		b.setup(true, Vector2.from_angle(base + off), dmg, 680.0, 0.9, Color(0.5, 0.9, 1.0), 5.0)
 		Global.world.add_child(b)
 		b.global_position = player.global_position + Vector2.from_angle(base + off) * 22.0
-	Global.sfx("shotgun")
+	Global.sfx("barrage_volley", pitch)
 	Global.burst(player.global_position + player.aim_dir * 26.0, Color(0.5, 0.9, 1.0), 6, 120.0, 1.2)
 
 # ------------------------------------------------------------------ Brawler+: Shockwave
@@ -104,4 +107,4 @@ func _shockwave() -> void:
 	fx.global_position = origin
 	Global.burst(origin, Color(1.0, 0.75, 0.35), 28, 320.0, 2.0)
 	Global.shake(0.8, 0.3)
-	Global.sfx("slam")
+	Global.sfx("shockwave")
