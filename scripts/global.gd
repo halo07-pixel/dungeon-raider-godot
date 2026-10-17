@@ -498,6 +498,7 @@ func _setup_input() -> void:
 	_add_key("move_down", KEY_S)
 	_add_key("move_down", KEY_DOWN)
 	_add_key("dodge", KEY_SPACE)
+	_add_key("skill", KEY_Q)
 	_add_key("confirm", KEY_ENTER)
 	_add_key("confirm", KEY_KP_ENTER)
 	_add_key("restart", KEY_R)
@@ -616,6 +617,9 @@ func hitstop(duration: float = 0.05) -> void:
 var save_path: String = "user://dungeon_raider_save.dat"
 
 var purple_gems: int = 0
+## Hồ sơ vĩnh viễn (thống kê + tiến hoá class). Cấu trúc/logic nằm ở scripts/meta_progress.gd.
+const MetaProgress = preload("res://scripts/meta_progress.gd")
+var profile: Dictionary = MetaProgress.new_profile()
 var upgrades: Dictionary = {
 	"hp_boost": 0, "start_coin": 0, "mastery": 0, "revive": 0
 }
@@ -648,6 +652,32 @@ func _migrate_q_table(t: Dictionary) -> Dictionary:
 			out[state] = t[state]
 	return out
 
+# --- Ghi nhận hồ sơ (gọi từ main/enemy/boss; lưu file ở các mốc hiếm, không lưu mỗi lần hạ quái) ---
+func record_run_start() -> void:
+	MetaProgress.record_run_start(profile, current_class)
+	save_game()
+
+func record_floor_reached(f: int) -> void:
+	MetaProgress.record_floor(profile, current_class, f)
+
+func record_kill() -> void:
+	MetaProgress.record_kill(profile, current_class)
+
+func record_win() -> void:
+	MetaProgress.record_win(profile)
+	save_game()
+
+func record_boss_kill(kind: String) -> void:
+	var was_ready: bool = MetaProgress.can_evolve(profile, current_class)
+	MetaProgress.record_boss(profile, current_class, kind)
+	if not was_ready and MetaProgress.can_evolve(profile, current_class):
+		var nm: String = String(classes[current_class]["name"])
+		message.emit("%s can evolve! Open Profile in the menu." % nm, Color(1.0, 0.85, 0.3))
+	save_game()
+
+func class_skill_id() -> String:
+	return MetaProgress.active_skill(profile, current_class)
+
 func save_game() -> void:
 	var file = FileAccess.open(save_path, FileAccess.WRITE)
 	if file != null:
@@ -656,6 +686,7 @@ func save_game() -> void:
 			"upgrades": upgrades,
 			"saved_run": saved_run, # Lưu thêm ván đang chơi
 			"settings": settings,
+			"profile": profile,
 			"elite_q_table": elite_q_table
 		}
 		file.store_var(data)
@@ -675,6 +706,7 @@ func load_game() -> void:
 				var loaded_settings = data.get("settings", {})
 				for k in loaded_settings.keys():
 					settings[k] = loaded_settings[k]
+				profile = MetaProgress.merge_loaded(data.get("profile", {}))
 				elite_q_table = _migrate_q_table(data.get("elite_q_table", {}))
 			file.close()
 	else:

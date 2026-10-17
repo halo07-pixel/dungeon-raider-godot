@@ -4,6 +4,7 @@ extends CharacterBody2D
 signal died
 
 const BULLET = preload("res://scenes/bullet.tscn")
+const ClassSkillScript = preload("res://scripts/class_skill.gd")
 const SPEED: float = 230.0
 const ROLL_SPEED: float = 560.0
 const KNOCK_DECAY: float = 1400.0
@@ -17,6 +18,7 @@ const SHIELD_REGEN_DELAY: float = 2.5
 const SHIELD_REGEN_RATE: float = 10.0
 var max_shield: int = 20
 var shield_nova_cd: float = 0.0
+var class_skill: Node = null ## Kỹ năng class tiến hoá (null nếu chưa mở)
 var counter_timer: float = 0.0   # Phản Công: cửa sổ x2 sát thương sau khi bị đánh
 var swing_count: int = 0         # Lốc Xoáy
 var shot_count: int = 0          # Loạt Đạn Vòng / Siêu Đạn
@@ -102,6 +104,7 @@ func _ready() -> void:
 	Global.room_cleared.connect(_on_room_cleared)
 
 	set_weapon_with_rarity(cls["default_weapon"], "common")
+	_attach_class_skill()
 	dodge_timer.timeout.connect(_on_dodge_finished)
 
 	sprite.sprite_frames = _build_sprite_frames()
@@ -109,6 +112,16 @@ func _ready() -> void:
 	sprite.offset = Vector2(0.0, SPRITE_OFFSET_Y)
 	sprite.play("idle")
 
+
+## Class đã tiến hoá (meta-progression) → gắn Node kỹ năng riêng, bấm phím "skill" (Q).
+func _attach_class_skill() -> void:
+	var sid: String = Global.class_skill_id()
+	if sid == "":
+		return
+	class_skill = ClassSkillScript.new()
+	class_skill.name = "ClassSkill"
+	add_child(class_skill)
+	class_skill.setup(self, sid)
 
 func _build_sprite_frames() -> SpriteFrames:
 	var prefix: String = SPRITE_SET.get(Global.current_class, "knight_m")

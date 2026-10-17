@@ -945,6 +945,8 @@ func _die() -> void:
 	alive = false
 	if Global.get("run_stats") != null and Global.run_stats.has("kills"):
 		Global.run_stats["kills"] += 1
+	Global.record_kill()
+	Global.record_boss_kill(kind)
 	charging = false
 	tele_mode = ""
 	hitbox.set_deferred("monitoring", false)

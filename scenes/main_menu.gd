@@ -18,6 +18,8 @@ var main_node: CenterContainer
 var index_node: MarginContainer
 var class_node: CenterContainer
 var upgrade_node: MarginContainer # Node cho Cây Kỹ Năng
+var profile_node: MarginContainer # Trang hồ sơ + tiến hoá class
+var profile_box: VBoxContainer
 
 # --- Dữ liệu hệ thống Kỹ năng ---
 var upg_data = {
@@ -41,6 +43,7 @@ func _ready() -> void:
 	_build_index_menu()
 	_build_class_menu()
 	_build_upgrade_menu() # Xây Cây Kỹ Năng
+	_build_profile_menu()
 
 	show_main_menu()
 
@@ -175,6 +178,7 @@ func _build_main_menu() -> void:
 		vbox.add_child(_create_btn("START GAME", show_class_menu, Vector2(400, 60)))
 
 	vbox.add_child(_create_btn("SKILL TREE", show_upgrade_menu, Vector2(400, 60), Color(0.6, 0.2, 0.8)))
+	vbox.add_child(_create_btn("PROFILE", show_profile, Vector2(400, 60), Color(0.8, 0.6, 0.2)))
 	vbox.add_child(_create_btn("SURVIVAL GUIDE", show_index, Vector2(400, 60)))
 	vbox.add_child(_create_btn("SETTINGS", _open_settings, Vector2(400, 60), Color(0.3, 0.5, 0.7)))
 	vbox.add_child(_create_btn("QUIT", _quit_game, Vector2(400, 60), Color(0.5, 0.2, 0.2)))
@@ -203,12 +207,23 @@ func _build_class_menu() -> void:
 	hbox.add_theme_constant_override("separation", 40)
 	vbox.add_child(hbox)
 
-	hbox.add_child(_build_class_option("elf_m", "RANGER\n\nHP: 100\nWeapon: Pistol", func(): _start_new_game("ranger"), Color(0.2, 0.5, 0.8)))
-	hbox.add_child(_build_class_option("knight_m", "BRAWLER\n\nHP: 200\nWeapon: Longsword", func(): _start_new_game("brawler"), Color(0.8, 0.3, 0.2)))
+	hbox.add_child(_build_class_option("elf_m", _class_card_text("ranger", "HP: 100\nWeapon: Pistol"), func(): _start_new_game("ranger"), Color(0.2, 0.5, 0.8)))
+	hbox.add_child(_build_class_option("knight_m", _class_card_text("brawler", "HP: 200\nWeapon: Longsword"), func(): _start_new_game("brawler"), Color(0.8, 0.3, 0.2)))
 
 	vbox.add_child(_create_btn("BACK", show_main_menu, Vector2(250, 60), Color(0.4, 0.4, 0.4)))
 	class_node.hide()
 
+
+## Chữ trên thẻ chọn class: tên theo bậc tiến hoá + kỹ năng riêng (nếu đã mở).
+func _class_card_text(cid: String, stats: String) -> String:
+	var P: Dictionary = Global.profile
+	var nm: String = Global.MetaProgress.display_name(P, cid, String(Global.classes[cid]["name"])).to_upper()
+	var t: String = "%s\n\n%s" % [nm, stats]
+	var sid: String = Global.MetaProgress.active_skill(P, cid)
+	if sid != "":
+		var cur: Dictionary = Global.MetaProgress.EVOLUTIONS[cid][Global.MetaProgress.tier_of(P, cid) - 1]
+		t += "\nSkill: %s" % cur["skill_name"]
+	return t
 
 func _build_class_option(prefix: String, label_text: String, action: Callable, color: Color) -> Control:
 	var col = VBoxContainer.new()
@@ -295,6 +310,85 @@ func _build_upgrade_menu() -> void:
 	center_btn.add_child(_create_btn("BACK", show_main_menu, Vector2(300, 60), Color(0.5, 0.5, 0.5)))
 
 	upgrade_node.hide()
+
+# ==========================================
+# 3b. HỒ SƠ: thống kê vĩnh viễn + tiến hoá class
+# ==========================================
+func _build_profile_menu() -> void:
+	profile_node = MarginContainer.new()
+	profile_node.set_anchors_preset(Control.PRESET_FULL_RECT)
+	for side in ["left", "right"]:
+		profile_node.add_theme_constant_override("margin_" + side, 200)
+	for side in ["top", "bottom"]:
+		profile_node.add_theme_constant_override("margin_" + side, 60)
+	ui_layer.add_child(profile_node)
+
+	var panel = Panel.new()
+	var st = StyleBoxFlat.new()
+	st.bg_color = Color(0.12, 0.12, 0.15, 0.95)
+	st.set_border_width_all(4)
+	st.border_color = Color(0.9, 0.7, 0.2)
+	st.set_corner_radius_all(15)
+	panel.add_theme_stylebox_override("panel", st)
+	profile_node.add_child(panel)
+
+	profile_box = VBoxContainer.new()
+	profile_box.add_theme_constant_override("separation", 12)
+	profile_node.add_child(profile_box)
+	profile_node.hide()
+
+func _profile_label(text: String, size: int, color: Color = Color.WHITE) -> Label:
+	var l = Label.new()
+	l.text = text
+	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_apply_font(l, size)
+	l.add_theme_color_override("font_color", color)
+	return l
+
+func _refresh_profile() -> void:
+	for c in profile_box.get_children():
+		c.queue_free()
+	var P: Dictionary = Global.profile
+	profile_box.add_child(_profile_label("PROFILE", 24, Color(1.0, 0.8, 0.3)))
+	profile_box.add_child(_profile_label("Runs: %d   Wins: %d   Best floor: %d   Kills: %d" % [P["runs"], P["wins"], P["best_floor"], P["kills"]], 12))
+	profile_box.add_child(HSeparator.new())
+
+	for cid in ["ranger", "brawler"]:
+		var C: Dictionary = Global.MetaProgress.cls(P, cid)
+		var base: String = String(Global.classes[cid]["name"])
+		var shown: String = Global.MetaProgress.display_name(P, cid, base)
+		var lords: int = int(C["bosses"].get("lord", 0))
+		var head = "%s   Runs: %d   Best floor: %d   Lords: %d" % [shown.to_upper(), C["runs"], C["best_floor"], lords]
+		profile_box.add_child(_profile_label(head, 13, Color(0.9, 0.9, 1.0)))
+
+		var evo: Dictionary = Global.MetaProgress.next_evolution(P, cid)
+		var skill_id: String = Global.MetaProgress.active_skill(P, cid)
+		if skill_id != "":
+			var tier_idx: int = Global.MetaProgress.tier_of(P, cid) - 1
+			var cur: Dictionary = Global.MetaProgress.EVOLUTIONS[cid][tier_idx]
+			profile_box.add_child(_profile_label("%s: %s" % [cur["skill_name"], cur["desc"]], 11, Color(0.6, 1.0, 0.6)))
+		if not evo.is_empty():
+			var pr: Array = Global.MetaProgress.progress(P, cid)
+			var req: Dictionary = evo["req"]
+			var goal: String = ("Defeat Dungeon Lord" if req["type"] == "boss" else "Reach floor %d" % req["value"])
+			profile_box.add_child(_profile_label("Next: %s - %s  %d/%d" % [evo["name"], goal, pr[0], pr[1]], 11, Color(1.0, 0.85, 0.5)))
+			if Global.MetaProgress.can_evolve(P, cid):
+				var row = CenterContainer.new()
+				row.add_child(_create_btn("EVOLVE TO %s" % String(evo["name"]).to_upper(), func(): _evolve(cid), Vector2(420, 48), Color(0.8, 0.6, 0.1), 12))
+				profile_box.add_child(row)
+		profile_box.add_child(HSeparator.new())
+
+	var spacer = Control.new()
+	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	profile_box.add_child(spacer)
+	var back = CenterContainer.new()
+	back.add_child(_create_btn("BACK", show_main_menu, Vector2(300, 60), Color(0.5, 0.5, 0.5)))
+	profile_box.add_child(back)
+
+func _evolve(cid: String) -> void:
+	if Global.MetaProgress.evolve(Global.profile, cid):
+		Global.save_game()
+		_refresh_profile()
 
 func _update_upgrade_ui() -> void:
 	gem_label.text = "Gems: %d" % Global.purple_gems
@@ -424,6 +518,7 @@ func _create_btn(text_val: String, action: Callable, custom_min_size: Vector2 = 
 	return btn
 
 func show_main_menu() -> void:
+	profile_node.hide()
 	index_node.hide()
 	class_node.hide()
 	upgrade_node.hide()
@@ -435,7 +530,14 @@ func show_index() -> void:
 
 func show_class_menu() -> void:
 	main_node.hide()
+	class_node.free() # dựng lại để tên/kỹ năng theo bậc tiến hoá luôn mới
+	_build_class_menu()
 	class_node.show()
+
+func show_profile() -> void:
+	main_node.hide()
+	_refresh_profile()
+	profile_node.show()
 
 func show_upgrade_menu() -> void:
 	main_node.hide()

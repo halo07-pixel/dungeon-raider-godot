@@ -30,6 +30,8 @@ func _ready() -> void:
 	else:
 		if Global.has_method("reset_run"): Global.reset_run()
 		if Global.has_method("reset_run_stats"): Global.reset_run_stats()
+		Global.record_run_start() # hồ sơ vĩnh viễn: +1 ván cho class đang chơi
+		Global.record_floor_reached(1)
 		
 	# Player._ready chạy trước main._ready (lúc đó floor_num có thể còn của ván cũ) -> tính lại giáp
 	player.refresh_max_shield()
@@ -131,6 +133,7 @@ func _next_floor() -> void:
 	# ====================================================
 
 	Global.floor_num += 1
+	Global.record_floor_reached(Global.floor_num)
 	if Global.get("run_stats") != null:
 		Global.run_stats["floors"] = Global.floor_num
 		
@@ -255,6 +258,7 @@ func _build_game_over_menu() -> void:
 # ==========================================
 func _show_victory() -> void:
 	is_victory_screen = true
+	Global.record_win()
 	Global.purple_gems += VICTORY_GEM_BONUS
 	Global.save_game()
 
