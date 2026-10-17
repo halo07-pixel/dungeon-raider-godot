@@ -28,6 +28,9 @@ const WHIRL_WAVE_COUNT: int = 6
 const ROLL_SLASH_BASE_RADIUS: float = 85.0   # tầm Lăn Chém tối thiểu (như bản cũ)
 const ROLL_SLASH_RANGE_FACTOR: float = 1.55  # bán kính = tầm chém hiện tại x hệ số này (nếu lớn hơn mức tối thiểu)
 var shield: float = 20.0
+const FORTIFY_SHIELD_PER_HIT: float = 1.0 # buff Fortify: giáp ảo nhận được mỗi đòn trúng
+const FORTIFY_COOLDOWN: float = 0.25      # giây giữa 2 lần nhận (đòn xuyên/lan nhiều mục tiêu không cộng nhiều lần)
+var _fortify_ready_msec: int = 0
 var shield_delay_timer: float = 0.0
 var weapon_id: String = "pistol"
 var weapon_rarity: String = "common"
@@ -100,6 +103,7 @@ func _ready() -> void:
 	refresh_max_shield()
 	shield = float(max_shield)
 	Global.room_cleared.connect(_on_room_cleared)
+	Global.player_hit_landed.connect(_on_hit_landed_fortify)
 
 	set_weapon_with_rarity(cls["default_weapon"], "common")
 	dodge_timer.timeout.connect(_on_dodge_finished)
@@ -494,21 +498,14 @@ func _swing() -> void:
 	var total_heal = 0
 	var rad_angle = deg_to_rad(aoe_angle)
 	
-	# CƠ CHẾ DAO GĂM: CHÉM XÓA ĐẠN QUÁI
-	# (Dao Găm xóa đạn sẵn; buff Phản Đạn mở rộng cho mọi vũ khí cận chiến, Dao Găm thì PHẢN đạn.)
-	var can_deflect: bool = Global.buff_stack("buff_deflect") > 0
-	if weapon_id == "daggers" or can_deflect:
+	# CƠ CHẾ DAO GĂM: CHÉM XÓA ĐẠN QUÁI (chỉ Dao Găm)
+	if weapon_id == "daggers":
 		for b in get_tree().get_nodes_in_group("enemy_bullets"):
 			var to_b = b.global_position - global_position
 			if to_b.length() <= aoe_range + 10.0:
 				if absf(aim_dir.angle_to(to_b)) <= rad_angle * 0.5:
 					Global.burst(b.global_position, Color.WHITE, 4, 60.0, 0.6)
-					if can_deflect and weapon_id == "daggers" and b.has_method("reflect"):
-						b.reflect(aim_dir, 1.5) # Phản đạn!
-						if Global.buff_stack("buff_homing") > 0:
-							b.homing = true # Synergy Phản Đạn + Tầm Nhiệt: đạn phản tự đuổi quái
-					else:
-						b.queue_free() # Xóa đạn!
+					b.queue_free() # Xóa đạn!
 					Global.sfx("dodge")
 					
 	# CHÉM QUÁI VÀ BOSS
@@ -642,6 +639,17 @@ func _tick_shield(delta: float) -> void:
 		shield_delay_timer = maxf(0.0, shield_delay_timer - delta)
 	elif shield < float(max_shield):
 		shield = minf(float(max_shield), shield + SHIELD_REGEN_RATE * (1.0 + 0.25 * float(Global.buff_stack("buff_shield_regen"))) * delta)
+
+## Buff Fortify: mỗi đòn của Player trúng quái/boss cộng FORTIFY_SHIELD_PER_HIT giáp ảo (không vượt max_shield).
+## Nghe signal Global.player_hit_landed; hồi chiêu đo bằng đồng hồ hệ thống nên không cần tick mỗi frame.
+func _on_hit_landed_fortify(_target: Node, _dmg: int, _is_crit: bool) -> void:
+	if not alive or Global.buff_stack("buff_fortify") <= 0 or shield >= float(max_shield):
+		return
+	var now: int = Time.get_ticks_msec()
+	if now < _fortify_ready_msec:
+		return
+	_fortify_ready_msec = now + int(FORTIFY_COOLDOWN * 1000.0)
+	shield = minf(float(max_shield), shield + FORTIFY_SHIELD_PER_HIT)
 
 ## Trả về lượng sát thương còn lại sau khi giáp hấp thụ. Luôn reset nhịp hồi giáp.
 func _absorb_with_shield(amount: int) -> int:

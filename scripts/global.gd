@@ -10,6 +10,8 @@ signal boss_hp_changed(hp: float, max_hp: float, phase: int, boss_name: String)
 signal boss_defeated
 ## Dungeon phát ngay khi bắt đầu dựng một tầng (mọi tầng, kể cả tầng Lord). MusicManager chọn nhạc theo biome.
 signal floor_started(floor_num: int)
+## Một đòn của Player vừa trúng quái/boss (cận chiến, đạn, nguồn phụ). Buff phản ứng khi trúng (Fortify...) nghe signal này.
+signal player_hit_landed(target: Node, dmg: int, is_crit: bool)
 ## Player vừa nhận sát thương (HUD nghe để nháy viền đỏ khi đòn nặng).
 signal player_damaged(amount: int, max_hp: int)
 
@@ -275,9 +277,9 @@ const BUFF_MAX_STACK: Dictionary = {
 	"buff_deathnova": 1, "buff_momentum": 1, "buff_sunder": 1, "buff_berserk": 1, "buff_sweep": 1,
 	# Giáp ảo
 	"buff_burn": 3, "buff_poison": 3, "buff_freeze": 2, "buff_arc": 1, "buff_chain": 1,
-	"buff_shield_cap": 5, "buff_shield_regen": 4, "buff_shield_nova": 1,
+	"buff_shield_cap": 5, "buff_shield_regen": 4, "buff_shield_nova": 1, "buff_fortify": 1,
 	# Cận chiến
-	"buff_deflect": 1, "buff_wave": 3, "buff_rollslash": 3, "buff_counter": 1, "buff_whirl": 1,
+	"buff_wave": 3, "buff_rollslash": 3, "buff_counter": 1, "buff_whirl": 1,
 	# Tầm xa
 	"buff_bounce": 2, "buff_split": 1, "buff_focus": 3, "buff_homing": 1, "buff_ring": 1, "buff_super": 1,
 }
@@ -309,8 +311,8 @@ var buff_pool: Dictionary = {
 	"buff_shield_cap": {"name": "Shield Cap", "desc": "+10 max shield", "tier": "common", "class": "any"},
 	"buff_shield_regen": {"name": "Shield Regen", "desc": "+25% regen, starts 0.4s sooner", "tier": "rare", "class": "any"},
 	"buff_shield_nova": {"name": "Shield Nova", "desc": "On shield break: shockwave (6s CD)", "tier": "epic", "class": "any"},
+	"buff_fortify": {"name": "Fortify", "desc": "Hits grant a little shield", "tier": "rare", "class": "any"},
 	# ---- Cận chiến
-	"buff_deflect": {"name": "Deflect", "desc": "Slash clears bullets; daggers reflect (x1.5)", "tier": "rare", "class": "melee"},
 	"buff_wave": {"name": "Sword Wave", "desc": "Slash fires a wave (35% damage)", "tier": "rare", "class": "melee"},
 	"buff_rollslash": {"name": "Roll Slash", "desc": "Roll end: 120% damage burst", "tier": "rare", "class": "melee"},
 	"buff_counter": {"name": "Counter", "desc": "After a hit: next slash x2 (3s)", "tier": "epic", "class": "melee"},
@@ -326,13 +328,15 @@ var buff_pool: Dictionary = {
 ## Bảng buff có tương tác chéo (đối xứng): id -> các buff đối tác. buff_picker hiện nhãn ★ khi đã có đối tác.
 const SYNERGY_MAP: Dictionary = {
 	"buff_ring": ["buff_homing", "buff_bounce"],
-	"buff_homing": ["buff_ring", "buff_split", "buff_deflect"],
+	"buff_homing": ["buff_ring", "buff_split"],
 	"buff_bounce": ["buff_ring", "buff_split"],
 	"buff_split": ["buff_homing", "buff_bounce", "buff_super"],
 	"buff_super": ["buff_split"],
 	"buff_whirl": ["buff_wave"],
 	"buff_wave": ["buff_whirl"],
-	"buff_deflect": ["buff_homing"],
+	"buff_fortify": ["buff_shield_regen", "buff_shield_cap"],
+	"buff_shield_regen": ["buff_fortify"],
+	"buff_shield_cap": ["buff_fortify"],
 	"buff_deathnova": ["buff_burn", "buff_poison", "buff_freeze"],
 	"buff_burn": ["buff_deathnova"],
 	"buff_poison": ["buff_deathnova"],
@@ -428,6 +432,7 @@ func consume_buff_pick() -> void:
 func on_player_hit(target: Node, dmg: int, is_crit: bool) -> void:
 	if not is_instance_valid(target) or not target.has_method("apply_element"):
 		return
+	player_hit_landed.emit(target, dmg, is_crit)
 	var burn: int = buff_stack("buff_burn")
 	if burn > 0 and randf() < 0.2 * float(burn):
 		target.apply_element("burn", maxi(2, int(float(dmg) * 0.12)), 0)
