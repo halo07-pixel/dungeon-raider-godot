@@ -13,7 +13,7 @@ var max_hp: int = 100
 var hp: int = 100
 ## Giáp Ảo (kiểu Soul Knight): hấp thụ sát thương TRƯỚC máu, tự hồi sau một nhịp không bị đánh.
 const SHIELD_BASE: int = 20
-const SHIELD_PER_FLOOR: int = 4
+const SHIELD_CAP_PER_STACK: int = 10 # buff Shield Cap: +10 giáp tối đa mỗi stack
 const SHIELD_REGEN_DELAY: float = 2.5
 const SHIELD_REGEN_RATE: float = 10.0
 var max_shield: int = 20
@@ -648,7 +648,7 @@ func _on_room_cleared() -> void:
 
 ## Giáp tối đa tăng theo tầng + buff Lá Chắn Lớn; gọi lại khi sang tầng mới.
 func refresh_max_shield() -> void:
-	var new_max: int = SHIELD_BASE + SHIELD_PER_FLOOR * maxi(0, Global.floor_num - 1) + 10 * Global.buff_stack("buff_shield_cap")
+	var new_max: int = SHIELD_BASE + SHIELD_CAP_PER_STACK * Global.buff_stack("buff_shield_cap") # giáp chỉ tăng qua buff, không theo tầng
 	shield += float(new_max - max_shield) if new_max > max_shield else 0.0
 	max_shield = new_max
 	shield = minf(shield, float(max_shield))

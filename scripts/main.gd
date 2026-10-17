@@ -156,6 +156,7 @@ func _next_floor() -> void:
 	player.global_position = dungeon.room_center(dungeon.start_cell)
 	if player.has_method("refresh_max_shield"):
 		player.refresh_max_shield()
+		player.shield = float(player.max_shield) # sang tầng mới: giáp hồi đầy (trần không còn tự tăng theo tầng)
 	_spawn_npc_if_needed()
 	
 	player.knockback = Vector2.ZERO
