@@ -105,7 +105,7 @@ var weapons: Dictionary = {
 	"pistol": {"name": "Pistol", "damage": 10, "cooldown": 0.30, "speed": 640.0, "pellets": 1, "spread": 3.0, "pierce": false, "life": 1.1, "recoil": 45.0, "radius": 5.0, "color": Color(1.0, 0.9, 0.4), "sfx": "shoot", "is_melee": false},
 	"smg": {"name": "SMG", "damage": 5, "cooldown": 0.085, "speed": 700.0, "pellets": 1, "spread": 9.0, "pierce": false, "life": 1.0, "recoil": 18.0, "radius": 4.0, "color": Color(1.0, 0.65, 0.25), "sfx": "shoot", "is_melee": false},
 	"shotgun": {"name": "Shotgun", "damage": 7, "cooldown": 0.75, "speed": 560.0, "pellets": 6, "spread": 36.0, "pierce": false, "life": 0.45, "recoil": 150.0, "radius": 4.0, "color": Color(1.0, 0.5, 0.3), "sfx": "shotgun", "is_melee": false},
-	"laser": {"name": "Laser Gun", "damage": 14, "cooldown": 0.50, "speed": 1100.0, "pellets": 1, "spread": 0.0, "pierce": true, "life": 0.9, "recoil": 60.0, "radius": 4.0, "color": Color(0.4, 1.0, 1.0), "sfx": "laser", "is_melee": false},
+	"laser": {"name": "Laser Gun", "damage": 14, "cooldown": 0.50, "speed": 1100.0, "pellets": 1, "spread": 0.0, "pierce": false, "pierce_count": 2, "life": 0.9, "recoil": 60.0, "radius": 4.0, "color": Color(0.4, 1.0, 1.0), "sfx": "laser", "is_melee": false},
 
 	"broadsword": {"name": "Longsword", "damage": 25, "cooldown": 0.45, "is_melee": true, "range": 55.0, "cleave_angle": 180.0, "knock": 280.0, "color": Color(0.9, 0.9, 0.9), "sfx": "dodge"},
 	"daggers": {"name": "Daggers", "damage": 17, "cooldown": 0.22, "is_melee": true, "range": 40.0, "cleave_angle": 80.0, "knock": 120.0, "color": Color(0.6, 0.9, 0.6), "sfx": "dodge"},
@@ -300,7 +300,7 @@ var buff_pool: Dictionary = {
 	"buff_momentum": {"name": "Momentum", "desc": "Chain hits: up to +25% damage", "tier": "epic", "class": "any"},
 	"buff_sunder": {"name": "Sunder", "desc": "Hits stack bonus damage taken", "tier": "epic", "class": "any"},
 	"buff_berserk": {"name": "Berserk", "desc": "Low HP: up to +40% damage", "tier": "epic", "class": "any"},
-	"buff_sweep": {"name": "Sweep", "desc": "Melee: +50% range, +40% arc. Ranged: pierce", "tier": "epic", "class": "any"},
+	"buff_sweep": {"name": "Sweep", "desc": "Melee: +50% range, +40% arc. Ranged: shots pierce +1 enemy", "tier": "epic", "class": "any"},
 	# ---- Nguyên tố
 	"buff_burn": {"name": "Ignite", "desc": "20% burn chance (3s)", "tier": "rare", "class": "any"},
 	"buff_poison": {"name": "Venom", "desc": "Hits stack poison (max 3)", "tier": "rare", "class": "any"},
@@ -323,7 +323,7 @@ var buff_pool: Dictionary = {
 	"buff_focus": {"name": "Focus", "desc": "Standing still: +20% damage", "tier": "rare", "class": "ranged"},
 	"buff_homing": {"name": "Homing", "desc": "Bullets track targets", "tier": "epic", "class": "ranged"},
 	"buff_ring": {"name": "Bullet Ring", "desc": "Every 5th shot: ring of 8 (50%)", "tier": "epic", "class": "ranged"},
-	"buff_super": {"name": "Mega Shot", "desc": "Every 6th shot: piercing, x3 damage", "tier": "epic", "class": "ranged"},
+	"buff_super": {"name": "Mega Shot", "desc": "Every 6th shot: x3 damage, pierces 2 enemies", "tier": "epic", "class": "ranged"},
 }
 ## Bảng buff có tương tác chéo (đối xứng): id -> các buff đối tác. buff_picker hiện nhãn ★ khi đã có đối tác.
 const SYNERGY_MAP: Dictionary = {

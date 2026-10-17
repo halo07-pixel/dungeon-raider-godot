@@ -33,6 +33,11 @@ var shield: float = 20.0
 const FORTIFY_SHIELD_PER_HIT: float = 1.0 # buff Fortify: giáp ảo nhận được mỗi đòn trúng
 const FORTIFY_COOLDOWN: float = 0.25      # giây giữa 2 lần nhận (đòn xuyên/lan nhiều mục tiêu không cộng nhiều lần)
 var _fortify_ready_msec: int = 0
+## Xuyên có giới hạn: số quái đạn xuyên qua (sau đó trúng quái kế tiếp thì gây sát thương rồi biến mất).
+## Laser có sẵn "pierce_count" trong Global.weapons; các buff/độ hiếm dưới đây cộng thêm vào.
+const PIERCE_PISTOL_EPIC: int = 1 # Pistol Epic
+const PIERCE_SWEEP: int = 1       # buff Sweep (tầm xa)
+const PIERCE_SUPER: int = 2       # buff Mega Shot (phát thứ 6): tối thiểu 2, Laser = cơ bản + 1
 var shield_delay_timer: float = 0.0
 var weapon_id: String = "pistol"
 var weapon_rarity: String = "common"
@@ -340,7 +345,7 @@ func _shoot() -> void:
 	var speed: float = w["speed"]
 	var cd: float = w["cooldown"]
 	var life: float = w["life"]
-	var is_pierce: bool = w["pierce"]
+	var pierce_n: int = int(w.get("pierce_count", 0)) # số quái đạn xuyên qua (đạn còn đánh thêm 1 quái nữa rồi biến mất)
 	var w_knock: float = w["recoil"]
 	var eff: String = ""
 	var p_color: Color = w["color"]
@@ -349,7 +354,7 @@ func _shoot() -> void:
 	# LOGIC ĐỘ HIẾM TẦM XA CHUYÊN SÂU
 	if weapon_id == "pistol":
 		if weapon_rarity == "rare": cd *= 0.85
-		elif weapon_rarity == "epic": is_pierce = true
+		elif weapon_rarity == "epic": pierce_n += PIERCE_PISTOL_EPIC
 		elif weapon_rarity == "legendary":
 			pellets = 3; spread = 15.0; dmg = base_dmg * 2
 	elif weapon_id == "shotgun":
@@ -369,7 +374,7 @@ func _shoot() -> void:
 		life *= 1.0 + 0.15 * float(Global.buff_stack("buff_reach"))
 		speed *= 1.0 + 0.08 * float(Global.buff_stack("buff_reach"))
 	if Global.buff_stack("buff_sweep") > 0:
-		is_pierce = true
+		pierce_n += PIERCE_SWEEP
 	if is_crit: dmg *= 2
 
 	# Siêu Đạn / Loạt Đạn Vòng: đếm phát bắn
@@ -379,7 +384,7 @@ func _shoot() -> void:
 	var bullet_radius: float = float(w["radius"])
 	if is_super:
 		dmg *= 3
-		is_pierce = true
+		pierce_n = maxi(pierce_n + 1, PIERCE_SUPER) # Laser (đã xuyên sẵn) được cộng thêm 1
 		bullet_radius *= 2.0
 		p_color = Color(1.0, 0.85, 0.2)
 
@@ -395,7 +400,8 @@ func _shoot() -> void:
 			off += randf_range(-spread, spread) * 0.08
 		var dir: Vector2 = Vector2.from_angle(base_ang + off)
 		var b = BULLET.instantiate()
-		b.setup(true, dir, dmg, speed, life, p_color, bullet_radius, is_pierce, eff)
+		b.setup(true, dir, dmg, speed, life, p_color, bullet_radius, false, eff)
+		b.pierce_left = pierce_n
 		_apply_ranged_buffs(b)
 		b.is_crit = is_crit
 		Global.world.add_child(b)
