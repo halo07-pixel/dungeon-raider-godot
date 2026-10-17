@@ -22,6 +22,9 @@ func _draw() -> void:
 			for d in room["doors"]:
 				if dungeon.rooms[c + d]["visited"]:
 					known = true
+			# Phòng bí mật ẩn cho tới khi lộ (đứng gần cửa) hoặc đã vào / có Map Sense.
+			if room["type"] == "secret" and not room.get("revealed", false):
+				known = false
 		if not known:
 			continue
 		# Màu đồng bộ tông đá/gỗ ấm của bộ asset pixel-art 0x72 thay vì xám-xanh trung tính cũ.
@@ -32,6 +35,8 @@ func _draw() -> void:
 			col = Color(0.95, 0.8, 0.3)
 		elif room["type"] == "start":
 			col = Color(0.35, 0.75, 0.85)
+		elif dungeon.EventRooms.is_event(room["type"]):
+			col = dungeon.EventRooms.TYPES[room["type"]]["color"]
 		if not room["visited"]:
 			col = col.darkened(0.45)
 		if c == dungeon.current_cell:
