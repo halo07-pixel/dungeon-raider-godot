@@ -13,6 +13,7 @@ const SpikeTrapScript = preload("res://scripts/spike_trap.gd")
 const PoisonTileScript = preload("res://scripts/poison_tile.gd")
 const IceTileScript = preload("res://scripts/ice_tile.gd")
 const LordArenaRuneScript = preload("res://scripts/lord_arena_rune.gd")
+const AffixScript = preload("res://scripts/enemy_affix.gd")
 
 const CELL_W: int = 24
 const CELL_H: int = 16
@@ -489,17 +490,38 @@ func _pick_kind_ice() -> String:
 func _spawn_wave(cell: Vector2i) -> void:
 	var count: int = mini(3 + Global.floor_num + randi_range(0, 2), 10)
 	var avoid: Vector2 = Global.player.global_position
+	var affixed: int = 0
 	for i in count:
-		_spawn_enemy(_pick_kind(), _random_floor_pos(cell, avoid, 200.0), cell)
+		var e = _spawn_enemy(_pick_kind(), _random_floor_pos(cell, avoid, 200.0), cell, affixed < AffixScript.MAX_PER_ROOM)
+		if e.affix_id != "":
+			affixed += 1
 
 
-func _spawn_enemy(kind: String, pos: Vector2, cell: Vector2i) -> void:
+func _spawn_enemy(kind: String, pos: Vector2, cell: Vector2i, allow_affix: bool = false) -> Node:
 	var e = ENEMY.instantiate()
-	e.setup(kind) # HP theo tầng do enemy.gd::setup() nhân đúng 1 lần (Global.hp_scale_for_floor)
+	e.setup(kind, 1.0, allow_affix) # HP theo tầng do enemy.gd::setup() nhân đúng 1 lần (Global.hp_scale_for_floor)
 	e.died.connect(_on_enemy_died.bind(cell))
+	e.summon_requested.connect(_on_affix_summon.bind(cell))
 	entities.add_child(e)
 	e.global_position = pos
 	alive_enemies += 1
+	return e
+
+
+## Affix Summoner: dựng 1 quái nhỏ theo biome cạnh quái triệu hồi; gắn meta để đếm và không rơi xu.
+func _on_affix_summon(owner_enemy: Node, cell: Vector2i) -> void:
+	if not is_instance_valid(owner_enemy) or not owner_enemy.alive:
+		return
+	var minion_kind: String = "slime"
+	match current_biome:
+		"swamp": minion_kind = "chort"
+		"ice": minion_kind = "frost_tiny"
+	var r: Rect2 = _room_rect(cell, 3)
+	var off := Vector2.from_angle(randf() * TAU) * 44.0
+	var p: Vector2 = owner_enemy.global_position + off
+	p = Vector2(clampf(p.x, r.position.x, r.end.x), clampf(p.y, r.position.y, r.end.y))
+	var m = _spawn_enemy(minion_kind, p, cell, false)
+	m.set_meta("summoner", owner_enemy)
 
 
 func _random_floor_pos(cell: Vector2i, avoid: Vector2, min_dist: float) -> Vector2:
@@ -553,7 +575,7 @@ func _spawn_boss(cell: Vector2i) -> void:
 func _on_summon(kind: String, pos: Vector2, cell: Vector2i) -> void:
 	var r: Rect2 = _room_rect(cell, 3)
 	var p := Vector2(clampf(pos.x, r.position.x, r.end.x), clampf(pos.y, r.position.y, r.end.y))
-	_spawn_enemy(kind, p, cell)
+	_spawn_enemy(kind, p, cell, false)
 
 
 func _on_enemy_died(_enemy, cell: Vector2i) -> void:

@@ -14,6 +14,8 @@ var enemy: Node2D = null
 var top_y: float = -40.0 # khoảng cách từ gốc quái lên đỉnh sprite (âm)
 var bar_w: float = 32.0
 var elite: bool = false
+var tag: String = ""        ## Hậu tố affix hiển thị trên thanh máu (vd. "Volatile")
+var tag_color: Color = Color.WHITE
 var _chip: float = 1.0
 var _hold: float = 0.0
 var _last_ratio: float = 1.0
@@ -30,6 +32,10 @@ func setup(p_enemy: Node2D, p_top_y: float, radius: float, p_elite: bool) -> voi
 	visible = false
 
 
+func set_tag(text: String, color: Color) -> void:
+	tag = text
+	tag_color = color
+
 func _ratio() -> float:
 	var mh: float = float(enemy.get("max_hp"))
 	if mh <= 0.0:
@@ -43,7 +49,7 @@ func _process(delta: float) -> void:
 		return
 	global_position = enemy.global_position + Vector2(0.0, top_y)
 	var ratio: float = _ratio()
-	visible = ratio < 0.999
+	visible = ratio < 0.999 or tag != ""
 	if ratio < _last_ratio:
 		_hold = CHIP_HOLD
 	elif ratio > _chip:
@@ -63,6 +69,12 @@ func _draw() -> void:
 	var ratio: float = _ratio()
 	var x0: float = -bar_w * 0.5
 	var frame: Color = Color(0.85, 0.35, 0.95) if elite else Color(0.0, 0.0, 0.0)
+	if tag != "":
+		frame = tag_color
+		var font: Font = ThemeDB.fallback_font
+		var sz: Vector2 = font.get_string_size(tag, HORIZONTAL_ALIGNMENT_LEFT, -1, 10)
+		draw_string(font, Vector2(-sz.x * 0.5 + 1.0, -4.0 + 1.0), tag, HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color(0, 0, 0, 0.8))
+		draw_string(font, Vector2(-sz.x * 0.5, -4.0), tag, HORIZONTAL_ALIGNMENT_LEFT, -1, 10, tag_color)
 	draw_rect(Rect2(x0 - 1.0, -1.0, bar_w + 2.0, H + 2.0), Color(frame, 0.9))   # viền
 	draw_rect(Rect2(x0, 0.0, bar_w, H), Color(0.12, 0.02, 0.02))                  # nền
 	if _chip > ratio:

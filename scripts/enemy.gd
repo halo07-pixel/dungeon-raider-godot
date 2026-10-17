@@ -9,11 +9,14 @@ extends CharacterBody2D
 ## gây/nhận sát thương nên vẫn ở đây, chỉ đổi điểm kích hoạt sang nghe signal từ Hurtbox).
 
 signal died(enemy)
+## Affix Summoner xin triệu hồi quái nhỏ — dungeon lắng nghe và dựng quái (enemy không tự biết về phòng).
+signal summon_requested(owner_enemy: Node)
 
 const PICKUP = preload("res://scenes/pickup.tscn")
 const BULLET = preload("res://scenes/bullet.tscn")
 const QAgentScript = preload("res://scripts/q_agent.gd")
 const HpBarScript = preload("res://scripts/enemy_hp_bar.gd")
+const AffixScript = preload("res://scripts/enemy_affix.gd")
 
 ## AI Tầng 2 (Q-Learning): % quái tầm xa (archer/shaman) trở thành "Tinh Anh" mỗi lần spawn —
 ## HP cao hơn, tint tím nhận diện, và dùng QAgent (scripts/q_agent.gd) để quyết định hành vi
@@ -22,6 +25,8 @@ const ELITE_CHANCE: float = 0.15
 const ELITE_HP_MULT: float = 1.4
 var is_elite: bool = false
 var q_agent: Node = null
+var affix_id: String = "" ## Biến thể (volatile/summoner/warden); "" = quái thường
+var affix_node: Node2D = null
 
 var kind: String = "slime"
 var data: Dictionary = {}
@@ -91,12 +96,14 @@ func hurt_center() -> Vector2:
 ## @onready var hurtbox vẫn CHƯA được gán lúc này — phải dùng $Hurtbox (resolve ngay
 ## trên cây Node con đã dựng xong lúc instantiate(), không phụ thuộc SceneTree) thay
 ## vì field "hurtbox" ở trên.
-func setup(p_kind: String, hp_mult: float = 1.0) -> void:
+func setup(p_kind: String, hp_mult: float = 1.0, allow_affix: bool = false) -> void:
 	kind = p_kind
 	data = Global.enemies[p_kind]
 	if (kind == "archer" or kind == "shaman") and randf() < ELITE_CHANCE:
 		is_elite = true
 		hp_mult *= ELITE_HP_MULT
+	elif allow_affix:
+		affix_id = AffixScript.roll(kind, Global.floor_num)
 	var floor_scale: float = Global.hp_scale_for_floor(Global.floor_num)
 	var endless_mult: float = Global.endless_difficulty_mult(Global.floor_num) # >1.0 chỉ khi tầng > 10 (Vô Hạn)
 	var computed_max_hp: float = float(data["hp"]) * hp_mult * floor_scale * endless_mult
@@ -108,6 +115,13 @@ func setup(p_kind: String, hp_mult: float = 1.0) -> void:
 		q_agent.set_script(QAgentScript)
 		add_child(q_agent)
 		q_agent.attach(self)
+	if affix_id != "":
+		affix_node = Node2D.new()
+		affix_node.set_script(AffixScript)
+		affix_node.name = "Affix"
+		add_child(affix_node)
+		affix_node.attach(self, affix_id)
+		affix_node.summon_requested.connect(func(o): summon_requested.emit(o))
 
 func _ready() -> void:
 	if data.is_empty():
@@ -155,6 +169,8 @@ func _add_hp_bar() -> void:
 	bar.name = "HpBar"
 	add_child(bar)
 	bar.setup(self, top, float(data["radius"]), is_elite)
+	if affix_id != "":
+		bar.set_tag(AffixScript.label_of(affix_id), AffixScript.color_of(affix_id))
 
 
 func _setup_sprite() -> void:
@@ -198,6 +214,10 @@ func _update_sprite(moving: bool) -> void:
 		sprite.modulate = Color.YELLOW
 	elif hurtbox.is_slowed():
 		sprite.modulate = Color.AQUA
+	elif hurtbox.ward > 0.0:
+		sprite.modulate = Color(0.6, 0.85, 1.7) # đang có khiên của Warden
+	elif affix_id != "":
+		sprite.modulate = AffixScript.color_of(affix_id).lerp(Color.WHITE, 0.35) * 1.15
 	elif is_elite:
 		sprite.modulate = Color(1.4, 0.85, 1.7) # Tinh Anh: tint tím nhận diện bằng mắt
 	else:
@@ -451,6 +471,10 @@ const HEAL_DROP_CHANCE: float = 0.06
 
 func _drop_and_free() -> void:
 	var n: int = data["coins"]
+	if has_meta("summoner"):
+		n = 0 # quái do Summoner triệu hồi không rơi xu (chống cày)
+	elif affix_id != "":
+		n += 1 # thưởng thêm cho quái biến thể
 	for i in n:
 		_spawn_pickup("coin")
 	if randf() < HEAL_DROP_CHANCE:
