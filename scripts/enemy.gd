@@ -75,6 +75,7 @@ var alive: bool:
 ## chỉ có 1 bộ khung hình dùng chung cho cả idle lẫn di chuyển (vd slug lúc nào cũng trườn).
 const ENEMY_SPRITES: Dictionary = {
 	"slime": {"prefix": "slug", "single_anim": true, "offset_y": -12.0},
+	"mimic": {"prefix": "chest_full_open", "single_anim": true, "offset_y": -8.0},
 	"archer": {"prefix": "imp", "single_anim": false, "offset_y": -10.0},
 	"brute": {"prefix": "ogre", "single_anim": false, "offset_y": 2.0},
 	# Biome 2 (Đầm Lầy) — sprite chỉ có khung "idle" (không có "run" riêng) nên single_anim=true.

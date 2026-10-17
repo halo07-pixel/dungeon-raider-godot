@@ -134,6 +134,9 @@ var enemies: Dictionary = {
 	"frost_zombie": {"hp": 35, "speed": 90.0, "touch": 8, "touch_cd": 0.9, "touch_knock": 220.0, "radius": 13.0, "coins": 2, "weight": 1.0, "color": Color(0.55, 0.8, 0.95)},
 	"frost_big_zombie": {"hp": 150, "speed": 50.0, "touch": 22, "touch_cd": 1.2, "touch_knock": 400.0, "radius": 21.0, "coins": 3, "weight": 2.8, "color": Color(0.6, 0.85, 1.0), "slam_cd": 2.2, "slam_radius": 70.0},
 	"frost_tiny": {"hp": 12, "speed": 150.0, "touch": 14, "touch_cd": 999.0, "touch_knock": 260.0, "radius": 9.0, "coins": 1, "weight": 0.6, "color": Color(0.75, 0.92, 1.0)},
+
+	# --- Mimic (phòng sự kiện Rương Bẫy): không nằm trong bảng spawn thường, chỉ sinh từ rương bẫy.
+	"mimic": {"hp": 90, "speed": 115.0, "touch": 22, "touch_cd": 0.7, "touch_knock": 380.0, "radius": 15.0, "coins": 8, "weight": 1.6, "color": Color(0.85, 0.6, 0.2)},
 }
 # ==============================================================================
 
@@ -504,6 +507,7 @@ func _setup_input() -> void:
 	_add_key("move_down", KEY_DOWN)
 	_add_key("dodge", KEY_SPACE)
 	_add_key("skill", KEY_Q)
+	_add_key("interact", KEY_E)
 	_add_key("confirm", KEY_ENTER)
 	_add_key("confirm", KEY_KP_ENTER)
 	_add_key("restart", KEY_R)

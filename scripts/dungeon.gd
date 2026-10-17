@@ -14,6 +14,8 @@ const PoisonTileScript = preload("res://scripts/poison_tile.gd")
 const IceTileScript = preload("res://scripts/ice_tile.gd")
 const LordArenaRuneScript = preload("res://scripts/lord_arena_rune.gd")
 const AffixScript = preload("res://scripts/enemy_affix.gd")
+const EventRooms = preload("res://scripts/event_rooms.gd")
+const EventPropScript = preload("res://scripts/event_prop.gd")
 
 const CELL_W: int = 24
 const CELL_H: int = 16
@@ -232,6 +234,8 @@ func generate(floor_number: int) -> void:
 		var tc: Vector2i = cands.pick_random()
 		rooms[tc]["type"] = "treasure"
 
+	_assign_event_rooms(floor_number)
+
 	for c in rooms:
 		_build_room(c, rooms[c])
 		
@@ -245,6 +249,26 @@ func generate(floor_number: int) -> void:
 	_unlock_doors(rooms[start_cell])
 	
 	rooms_updated.emit()
+
+
+## Gán loại phòng sự kiện (Altar/Challenge/Rương Bẫy/Phòng Bí Mật) cho vài phòng thường còn lại,
+## ưu tiên ngõ cụt. Dữ liệu và xác suất nằm ở event_rooms.gd.
+func _assign_event_rooms(floor_number: int) -> void:
+	var dead_ends: Array = []
+	var others: Array = []
+	for c in rooms:
+		if rooms[c]["type"] != "normal":
+			continue
+		if rooms[c]["doors"].size() == 1:
+			dead_ends.append(c)
+		else:
+			others.append(c)
+	dead_ends.shuffle()
+	others.shuffle()
+	var slots: Array = dead_ends + others
+	var picks: Array = EventRooms.pick_for_floor(floor_number, slots.size())
+	for i in picks.size():
+		rooms[slots[i]]["type"] = picks[i]
 
 
 func _new_room(type: String) -> Dictionary:
@@ -426,8 +450,58 @@ func _enter_room(cell: Vector2i) -> void:
 			_spawn_pickup("weapon", chosen_weapon + ":" + rarity, room_center(cell) + Vector2(0.0, -24.0))
 			_spawn_chest_decor(room_center(cell) + Vector2(0.0, 10.0))
 			Global.message.emit("Treasure Room!", Color(1.0, 0.85, 0.3))
+		"altar":
+			room["cleared"] = true
+			_spawn_prop("altar", room_center(cell), cell)
+			Global.message.emit("Altar Room", Color(0.8, 0.45, 0.95))
+		"trapped_chest":
+			room["cleared"] = true
+			_spawn_prop("chest", room_center(cell), cell)
+			Global.message.emit("A lone chest...", Color(1.0, 0.85, 0.3))
+		"secret":
+			room["cleared"] = true
+			_spawn_prop("cache", room_center(cell), cell)
+			Global.message.emit("Secret Room!", Color(0.4, 0.9, 0.5))
+		"challenge":
+			# Không khoá cửa cho tới khi bấm đền: người chơi có thể bỏ qua.
+			_spawn_prop("shrine", room_center(cell), cell)
+			Global.message.emit("Trial Shrine", Color(1.0, 0.55, 0.2))
 		_:
 			room["cleared"] = true
+
+
+## Dựng vật thể tương tác của phòng sự kiện; hành động cần biết phòng (thử thách, Mimic) đi qua signal.
+func _spawn_prop(kind: String, pos: Vector2, cell: Vector2i) -> Node:
+	var prop := Node2D.new()
+	prop.set_script(EventPropScript)
+	prop.setup(kind)
+	prop.action_requested.connect(_on_prop_action.bind(cell))
+	entities.add_child(prop)
+	prop.global_position = pos
+	return prop
+
+
+func _on_prop_action(action: String, pos: Vector2, cell: Vector2i) -> void:
+	match action:
+		"start_challenge":
+			var room: Dictionary = rooms[cell]
+			room["waves_left"] = EventRooms.CHALLENGE_WAVES - 1
+			_lock_doors(room)
+			Global.message.emit("Wave 1/%d" % EventRooms.CHALLENGE_WAVES, Color(1.0, 0.55, 0.2))
+			_spawn_wave(cell, _challenge_wave_size())
+		"spawn_mimic":
+			var m = _spawn_enemy("mimic", pos, cell, false)
+			m.died.connect(_on_mimic_died)
+
+
+func _on_mimic_died(_enemy) -> void:
+	Global.purple_gems += EventRooms.MIMIC_GEM_REWARD
+	Global.save_game()
+	Global.message.emit("Mimic defeated: +%d Purple Gem" % EventRooms.MIMIC_GEM_REWARD, Color(0.8, 0.3, 0.9))
+
+
+func _challenge_wave_size() -> int:
+	return maxi(3, int(round(float(_wave_size()) * EventRooms.CHALLENGE_WAVE_SCALE)))
 
 
 func _lock_doors(room: Dictionary) -> void:
@@ -487,8 +561,12 @@ func _pick_kind_ice() -> String:
 	return "frost_zombie"
 
 
-func _spawn_wave(cell: Vector2i) -> void:
-	var count: int = mini(3 + Global.floor_num + randi_range(0, 2), 10)
+func _wave_size() -> int:
+	return mini(3 + Global.floor_num + randi_range(0, 2), 10)
+
+
+func _spawn_wave(cell: Vector2i, count_override: int = -1) -> void:
+	var count: int = count_override if count_override > 0 else _wave_size()
 	var avoid: Vector2 = Global.player.global_position
 	var affixed: int = 0
 	for i in count:
@@ -582,9 +660,33 @@ func _on_enemy_died(_enemy, cell: Vector2i) -> void:
 	alive_enemies -= 1
 	alive_enemies = maxi(alive_enemies, 0)
 	if alive_enemies <= 0 and not boss_alive:
-		_room_cleared.call_deferred(cell)
+		if rooms.has(cell) and rooms[cell]["type"] == "challenge" and int(rooms[cell].get("waves_left", 0)) > 0:
+			_challenge_next_wave.call_deferred(cell)
+		else:
+			_room_cleared.call_deferred(cell)
+
+## Phòng bí mật chỉ lộ trên minimap khi người chơi ở phòng kề và đứng gần cửa thông sang nó.
+func _update_secret_reveal() -> void:
+	var pl = Global.player
+	if not is_instance_valid(pl):
+		return
+	for c in rooms:
+		var room: Dictionary = rooms[c]
+		if room["type"] != "secret" or room.get("revealed", false):
+			continue
+		for d in room["doors"]:
+			if c + d != current_cell:
+				continue
+			var door_tile: Vector2i = _door_tiles(current_cell, -d)[1]
+			var door_pos: Vector2 = (Vector2(door_tile) + Vector2(0.5, 0.5)) * float(Global.TILE)
+			if pl.global_position.distance_to(door_pos) <= EventRooms.SECRET_REVEAL_DIST:
+				room["revealed"] = true
+				rooms_updated.emit()
+				Global.message.emit("You sense a hidden room...", Color(0.4, 0.9, 0.5))
+
 
 func _physics_process(_delta: float) -> void:
+	_update_secret_reveal()
 	# Cơ chế phòng hộ: Nếu trong nhóm enemies thực tế không còn con nào sống, tự động mở cửa
 	if not rooms.is_empty() and rooms.has(current_cell):
 		var room = rooms[current_cell]
@@ -600,6 +702,18 @@ func _physics_process(_delta: float) -> void:
 				alive_enemies = 0
 				_room_cleared(current_cell)
 			# ============================================
+
+
+func _challenge_next_wave(cell: Vector2i) -> void:
+	if not rooms.has(cell) or alive_enemies > 0:
+		return
+	var room: Dictionary = rooms[cell]
+	var left: int = int(room.get("waves_left", 0))
+	if left <= 0:
+		return
+	room["waves_left"] = left - 1
+	Global.message.emit("Wave %d/%d" % [EventRooms.CHALLENGE_WAVES - left + 1, EventRooms.CHALLENGE_WAVES], Color(1.0, 0.55, 0.2))
+	_spawn_wave(cell, _challenge_wave_size())
 
 
 func _on_boss_died(cell: Vector2i) -> void:
@@ -626,6 +740,9 @@ func _room_cleared(cell: Vector2i) -> void:
 		# Cân bằng lại: trước đây mời chọn buff sau MỌI phòng dọn sạch (quá dễ cày),
 		# giờ chỉ 1 lần chọn buff duy nhất mỗi tầng, ngay sau khi hạ Boss.
 		Global.request_buff_choice()
+	elif room["type"] == "challenge":
+		_spawn_prop("reward", room_center(cell), cell)
+		Global.message.emit("Trial cleared!", Color(1.0, 0.85, 0.3))
 	else:
 		Global.message.emit("Room cleared!", Color(0.6, 1.0, 0.6))
 		if randf() < 0.35:
