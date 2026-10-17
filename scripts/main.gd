@@ -30,6 +30,9 @@ func _ready() -> void:
 	else:
 		if Global.has_method("reset_run"): Global.reset_run()
 		if Global.has_method("reset_run_stats"): Global.reset_run_stats()
+		# Vốn khởi điểm (nâng cấp Starting Capital) phải đặt SAU reset_run() — trước đây menu đặt xu rồi
+		# reset_run() xoá về 0 nên nâng cấp này không có tác dụng.
+		Global.coins = int(Global.upgrades.get("start_coin", 0)) * 10
 		Global.record_run_start() # hồ sơ vĩnh viễn: +1 ván cho class đang chơi
 		Global.record_floor_reached(1)
 		
@@ -97,6 +100,7 @@ func _restore_player_state() -> void:
 		Global.run_buffs = Dictionary(Global.saved_run.get("run_buffs", {})).duplicate()
 		Global.run_buffs.erase("buff_lifesteal") # buff đã bị gỡ khỏi game; bỏ khỏi save cũ
 		Global.run_buffs.erase("buff_deflect") # Deflect đã bị gỡ (thay bằng Fortify); bỏ khỏi save cũ
+		Global.coins = int(Global.saved_run.get("gold", Global.coins))
 		player.max_hp = int(Global.saved_run.get("max_hp", player.max_hp))
 		player.refresh_max_shield()
 		player.shield = minf(float(player.max_shield), float(Global.saved_run.get("shield", player.max_shield)))
@@ -211,6 +215,7 @@ func _build_saved_run() -> Dictionary:
 		"max_hp": player.max_hp,
 		"shield": player.shield,
 		"run_buffs": Global.run_buffs.duplicate(),
+		"gold": Global.coins, # xu đang cầm (trước đây không lưu nên Continue mất sạch xu)
 		"stats": Global.run_stats.duplicate() if Global.get("run_stats") else {}
 	}
 

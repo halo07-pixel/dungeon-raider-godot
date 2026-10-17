@@ -279,7 +279,7 @@ func _on_dodge_finished() -> void:
 ## Hệ số sát thương cộng thêm từ buff dùng chung (Sức Mạnh / Đà Chiến Đấu / Cuồng Nộ) — cho các
 ## nguồn sát thương PHỤ (Lăn Chém, Sét Lan, Giáp Phản Chấn) để buff không bị bỏ qua.
 func _secondary_dmg_mult() -> float:
-	var m: float = 1.0 + 0.08 * float(Global.buff_stack("buff_dmg"))
+	var m: float = 1.0 + 0.08 * float(Global.buff_stack("buff_dmg")) + 0.05 * float(Global.upgrades["mastery"]) # Weapon Mastery áp cả đòn phụ/kỹ năng
 	if Global.buff_stack("buff_momentum") > 0:
 		m += MOMENTUM_PER_STACK * float(momentum_stacks)
 	if Global.buff_stack("buff_berserk") > 0 and max_hp > 0:
