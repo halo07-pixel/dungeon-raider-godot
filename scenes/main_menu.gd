@@ -426,13 +426,19 @@ func _buy_upgrade(key: String) -> void:
 # ==========================================
 # 4. XÂY DỰNG TỪ ĐIỂN TRA CỨU (INDEX)
 # ==========================================
+const GuideContent = preload("res://scripts/guide_content.gd")
+var _guide_text: RichTextLabel
+var _guide_scroll: ScrollContainer
+var _guide_tab_btns: Dictionary = {}
+var _guide_tab: String = "basics"
+
 func _build_index_menu() -> void:
 	index_node = MarginContainer.new()
 	index_node.set_anchors_preset(Control.PRESET_FULL_RECT)
-	index_node.add_theme_constant_override("margin_left", 150)
-	index_node.add_theme_constant_override("margin_right", 150)
-	index_node.add_theme_constant_override("margin_top", 80)
-	index_node.add_theme_constant_override("margin_bottom", 80)
+	index_node.add_theme_constant_override("margin_left", 90)
+	index_node.add_theme_constant_override("margin_right", 90)
+	index_node.add_theme_constant_override("margin_top", 40)
+	index_node.add_theme_constant_override("margin_bottom", 40)
 	ui_layer.add_child(index_node)
 
 	var panel = Panel.new()
@@ -446,9 +452,16 @@ func _build_index_menu() -> void:
 	panel.add_theme_stylebox_override("panel", p_style)
 	index_node.add_child(panel)
 
+	var inner = MarginContainer.new()
+	inner.add_theme_constant_override("margin_left", 24)
+	inner.add_theme_constant_override("margin_right", 24)
+	inner.add_theme_constant_override("margin_top", 16)
+	inner.add_theme_constant_override("margin_bottom", 16)
+	index_node.add_child(inner)
+
 	var vbox = VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 20)
-	index_node.add_child(vbox)
+	vbox.add_theme_constant_override("separation", 12)
+	inner.add_child(vbox)
 
 	var title = Label.new()
 	title.text = "SURVIVAL GUIDE"
@@ -457,33 +470,53 @@ func _build_index_menu() -> void:
 	title.add_theme_color_override("font_color", Color(0.4, 0.8, 1.0))
 	vbox.add_child(title)
 
-	var scroll = ScrollContainer.new()
-	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	vbox.add_child(scroll)
+	# Hàng tab (tự xuống dòng nếu hẹp)
+	var tabs = HFlowContainer.new()
+	tabs.alignment = FlowContainer.ALIGNMENT_CENTER
+	tabs.add_theme_constant_override("h_separation", 8)
+	tabs.add_theme_constant_override("v_separation", 8)
+	vbox.add_child(tabs)
+	_guide_tab_btns.clear()
+	for tab_id in GuideContent.TAB_ORDER:
+		var btn := _create_btn(String(GuideContent.TAB_TITLES[tab_id]), _select_guide_tab.bind(tab_id), Vector2(104, 38), Color(0.2, 0.25, 0.35), 10)
+		tabs.add_child(btn)
+		_guide_tab_btns[tab_id] = btn
 
-	var rich_text = RichTextLabel.new()
-	rich_text.bbcode_enabled = true
-	rich_text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	rich_text.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	rich_text.add_theme_font_override("normal_font", Global.pixel_font())
-	rich_text.add_theme_font_override("bold_font", Global.pixel_font())
-	rich_text.add_theme_font_size_override("normal_font_size", 14)
-	rich_text.add_theme_font_size_override("bold_font_size", 14)
-	rich_text.text = _get_index_content()
-	scroll.add_child(rich_text)
+	_guide_scroll = ScrollContainer.new()
+	_guide_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_guide_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	vbox.add_child(_guide_scroll)
+
+	_guide_text = RichTextLabel.new()
+	_guide_text.bbcode_enabled = true
+	_guide_text.fit_content = true
+	_guide_text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_guide_text.add_theme_font_override("normal_font", Global.pixel_font())
+	_guide_text.add_theme_font_override("bold_font", Global.pixel_font())
+	_guide_text.add_theme_font_size_override("normal_font_size", 13)
+	_guide_text.add_theme_font_size_override("bold_font_size", 13)
+	_guide_text.add_theme_constant_override("line_separation", 4)
+	_guide_scroll.add_child(_guide_text)
 
 	var center_btn = CenterContainer.new()
 	vbox.add_child(center_btn)
-	center_btn.add_child(_create_btn("BACK", show_main_menu, Vector2(300, 60), Color(0.5, 0.5, 0.5)))
+	center_btn.add_child(_create_btn("BACK", show_main_menu, Vector2(260, 50), Color(0.5, 0.5, 0.5)))
 
+	_select_guide_tab("basics")
 	index_node.hide()
 
-func _get_index_content() -> String:
-	var t = "[center][b][color=#ffd700]--- RARITY GUIDE ---[/color][/b][/center]\n\n"
-	t += "[b]1. Common (White)[/b]: Base stats.\n[b][color=#44ff44]2. Rare (Green)[/color][/b]: +25% Damage, +2% Lifesteal.\n"
-	t += "[b][color=#b644ff]3. Epic (Purple)[/color][/b]: +50% Damage, +5% Lifesteal. Applies a special effect.\n"
-	t += "[b][color=#ffd700]4. Legendary (Gold)[/color][/b]: +100% Damage, +10% Lifesteal. Changes weapon behavior.\n"
-	return t
+func _select_guide_tab(tab_id: String) -> void:
+	_guide_tab = tab_id
+	_guide_text.text = GuideContent.tab_text(tab_id)
+	_guide_scroll.scroll_vertical = 0
+	for id in _guide_tab_btns:
+		var on: bool = id == tab_id
+		var c: Color = Color(0.25, 0.55, 0.85) if on else Color(0.2, 0.25, 0.35)
+		var btn: Button = _guide_tab_btns[id]
+		for st in ["normal", "hover", "pressed"]:
+			var sb: StyleBoxFlat = (btn.get_theme_stylebox(st) as StyleBoxFlat).duplicate()
+			sb.bg_color = c.lightened(0.25) if st == "hover" else (c.darkened(0.2) if st == "pressed" else c)
+			btn.add_theme_stylebox_override(st, sb)
 
 # ==========================================
 # CÔNG CỤ & LOGIC CHUYỂN TRANG
