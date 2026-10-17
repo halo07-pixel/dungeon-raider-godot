@@ -436,7 +436,7 @@ func kill() -> void:
 ## Kích hoạt khi $Hurtbox phát tín hiệu "died" (hp về 0 HOẶC kill() ép chết ngay dù hp
 ## còn dư, vd. frost_tiny tự huỷ sau khi chạm — xem HurtboxComponent.mark_dead()).
 func _die() -> void:
-	Global.sfx("kill")
+	Global.sfx("mimic_die" if kind == "mimic" else "kill")
 	if Global.get("run_stats") != null and Global.run_stats.has("kills"):
 		Global.run_stats["kills"] += 1
 	Global.record_kill()

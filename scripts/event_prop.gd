@@ -85,17 +85,19 @@ func _use_altar() -> void:
 	var cost: int = maxi(1, int(ceil(float(p.max_hp) * EventRooms.ALTAR_HP_FRACTION)))
 	if p.hp <= cost:
 		Global.message.emit("Too weak to offer blood", Color(1.0, 0.4, 0.4))
+		Global.sfx("altar_deny")
 		return
 	var id: String = EventRooms.roll_epic_buff()
 	if id == "":
 		Global.message.emit("The altar is silent", Color(0.7, 0.7, 0.7))
+		Global.sfx("altar_deny")
 		return
 	used = true
 	p.hp -= cost
 	Global.apply_buff(id)
 	Global.shake(0.5, 0.3)
 	Global.burst(global_position, Color(0.8, 0.2, 0.9), 24, 240.0, 2.0)
-	Global.sfx("slam")
+	Global.sfx("altar_offer")
 
 # ------------------------------------------------------------------ Rương bẫy
 func _use_chest() -> void:
@@ -109,7 +111,7 @@ func _use_chest() -> void:
 		Global.message.emit("Treasure!", Color(1.0, 0.85, 0.3))
 	elif r < EventRooms.CHEST_GOOD + EventRooms.CHEST_MIMIC:
 		Global.message.emit("It's a Mimic!", Color(1.0, 0.3, 0.3))
-		Global.sfx("roar")
+		Global.sfx("mimic_reveal")
 		action_requested.emit("spawn_mimic", global_position)
 	else:
 		var p = Global.player
