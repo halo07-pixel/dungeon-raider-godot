@@ -787,6 +787,10 @@ func load_game() -> void:
 			if data != null:
 				purple_gems = data.get("purple_gems", 0)
 				saved_run = data.get("saved_run", {})
+				# Player._ready chạy TRƯỚC main._ready: phải đặt đúng class của ván đang lưu ngay lúc nạp,
+				# nếu không "Continue" sau khi mở lại game dựng nhầm sprite/máu/kỹ năng của class mặc định.
+				if not saved_run.is_empty() and classes.has(String(saved_run.get("class", ""))):
+					current_class = String(saved_run["class"])
 				var loaded_upgrades = data.get("upgrades", {})
 				for k in loaded_upgrades.keys():
 					if upgrades.has(k): upgrades[k] = loaded_upgrades[k]
