@@ -8,6 +8,9 @@ var life: float = 1.0
 var color: Color = Color.WHITE
 var radius: float = 5.0
 var pierce: bool = false
+## Xuyên CÓ GIỚI HẠN (đạn tầm xa của Player): số quái còn xuyên qua được. Trúng quái khi = 0 thì gây sát thương
+## rồi biến mất. `pierce` (true) vẫn là xuyên vô hạn, chỉ còn dùng cho sóng kiếm/đòn cận chiến.
+var pierce_left: int = 0
 var from_player: bool = true
 var knock: float = 140.0
 var effect: String = ""
@@ -167,11 +170,11 @@ func _on_body_entered(body: Node) -> void:
 	if body.has_method("take_damage"):
 		if not from_player and body.has_method("is_invulnerable") and body.is_invulnerable():
 			return
-		if pierce:
+		if pierce or pierce_left > 0:
 			if _hit.has(body):
-				return
+				return # đã xuyên qua quái này rồi, không đánh lần 2
 			_hit.append(body)
-			
+
 		body.take_damage(damage, global_position - dir * 8.0, knock)
 
 		if not from_player and source_q_agent and not _q_reward_sent:
@@ -204,7 +207,10 @@ func _on_body_entered(body: Node) -> void:
 		if from_player and split_on_hit and not is_fragment:
 			_spawn_fragments(body)
 		if not pierce:
-			_impact()
+			if pierce_left > 0:
+				pierce_left -= 1 # xuyên qua quái này, còn bay tiếp
+			else:
+				_impact()
 	elif from_player and bounces_left > 0 and _try_bounce():
 		return
 	else:
@@ -270,7 +276,7 @@ func _impact() -> void:
 	queue_free()
 
 func _draw() -> void:
-	var trail: float = radius * (6.0 if pierce else 2.5)
+	var trail: float = radius * (6.0 if (pierce or pierce_left > 0) else 2.5)
 	draw_line(Vector2(-trail, 0.0), Vector2.ZERO, Color(color, 0.5), radius * 1.4)
 	draw_circle(Vector2.ZERO, radius, color)
 	draw_circle(Vector2.ZERO, radius * 0.5, Color.WHITE)
