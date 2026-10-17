@@ -96,6 +96,7 @@ func _restore_player_state() -> void:
 		# Buff phải được khôi phục TRƯỚC (một số buff đổi max_hp / giáp)
 		Global.run_buffs = Dictionary(Global.saved_run.get("run_buffs", {})).duplicate()
 		Global.run_buffs.erase("buff_lifesteal") # buff đã bị gỡ khỏi game; bỏ khỏi save cũ
+		Global.run_buffs.erase("buff_deflect") # Deflect đã bị gỡ (thay bằng Fortify); bỏ khỏi save cũ
 		player.max_hp = int(Global.saved_run.get("max_hp", player.max_hp))
 		player.refresh_max_shield()
 		player.shield = minf(float(player.max_shield), float(Global.saved_run.get("shield", player.max_shield)))
