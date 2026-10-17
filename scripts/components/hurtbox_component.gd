@@ -23,6 +23,7 @@ var alive: bool = true
 var hp: float = 0.0
 var max_hp: float = 0.0
 var armor: float = 0.0
+var ward: float = 0.0 ## Khiên tạm (affix Warden cấp): hấp thụ sát thương trước khi trừ máu
 var cc_resist: float = 0.0
 var weight: float = 1.0
 
@@ -123,6 +124,10 @@ func take_hit(amount: int, from_pos: Vector2 = Vector2.ZERO, knock: float = 200.
 		actual_damage = Global.armored_damage(amount, armor)
 	if sunder_stacks > 0:
 		actual_damage = int(float(actual_damage) * (1.0 + SUNDER_PER_STACK * float(sunder_stacks)))
+	if ward > 0.0:
+		var absorbed: float = minf(ward, float(actual_damage))
+		ward -= absorbed
+		actual_damage -= int(absorbed)
 	hp = maxf(hp - float(actual_damage), 0.0)
 	var actual_knock: float = knock * (1.0 - cc_resist)
 	var knockback_vec: Vector2 = (_owner2d.global_position - from_pos).normalized() * actual_knock / weight
