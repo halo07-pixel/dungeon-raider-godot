@@ -18,6 +18,10 @@ const VICTORY_GEM_BONUS: int = 20
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS 
+	# Main phải luôn chạy (nhận ESC, dựng menu tạm dừng) nhưng thế giới game thì PHẢI dừng khi tạm dừng:
+	# Node con mặc định kế thừa chế độ của cha nên nếu không đặt rõ, Player/Dungeon/quái/đạn vẫn chạy ngầm.
+	player.process_mode = Node.PROCESS_MODE_PAUSABLE
+	dungeon.process_mode = Node.PROCESS_MODE_PAUSABLE
 	
 	# 1. KIỂM TRA VÀ PHỤC HỒI SAVE GAME (OPTION A)
 	var is_loading_save = not Global.saved_run.is_empty()
