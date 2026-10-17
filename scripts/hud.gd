@@ -18,6 +18,7 @@ var boss_fill: StyleBoxFlat
 var boss_ticks: Control
 var _boss_phases: int = 3
 var info_label: Label
+var skill_label: Label
 var boss_box: Control
 var boss_bar: ProgressBar
 var boss_label: Label
@@ -55,7 +56,22 @@ func _process(_delta: float) -> void:
 	if p.get("weapon") and p.weapon.has("name"):
 		w_name = p.weapon["name"]
 	info_label.text = "Floor %d   ·   %s   ·   Gold: %d" % [Global.floor_num, w_name, Global.coins]
+	_update_skill_label(p)
 	_update_debug_label()
+
+## Chỉ báo kỹ năng class tiến hoá: "[Q] Barrage READY" hoặc đếm ngược hồi chiêu.
+func _update_skill_label(p) -> void:
+	var sk = p.get("class_skill")
+	if sk == null or not is_instance_valid(sk):
+		skill_label.visible = false
+		return
+	skill_label.visible = true
+	if sk.is_ready():
+		skill_label.text = "[Q] %s  READY" % sk.skill_name
+		skill_label.modulate = Color(1.0, 0.9, 0.4)
+	else:
+		skill_label.text = "[Q] %s  %.1fs" % [sk.skill_name, sk.cooldown_left]
+		skill_label.modulate = Color(0.7, 0.7, 0.7)
 
 ## TẠM: debug overlay bắt bug "qua tầng mới spawn vào phòng quái thay vì phòng start"
 ## và bug "quái hết mà cổng không mở". Xoá khi tìm ra nguyên nhân.
@@ -210,6 +226,8 @@ func _build_ui() -> void:
 	dodge_bar = _bar(self, Vector2(20.0, 64.0), Vector2(280.0, 4.0), Color(0.4, 0.8, 1.0))
 	dodge_bar.max_value = 100.0
 	info_label = _label(self, "", 16, Vector2(20.0, 72.0), Vector2(500.0, 26.0))
+	skill_label = _label(self, "", 14, Vector2(20.0, 98.0), Vector2(300.0, 22.0))
+	skill_label.visible = false
 
 	var grad := Gradient.new()
 	grad.set_color(0, Color(0.9, 0.0, 0.0, 0.0))

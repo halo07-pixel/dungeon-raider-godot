@@ -418,6 +418,7 @@ func _die() -> void:
 	Global.sfx("kill")
 	if Global.get("run_stats") != null and Global.run_stats.has("kills"):
 		Global.run_stats["kills"] += 1
+	Global.record_kill()
 	Global.shake(0.25, 0.15)
 	Global.burst(global_position, data["color"], 18, 220.0, 2.0)
 	Global.hitstop(0.035)
