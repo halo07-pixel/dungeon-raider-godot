@@ -181,6 +181,7 @@ func _generate_lord_floor() -> void:
 	rooms[start_cell]["visited"] = true
 	rooms[start_cell]["cleared"] = true
 	_unlock_doors(rooms[start_cell])
+	_build_nav()
 	rooms_updated.emit()
 
 
@@ -253,6 +254,7 @@ func generate(floor_number: int) -> void:
 	# Bổ sung dòng này để đảm bảo cửa phòng Start luôn mở sẵn
 	_unlock_doors(rooms[start_cell])
 	
+	_build_nav()
 	rooms_updated.emit()
 
 
@@ -559,13 +561,76 @@ func _challenge_wave_size() -> int:
 func _lock_doors(room: Dictionary) -> void:
 	for t in room["door_tiles"]:
 		door_layer.set_cell(t, 0, T_DOOR)
+		_nav_set_solid(t, true)
 	Global.sfx("door")
 
 
 func _unlock_doors(room: Dictionary) -> void:
 	for t in room["door_tiles"]:
 		door_layer.erase_cell(t)
+		_nav_set_solid(t, false)
 	Global.sfx("door")
+
+
+# ------------------------------------------------------------------ Tìm đường cho quái
+## Lưới A* theo ô tile (AStarGrid2D): tường/trụ/cửa khoá/ô trống là vật cản. Quái chỉ hỏi đường khi
+## tia nhìn tới người chơi bị chặn (enemy.gd::_chase_dir); còn thấy thẳng thì vẫn đi thẳng như cũ.
+var _astar: AStarGrid2D = null
+const NAV_NONE := Vector2i(-999999, -999999)
+
+func _build_nav() -> void:
+	var rect: Rect2i = floor_layer.get_used_rect()
+	if rect.size == Vector2i.ZERO:
+		_astar = null
+		return
+	_astar = AStarGrid2D.new()
+	_astar.region = rect
+	_astar.cell_size = Vector2(Global.TILE, Global.TILE)
+	_astar.offset = Vector2(Global.TILE, Global.TILE) * 0.5
+	_astar.diagonal_mode = AStarGrid2D.DIAGONAL_MODE_ONLY_IF_NO_OBSTACLES # không cắt góc tường
+	_astar.default_compute_heuristic = AStarGrid2D.HEURISTIC_OCTILE
+	_astar.default_estimate_heuristic = AStarGrid2D.HEURISTIC_OCTILE
+	_astar.update()
+	for y in range(rect.position.y, rect.end.y):
+		for x in range(rect.position.x, rect.end.x):
+			var c := Vector2i(x, y)
+			var blocked: bool = floor_layer.get_cell_source_id(c) == -1 \
+				or SOLID_TILES.has(floor_layer.get_cell_atlas_coords(c)) \
+				or door_layer.get_cell_source_id(c) != -1
+			if blocked:
+				_astar.set_point_solid(c, true)
+
+
+func _nav_set_solid(c: Vector2i, solid: bool) -> void:
+	if _astar != null and _astar.is_in_boundsv(c):
+		_astar.set_point_solid(c, solid)
+
+
+## Điểm mở gần nhất quanh ô c (bán kính tối đa 2 ô); c nếu đã mở; NAV_NONE nếu không có.
+func _nav_open_cell(c: Vector2i) -> Vector2i:
+	for r in 3:
+		for dy in range(-r, r + 1):
+			for dx in range(-r, r + 1):
+				if maxi(absi(dx), absi(dy)) != r:
+					continue
+				var n := c + Vector2i(dx, dy)
+				if _astar.is_in_boundsv(n) and not _astar.is_point_solid(n):
+					return n
+	return NAV_NONE
+
+
+## Đường đi (toạ độ thế giới, tâm ô) từ from tới to; rỗng nếu không có đường.
+func find_path(from: Vector2, to: Vector2) -> PackedVector2Array:
+	if _astar == null:
+		return PackedVector2Array()
+	var a: Vector2i = _nav_open_cell(floor_layer.local_to_map(floor_layer.to_local(from)))
+	var b: Vector2i = _nav_open_cell(floor_layer.local_to_map(floor_layer.to_local(to)))
+	if a == NAV_NONE or b == NAV_NONE:
+		return PackedVector2Array()
+	var pts: PackedVector2Array = _astar.get_point_path(a, b)
+	for i in pts.size():
+		pts[i] = floor_layer.to_global(pts[i])
+	return pts
 
 
 ## Chọn loại quái thường sẽ spawn — tách theo current_biome để 3 biome KHÔNG BAO GIỜ
@@ -636,6 +701,7 @@ func _spawn_wave(cell: Vector2i, count_override: int = -1) -> void:
 func _spawn_enemy(kind: String, pos: Vector2, cell: Vector2i, allow_affix: bool = false, hp_mult: float = 1.0) -> Node:
 	var e = ENEMY.instantiate()
 	e.setup(kind, hp_mult, allow_affix) # HP theo tầng do enemy.gd::setup() nhân đúng 1 lần (Global.hp_scale_for_floor)
+	e.nav = self # quái hỏi đường qua find_path() khi bị tường chặn
 	e.died.connect(_on_enemy_died.bind(cell))
 	e.summon_requested.connect(_on_affix_summon.bind(cell))
 	e.split_requested.connect(_on_affix_split.bind(cell))

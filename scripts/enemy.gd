@@ -28,6 +28,16 @@ var is_elite: bool = false
 var q_agent: Node = null
 var affix_id: String = "" ## Biến thể (volatile/summoner/warden); "" = quái thường
 var affix_node: Node2D = null
+var nav: Node = null ## Dungeon (cấp lúc spawn): cung cấp find_path(from, to); null = đi thẳng như cũ
+var _path: PackedVector2Array = PackedVector2Array()
+var _path_i: int = 0
+var _repath_t: float = 0.0
+var _stuck_t: float = 0.0
+var _last_pos: Vector2 = Vector2.ZERO
+const REPATH_MIN: float = 0.4   ## giây giữa 2 lần tính lại đường (lệch pha ngẫu nhiên giữa các quái)
+const REPATH_MAX: float = 0.6
+const WAYPOINT_REACHED: float = 12.0 ## tới gần điểm này (px) thì chuyển sang điểm kế
+const STUCK_TIME: float = 0.5   ## đứng yên chừng này giây khi đang bị chặn thì ép tính lại đường
 var speed_mult: float = 1.0 ## Hệ số tốc độ do affix (Frenzy) đặt; 1.0 = bình thường
 signal split_requested(owner_enemy: Node)
 var skills: Node = null ## Kỹ năng riêng (hiện chỉ Mimic); null = quái thường
@@ -393,6 +403,34 @@ func _on_hurt(amount: int, knockback_vec: Vector2, true_dmg: bool) -> void:
 	if not true_dmg:
 		Global.sfx("hit")
 
+## Hướng đuổi theo người chơi: đi thẳng khi nhìn thấy; bị tường/trụ chặn thì đi theo đường A* của dungeon.
+func _chase_dir(dir: Vector2, delta: float) -> Vector2:
+	var p = Global.player
+	if has_los or nav == null or not is_instance_valid(p):
+		_path = PackedVector2Array()
+		_stuck_t = 0.0
+		return dir
+	# Phát hiện kẹt: đang bị chặn mà gần như không nhích.
+	if (global_position - _last_pos).length() < 0.25 * float(data["speed"]) * delta:
+		_stuck_t += delta
+		if _stuck_t >= STUCK_TIME:
+			_stuck_t = 0.0
+			_repath_t = 0.0
+	else:
+		_stuck_t = 0.0
+	_last_pos = global_position
+	_repath_t -= delta
+	if _repath_t <= 0.0 or _path.is_empty():
+		_repath_t = randf_range(REPATH_MIN, REPATH_MAX)
+		_path = nav.find_path(global_position, p.global_position)
+		_path_i = 0
+	while _path_i < _path.size() and global_position.distance_to(_path[_path_i]) < WAYPOINT_REACHED:
+		_path_i += 1
+	if _path_i >= _path.size():
+		return dir
+	return (_path[_path_i] - global_position).normalized()
+
+
 func _physics_process(delta: float) -> void:
 	if not alive:
 		return
@@ -424,9 +462,9 @@ func _physics_process(delta: float) -> void:
 			"archer", "shaman":
 				if player_too_close: move = -dir
 				elif player_in_range and has_los: move = dir.orthogonal() * strafe_sign * 0.5
-				else: move = dir
-			"slime": move = dir * (0.55 + 0.45 * absf(sin(_t * 4.0)))
-			_: move = dir
+				else: move = _chase_dir(dir, delta)
+			"slime": move = _chase_dir(dir, delta) * (0.55 + 0.45 * absf(sin(_t * 4.0)))
+			_: move = _chase_dir(dir, delta)
 		# QAgent chọn "retreat": chủ động lùi ra xa Player và lách ngang (ghi đè hướng thường)
 		if retreat_timer > 0.0:
 			retreat_timer -= delta
