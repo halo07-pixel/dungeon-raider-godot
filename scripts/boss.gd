@@ -94,6 +94,8 @@ var blink_cd: float = 0.0 # riêng Necromancer: hồi chiêu dịch chuyển né
 ## đuổi theo nhanh hơn, ưu tiên các đòn nguy hiểm nhất. Bù lại cho việc đòn to-xác mà
 ## thiếu áp lực thời gian khiến người chơi kiting thoải mái ở pha cuối.
 var frost_enraged: bool = false
+## Đòn được chốt cho lượt đánh KẾ TIẾP (combo), "" = chọn bình thường. Ví dụ Mặt Băng -> Frost Charge.
+var queued_attack: String = ""
 
 ## Buff "Phá Giáp" (Sử Thi) của Player — cùng công thức/field với HurtboxComponent của
 ## enemy.gd thường (xem ghi chú ở đó), boss không dùng component nên khai báo trực tiếp.
@@ -294,6 +296,8 @@ func _attack_pool() -> Array:
 			var pool: Array = ["necro_bolt", "necro_summon"]
 			if phase >= 2:
 				pool.append("necro_curse")
+			if phase >= 2:
+				pool.append("bog_spread") # vũng độc lan rộng (tương tác sàn Biome Đầm Lầy)
 			if phase >= 3:
 				pool.append("necro_bolt") # tăng tỉ lệ bolt ở pha cuối
 			return pool
@@ -305,6 +309,8 @@ func _attack_pool() -> Array:
 			if phase >= 3:
 				pool.append("blizzard")
 				pool.append("ice_prison") # tăng tỉ lệ ở pha cuối, đòn chính xác rủi ro cao
+			if phase >= 2:
+				pool.append("ice_sheet") # sàn hóa băng khiến Player trượt, hay nối tiếp bằng Frost Charge
 			if frost_enraged:
 				pool.append("ice_prison")
 				pool.append("blizzard") # nổi điên: dồn thêm trọng số vào 2 đòn nguy hiểm nhất
@@ -322,6 +328,7 @@ func _attack_pool() -> Array:
 			if phase >= 2:
 				pool.append("slam")
 				pool.append("summon")
+				pool.append("fissure") # vết nứt đất nổ lần lượt (tương tác sàn Biome Đá)
 			return pool
 
 
@@ -397,6 +404,9 @@ func _on_attack_timer_timeout() -> void:
 		if not alive:
 			return
 	var attack: String = _weighted_attack(_attack_pool(), _rl_pick_value())
+	if queued_attack != "":
+		attack = queued_attack # đòn nối tiếp (combo) đã được đòn trước chốt
+		queued_attack = ""
 	match attack:
 		"charge": await _atk_charge()
 		"ring": await _atk_ring()
@@ -413,6 +423,9 @@ func _on_attack_timer_timeout() -> void:
 		"judgement": await _atk_judgement()
 		"ice_prison": await _atk_ice_prison()
 		"lord_summon_all": await _atk_lord_summon_all()
+		"fissure": await _atk_fissure()
+		"bog_spread": await _atk_bog_spread()
+		"ice_sheet": await _atk_ice_sheet()
 	if not alive:
 		return
 	busy = false
@@ -655,6 +668,127 @@ func _atk_magma_eruption() -> void:
 		Global.world.add_child(hz)
 		hz.global_position = q
 	await get_tree().create_timer(MAGMA_TELEGRAPH * _speed_mult() + 0.1).timeout
+
+
+## Warden (Biome Đá): vết nứt đất chạy từ chân boss về phía Player, mỗi điểm nổ lần lượt. Toàn bộ vệt
+## hiện báo trước cùng lúc nên người chơi đọc được đường đi rồi né sang bên.
+const FISSURE_COUNT: int = 7
+const FISSURE_SPACING: float = 54.0
+const FISSURE_START: float = 70.0
+const FISSURE_RADIUS: float = 30.0
+const FISSURE_DAMAGE: int = 16
+const FISSURE_TELEGRAPH: float = 0.7
+const FISSURE_STAGGER: float = 0.11
+const FISSURE_SPREAD_DEG: float = 26.0 # pha 3: thêm 2 vệt chéo hai bên
+
+func _atk_fissure() -> void:
+	var p = Global.player
+	var tp: Vector2 = global_position + Vector2.RIGHT * 100.0
+	if is_instance_valid(p):
+		tp = p.global_position
+	var base_ang: float = (tp - global_position).angle()
+	var angs: Array = [base_ang]
+	if phase >= 3:
+		angs.append(base_ang + deg_to_rad(FISSURE_SPREAD_DEG))
+		angs.append(base_ang - deg_to_rad(FISSURE_SPREAD_DEG))
+	Global.sfx("door")
+	var tele: float = FISSURE_TELEGRAPH * _speed_mult()
+	for a in angs:
+		for i in FISSURE_COUNT:
+			var pos: Vector2 = global_position + Vector2.from_angle(a) * (FISSURE_START + FISSURE_SPACING * float(i))
+			if arena_rect.size != Vector2.ZERO and not arena_rect.grow(-20.0).has_point(pos):
+				continue
+			var hz := Area2D.new()
+			hz.set_script(BOSS_HAZARD)
+			hz.single_shot = true
+			hz.damage = FISSURE_DAMAGE
+			hz.radius = FISSURE_RADIUS
+			hz.telegraph_time = tele + FISSURE_STAGGER * float(i)
+			hz.color = Color(0.8, 0.55, 0.3, 0.55)
+			hz.burst_on_fire = true
+			Global.world.add_child(hz)
+			hz.global_position = pos
+	await get_tree().create_timer(tele + FISSURE_STAGGER * float(FISSURE_COUNT) + 0.2).timeout
+	Global.shake(0.4, 0.25)
+
+
+## Necromancer (Biome Đầm Lầy): vài vũng độc xuất hiện quanh boss và Player rồi LAN RỘNG dần, ép người chơi
+## rời chỗ thay vì đứng yên. Dùng lại BOSS_HAZARD (mở rộng bằng end_radius).
+const BOG_POOLS: int = 3
+const BOG_POOLS_PHASE3: int = 4
+const BOG_START_RADIUS: float = 38.0
+const BOG_END_RADIUS: float = 96.0
+const BOG_DURATION: float = 5.0
+const BOG_DAMAGE: int = 4
+const BOG_POISON_TICKS: int = 3
+const BOG_POISON_AMOUNT: float = 2.0
+const BOG_TELEGRAPH: float = 0.8
+
+func _atk_bog_spread() -> void:
+	var p = Global.player
+	var tp: Vector2 = global_position
+	if is_instance_valid(p):
+		tp = p.hurt_center() if p.has_method("hurt_center") else p.global_position
+	Global.sfx("door")
+	var spots: Array = [tp + Vector2.from_angle(randf() * TAU) * randf_range(20.0, 60.0)]
+	var n: int = BOG_POOLS_PHASE3 if phase >= 3 else BOG_POOLS
+	for i in n - 1:
+		var around: Vector2 = tp if i % 2 == 0 else global_position
+		spots.append(around + Vector2.from_angle(randf() * TAU) * randf_range(80.0, 150.0))
+	for pos in spots:
+		var q: Vector2 = pos
+		if arena_rect.size != Vector2.ZERO:
+			var safe_rect: Rect2 = arena_rect.grow(-40.0)
+			q = q.clamp(safe_rect.position, safe_rect.end)
+		var hz := Area2D.new()
+		hz.set_script(BOSS_HAZARD)
+		hz.damage = BOG_DAMAGE
+		hz.tick_interval = 0.6
+		hz.duration = BOG_DURATION
+		hz.radius = BOG_START_RADIUS
+		hz.end_radius = BOG_END_RADIUS
+		hz.telegraph_time = BOG_TELEGRAPH * _speed_mult()
+		hz.color = Color(0.4, 0.75, 0.25, 0.45)
+		hz.apply_poison_ticks = BOG_POISON_TICKS
+		hz.poison_amount = BOG_POISON_AMOUNT
+		Global.world.add_child(hz)
+		hz.global_position = q
+	await get_tree().create_timer(BOG_TELEGRAPH * _speed_mult() + 0.1).timeout
+
+
+## Frozen Horror (Biome Băng): một mảng sàn lớn hóa băng trong vài giây, Player trượt mất kiểm soát hướng đi.
+## Có xác suất nối ngay bằng Frost Charge (combo): trượt trên băng mà bị húc là nguy hiểm nhất.
+const ICE_SHEET_RADIUS: float = 160.0
+const ICE_SHEET_DURATION: float = 5.0
+const ICE_SHEET_TELEGRAPH: float = 0.9
+const ICE_SHEET_SLIDE: float = 0.55
+const ICE_SHEET_COMBO_CHANCE: float = 0.6
+const ICE_SHEET_COMBO_CHANCE_P3: float = 0.8
+
+func _atk_ice_sheet() -> void:
+	var p = Global.player
+	var center: Vector2 = global_position
+	if is_instance_valid(p):
+		center = p.global_position + p.velocity * 0.5
+	if arena_rect.size != Vector2.ZERO:
+		var safe_rect: Rect2 = arena_rect.grow(-60.0)
+		center = center.clamp(safe_rect.position, safe_rect.end)
+	Global.sfx("door")
+	var hz := Area2D.new()
+	hz.set_script(BOSS_HAZARD)
+	hz.damage = 0 # chỉ trượt; sát thương đến từ cú húc nối tiếp
+	hz.tick_interval = 0.2
+	hz.duration = ICE_SHEET_DURATION
+	hz.radius = ICE_SHEET_RADIUS
+	hz.telegraph_time = ICE_SHEET_TELEGRAPH * _speed_mult()
+	hz.color = Color(0.6, 0.9, 1.0, 0.35)
+	hz.apply_slide_duration = ICE_SHEET_SLIDE
+	Global.world.add_child(hz)
+	hz.global_position = center
+	var chance: float = ICE_SHEET_COMBO_CHANCE_P3 if phase >= 3 else ICE_SHEET_COMBO_CHANCE
+	if randf() < chance:
+		queued_attack = "frost_charge"
+	await get_tree().create_timer(ICE_SHEET_TELEGRAPH * _speed_mult() + 0.1).timeout
 
 
 func _necro_blink() -> void:

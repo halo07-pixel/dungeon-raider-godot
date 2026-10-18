@@ -17,11 +17,18 @@ var follow_target: Node2D = null # != null: vùng báo trước bám theo mục 
 var follow_time: float = 0.0
 var apply_burn_ticks: int = 0 # >0: gây Burn (DoT) khi đứng trong vùng
 var apply_stun_duration: float = 0.0 # >0: ngoài sát thương còn gây Choáng bấy nhiêu giây (đòn "Giam Băng")
+var apply_poison_ticks: int = 0 # >0: gây Độc (DoT) khi đứng trong vùng (đòn "Đầm Độc Lan")
+var poison_amount: float = 0.0 # sát thương mỗi nhịp độc
+var apply_slide_duration: float = 0.0 # >0: làm Player trượt mất kiểm soát hướng đi bấy nhiêu giây (đòn "Mặt Băng")
+var burst_on_fire: bool = false # true: đòn 1 lần có tia lửa/đá văng khi nổ (Nứt Đất)
+var end_radius: float = 0.0 # >radius: vùng LAN RỘNG dần từ radius tới end_radius suốt thời gian tồn tại
 
 var _t: float = 0.0
 var _tick_t: float = 0.0
 var _armed: bool = false
 var player_inside: bool = false
+var _shape: CircleShape2D = null
+var _start_radius: float = 0.0
 
 
 func _ready() -> void:
@@ -30,6 +37,8 @@ func _ready() -> void:
 	var shape := CollisionShape2D.new()
 	var circ := CircleShape2D.new()
 	circ.radius = radius
+	_shape = circ
+	_start_radius = radius
 	shape.shape = circ
 	add_child(shape)
 	body_entered.connect(_on_body_entered)
@@ -60,6 +69,8 @@ func _process(delta: float) -> void:
 		if _t >= telegraph_time:
 			_armed = true
 			_t = 0.0
+			if single_shot and burst_on_fire:
+				Global.burst(global_position, Color(color.r, color.g, color.b, 1.0), 10, 180.0, 1.6)
 			if single_shot and player_inside:
 				_deal_damage()
 		return
@@ -67,6 +78,11 @@ func _process(delta: float) -> void:
 	if single_shot:
 		queue_free()
 		return
+
+	if end_radius > _start_radius and duration > 0.0:
+		radius = lerpf(_start_radius, end_radius, clampf(_t / duration, 0.0, 1.0))
+		if _shape != null:
+			_shape.radius = radius
 
 	if _t >= duration:
 		queue_free()
@@ -83,7 +99,8 @@ func _deal_damage() -> void:
 	var p = Global.player
 	if is_instance_valid(p) and p.has_method("take_damage"):
 		if not (p.has_method("is_invulnerable") and p.is_invulnerable()):
-			p.take_damage(damage, global_position, 60.0)
+			if damage > 0:
+				p.take_damage(damage, global_position, 60.0)
 			if p.has_method("apply_status"):
 				if apply_slow:
 					p.apply_status("slow", 1.0)
@@ -91,6 +108,10 @@ func _deal_damage() -> void:
 					p.apply_status("burn", apply_burn_ticks)
 				if apply_stun_duration > 0.0:
 					p.apply_status("stun", apply_stun_duration)
+				if apply_poison_ticks > 0:
+					p.apply_status("poison", apply_poison_ticks, poison_amount)
+				if apply_slide_duration > 0.0:
+					p.apply_status("slide", apply_slide_duration)
 
 
 func _draw() -> void:
