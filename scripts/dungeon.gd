@@ -11,6 +11,7 @@ const BOSS = preload("res://scenes/boss.tscn")
 const PICKUP = preload("res://scenes/pickup.tscn")
 const SpikeTrapScript = preload("res://scripts/spike_trap.gd")
 const PoisonTileScript = preload("res://scripts/poison_tile.gd")
+const LavaTileScript = preload("res://scripts/lava_tile.gd")
 const IceTileScript = preload("res://scripts/ice_tile.gd")
 const LordArenaRuneScript = preload("res://scripts/lord_arena_rune.gd")
 const AffixScript = preload("res://scripts/enemy_affix.gd")
@@ -51,13 +52,15 @@ func _tile_files_for_biome(biome: String) -> Array:
 
 
 ## Biome 1 (Warden, tầng 1-3): đá · Biome 2 (Necromancer, tầng 4-6): đầm lầy ·
-## Biome 3 (Frost, tầng 7-9) + tầng Lord (10+): băng giá.
+## Biome 3 (Frost, tầng 7-9): băng giá · Biome 4 (Lord, tầng 10+): địa ngục.
 func _biome_for_floor(floor_num: int) -> String:
 	var k: String = _boss_kind_for_floor(floor_num)
 	if k == "necromancer":
 		return "swamp"
-	elif k == "frost" or k == "lord":
+	elif k == "frost":
 		return "ice"
+	elif k == "lord":
+		return "hell"
 	return "stone"
 const T_FLOOR_VARIANTS: Array = [
 	Vector2i(0, 0), Vector2i(1, 0), Vector2i(2, 0), Vector2i(3, 0),
@@ -522,6 +525,7 @@ func _pick_kind() -> String:
 	match current_biome:
 		"swamp": return _pick_kind_swamp()
 		"ice": return _pick_kind_ice()
+		"hell": return _pick_kind_hell()
 		_: return _pick_kind_stone()
 
 
@@ -550,6 +554,11 @@ func _pick_kind_swamp() -> String:
 
 ## Biome 3 (Băng Giá): Frost Big Zombie (tank) · Frost Tinyling (nhanh, tự nổ) ·
 ## Frost Zombie (phần còn lại, vai cơ bản).
+## Địa ngục: trộn bộ quái băng và đá (không có roster riêng; art quái địa ngục để sau).
+func _pick_kind_hell() -> String:
+	return _pick_kind_ice() if randf() < 0.5 else _pick_kind_stone()
+
+
 func _pick_kind_ice() -> String:
 	var r: float = randf()
 	var tank_p: float = 0.16
@@ -593,7 +602,7 @@ func _on_affix_summon(owner_enemy: Node, cell: Vector2i) -> void:
 	var minion_kind: String = "slime"
 	match current_biome:
 		"swamp": minion_kind = "chort"
-		"ice": minion_kind = "frost_tiny"
+		"ice", "hell": minion_kind = "frost_tiny"
 	var r: Rect2 = _room_rect(cell, 3)
 	var off := Vector2.from_angle(randf() * TAU) * 44.0
 	var p: Vector2 = owner_enemy.global_position + off
@@ -790,6 +799,9 @@ func _spawn_hazard_tiles(cell: Vector2i, count: int) -> void:
 		script = PoisonTileScript
 	elif current_biome == "ice":
 		script = IceTileScript
+	elif current_biome == "hell":
+		script = LavaTileScript
+		count = clampi(count, 1, 3)
 	for i in count:
 		var pos: Vector2 = _random_floor_pos(cell, Vector2(-99999.0, -99999.0), 0.0)
 		var trap := Area2D.new()

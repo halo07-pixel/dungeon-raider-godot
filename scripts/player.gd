@@ -55,6 +55,11 @@ var last_move_dir: Vector2 = Vector2.RIGHT # Hướng di chuyển gần nhất, 
 var poison_ticks: int = 0 # Số nhịp độc còn lại (Orc Shaman / Chort - biome Đầm Lầy)
 var poison_timer: float = 0.0
 var poison_dmg: int = 0
+# Burn (biome Địa Ngục): DoT vài nhịp, lăn né sẽ dập lửa.
+const BURN_TICK: float = 0.5
+const BURN_DAMAGE: int = 3
+var burn_ticks: int = 0
+var burn_timer: float = 0.0
 var stun_timer: float = 0.0 # Choáng (đòn "Giam Băng" của Frozen Horror) — khoá di chuyển/tấn công
 
 var swinging: bool = false
@@ -160,6 +165,8 @@ func _update_sprite() -> void:
 		sprite.modulate = Color(2.2, 1.2, 1.2) if int(float(Time.get_ticks_msec()) / 70.0) % 2 == 0 else Color.WHITE
 		return
 	sprite.modulate = Color(1.0, 1.0, 1.0, 0.6) if rolling else Color.WHITE
+	if burn_ticks > 0 and not rolling:
+		sprite.modulate = Color(1.6, 0.8, 0.45)
 	if rolling or velocity.length() > 5.0:
 		if sprite.animation != "run":
 			sprite.play("run")
@@ -193,6 +200,10 @@ func apply_status(type: String, duration: float, amount: float = 0.0) -> void:
 		poison_dmg = maxi(poison_dmg, int(amount))
 		if poison_timer <= 0.0:
 			poison_timer = 0.5
+	elif type == "burn":
+		burn_ticks = maxi(burn_ticks, int(duration))
+		if burn_timer <= 0.0:
+			burn_timer = BURN_TICK
 
 func _physics_process(delta: float) -> void:
 	if not alive: return
@@ -218,6 +229,13 @@ func _physics_process(delta: float) -> void:
 			# Độc BỎ QUA khung bất tử vật lý (hurt_timer) — venom không quan tâm bạn vừa
 			# trúng đòn thường hay chưa, khác hẳn sát thương tiếp xúc thông thường.
 			take_damage(poison_dmg, global_position, 0.0, true, true)
+
+	if burn_ticks > 0:
+		burn_timer -= delta
+		if burn_timer <= 0.0:
+			burn_timer = BURN_TICK
+			burn_ticks -= 1
+			take_damage(BURN_DAMAGE, global_position, 0.0, true, true)
 
 	if stun_timer > 0.0:
 		stun_timer = maxf(0.0, stun_timer - delta)
@@ -262,6 +280,7 @@ func _apply_ranged_buffs(b) -> void:
 
 func _start_roll(dir: Vector2) -> void:
 	rolling = true
+	burn_ticks = 0 # lăn né dập lửa
 	roll_dir = dir.normalized()
 	PlayerProfiler.record_dodge(roll_dir.x) # AI Tầng 1: ghi nhận thói quen né trái/phải
 	dodge_timer.start()
