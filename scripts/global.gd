@@ -379,9 +379,13 @@ func _ready() -> void:
 	}
 
 
+## Vàng đang bị Mimic cầm (đã trừ khỏi coins, trả lại khi Mimic chết/biến mất; Save & Quit cộng vào gold lưu).
+var stolen_gold_held: int = 0
+
 func reset_run() -> void:
 	floor_num = 1
 	coins = 0
+	stolen_gold_held = 0
 	buff_picks_left = 0
 	Engine.time_scale = 1.0
 	_hitstop_active = false

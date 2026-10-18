@@ -93,7 +93,7 @@ var alive: bool:
 ## chỉ có 1 bộ khung hình dùng chung cho cả idle lẫn di chuyển (vd slug lúc nào cũng trườn).
 const ENEMY_SPRITES: Dictionary = {
 	"slime": {"prefix": "slug", "single_anim": true, "offset_y": -12.0},
-	"mimic": {"prefix": "chest_full_open", "single_anim": true, "offset_y": -8.0},
+	"mimic": {"prefix": "chest_full_open", "single_anim": true, "offset_y": -8.0, "frames": 3},
 	"archer": {"prefix": "imp", "single_anim": false, "offset_y": -10.0},
 	"brute": {"prefix": "ogre", "single_anim": false, "offset_y": 2.0},
 	# Biome 2 (Đầm Lầy) — sprite chỉ có khung "idle" (không có "run" riêng) nên single_anim=true.
@@ -213,8 +213,9 @@ func _build_enemy_frames(cfg: Dictionary) -> SpriteFrames:
 	var frames := SpriteFrames.new()
 	var prefix: String = cfg["prefix"]
 	if cfg.get("single_anim", false):
-		_add_enemy_anim(frames, prefix, "idle", "", 4, 5.0, true)
-		_add_enemy_anim(frames, prefix, "run", "", 4, 8.0, true)
+		var n: int = int(cfg.get("frames", 4)) # số khung thật có trong assets (chest_full_open chỉ có 3)
+		_add_enemy_anim(frames, prefix, "idle", "", n, 5.0, true)
+		_add_enemy_anim(frames, prefix, "run", "", n, 8.0, true)
 	else:
 		_add_enemy_anim(frames, prefix, "idle", "idle", 4, 6.0, true)
 		_add_enemy_anim(frames, prefix, "run", "run", 4, 10.0, true)
