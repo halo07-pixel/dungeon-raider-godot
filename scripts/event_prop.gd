@@ -9,7 +9,7 @@ const PICKUP = preload("res://scenes/pickup.tscn")
 
 signal action_requested(action: String, pos: Vector2)
 
-var kind: String = "altar" # altar | shrine | chest | cache | reward | gamble | big_reward
+var kind: String = "altar" # altar | shrine | chest | cache | reward | gamble | big_reward | font | frozen_chest | pact
 var variant: String = "blood" # chỉ altar: blood | gold
 var used: bool = false
 var _near: bool = false
@@ -45,13 +45,13 @@ func _ready() -> void:
 	_label.text = _prompt()
 	_label.hide()
 	add_child(_label)
-	if kind == "altar":
+	if kind == "altar" or kind == "font" or kind == "pact":
 		_tex_closed = Global.load_tex("res://assets/dungeon/altar_idle.png")
 		_tex_open = Global.load_tex("res://assets/dungeon/altar_used.png")
 	elif kind == "shrine":
 		_tex_closed = Global.load_tex("res://assets/dungeon/shrine_idle.png")
 		_tex_open = Global.load_tex("res://assets/dungeon/shrine_used.png")
-	elif kind in ["chest", "cache", "reward", "gamble", "big_reward"]:
+	elif kind in ["chest", "cache", "reward", "gamble", "big_reward", "frozen_chest"]:
 		_tex_closed = Global.load_tex("res://assets/dungeon/chest_full_open_anim_f0.png")
 		_tex_open = Global.load_tex("res://assets/dungeon/chest_full_open_anim_f2.png")
 
@@ -64,6 +64,12 @@ func _prompt() -> String:
 		"shrine": return "[E] Begin trial"
 		"cache": return "[E] Open cache"
 		"reward": return "[E] Take reward now"
+		"font": return "[E] Drink (poison, then pick an element)"
+		"pact": return "[E] Make a pact (lose %d%% HP)" % int(EventRooms.PACT_HP_FRACTION * 100.0)
+		"frozen_chest":
+			if _thaw >= EventRooms.FROZEN_THAW_TIME:
+				return "[E] Open frozen chest"
+			return "Frozen... stay close to thaw (%d%%)" % int(100.0 * _thaw / EventRooms.FROZEN_THAW_TIME)
 		"gamble": return "[E] Gamble: bonus wave"
 		"big_reward": return "[E] Claim big reward"
 		"chest": return "[E] Open  |  hold E: pry (no trap)"
@@ -71,7 +77,12 @@ func _prompt() -> String:
 
 func _process(delta: float) -> void:
 	_t += delta
-	_label.visible = _near and not used
+	if kind == "frozen_chest":
+		_tick_frozen(delta)
+		_label.text = _prompt()
+		_label.visible = _near and not used
+	else:
+		_label.visible = _near and not used
 	queue_redraw()
 	if kind == "chest":
 		_tick_chest_input(delta)
@@ -84,8 +95,27 @@ func _interact() -> void:
 		"shrine": _finish("start_challenge")
 		"cache": _use_cache()
 		"reward": _use_reward()
+		"font": _use_font()
+		"pact": _use_pact()
+		"frozen_chest": _use_frozen()
 		"gamble": _use_gamble()
 		"big_reward": _use_big_reward()
+
+## Rương Đóng Băng: ở trong vùng lạnh (bị chậm) đủ lâu thì băng tan, mới mở được.
+var _thaw: float = 0.0
+func _tick_frozen(delta: float) -> void:
+	if used or _thaw >= EventRooms.FROZEN_THAW_TIME:
+		return
+	var p = Global.player
+	if not is_instance_valid(p) or not p.alive:
+		return
+	if global_position.distance_to(p.global_position) <= EventRooms.FROZEN_COLD_RADIUS:
+		_thaw += delta
+		if p.has_method("apply_status"):
+			p.apply_status("slow", 0.3)
+		if _thaw >= EventRooms.FROZEN_THAW_TIME:
+			Global.message.emit("The ice melts!", Color(0.6, 0.9, 1.0))
+			Global.sfx("door")
 
 ## Rương bẫy: nhấn nhanh E = mở thường; giữ E đủ lâu = nạy rương (không dính bẫy).
 var _hold: float = 0.0
@@ -140,6 +170,58 @@ func _use_altar() -> void:
 	Global.sfx("altar_offer")
 	# Phần thưởng là lượt chọn 1 trong N (buff_picker hiện, game tạm dừng tới khi chọn).
 	Global.request_buff_choice_of(choices, "GOLD ALTAR: CHOOSE A BUFF" if gold else "BLOOD ALTAR: CHOOSE A BUFF")
+
+# ------------------------------------------------------------------ Sự kiện biome
+func _use_font() -> void:
+	var p = Global.player
+	if not is_instance_valid(p):
+		return
+	var choices: Array = EventRooms.roll_from_ids(EventRooms.ELEMENTAL_BUFFS, EventRooms.FONT_CHOICES)
+	if choices.is_empty():
+		Global.message.emit("The font is dry", Color(0.7, 0.7, 0.7))
+		Global.sfx("altar_deny")
+		return
+	if p.hp <= EventRooms.FONT_MIN_HP:
+		Global.message.emit("Too weak to drink", Color(1.0, 0.4, 0.4))
+		Global.sfx("altar_deny")
+		return
+	used = true
+	p.apply_status("poison", float(EventRooms.FONT_POISON_TICKS), float(EventRooms.FONT_POISON_DMG))
+	Global.burst(global_position, Color(0.4, 0.9, 0.3), 20, 220.0, 2.0)
+	Global.sfx("altar_offer")
+	Global.request_buff_choice_of(choices, "POISON FONT: CHOOSE AN ELEMENT")
+
+func _use_pact() -> void:
+	var p = Global.player
+	if not is_instance_valid(p):
+		return
+	var cost: int = maxi(1, int(ceil(float(p.max_hp) * EventRooms.PACT_HP_FRACTION)))
+	var choices: Array = Global.roll_buff_choices(EventRooms.PACT_CHOICES, "epic")
+	if choices.is_empty():
+		Global.message.emit("The pact is void", Color(0.7, 0.7, 0.7))
+		Global.sfx("altar_deny")
+		return
+	if p.hp <= cost:
+		Global.message.emit("Too weak for the pact", Color(1.0, 0.4, 0.4))
+		Global.sfx("altar_deny")
+		return
+	used = true
+	p.hp -= cost
+	Global.shake(0.7, 0.4)
+	Global.burst(global_position, Color(1.0, 0.3, 0.1), 28, 260.0, 2.0)
+	Global.sfx("altar_offer")
+	Global.request_buff_choice_of(choices, "HELLISH PACT: CHOOSE A BUFF")
+
+func _use_frozen() -> void:
+	if _thaw < EventRooms.FROZEN_THAW_TIME:
+		Global.message.emit("Still frozen — stay close", Color(0.6, 0.85, 1.0))
+		return
+	used = true
+	_pay_coins(EventRooms.FROZEN_COINS)
+	if EventRooms.FROZEN_HEAL:
+		_spawn_pickup("heal")
+	Global.message.emit("Frozen treasure!", Color(0.6, 0.9, 1.0))
+	Global.request_buff_choice_of(Global.roll_buff_choices(EventRooms.FROZEN_CHOICES, "rare"), "FROZEN CHEST: CHOOSE A BUFF")
 
 # ------------------------------------------------------------------ Rương bẫy
 func _use_chest(pried: bool = false) -> void:
@@ -209,7 +291,7 @@ func _spawn_pickup(k: String) -> void:
 # ------------------------------------------------------------------ Vẽ
 func _draw() -> void:
 	match kind:
-		"altar": _draw_altar()
+		"altar", "font", "pact": _draw_altar()
 		"shrine": _draw_shrine()
 		_: _draw_chest()
 
@@ -242,6 +324,12 @@ func _draw_altar() -> void:
 	var glow: float = 0.5 + 0.5 * sin(_t * 3.0)
 	var bowl := Vector2(0, -11)
 	var gold: bool = variant == "gold"
+	if kind == "font" or kind == "pact":
+		var c: Color = Color(0.4, 0.9, 0.3) if kind == "font" else Color(1.0, 0.3, 0.1)
+		draw_circle(bowl, 16.0 + 4.0 * glow, Color(c, 0.14 + 0.06 * glow))
+		draw_circle(bowl, 9.0 + 2.0 * glow, Color(c, 0.22 + 0.1 * glow))
+		_draw_rising_motes(bowl, c.lightened(0.3), 6, 10.0, 32.0)
+		return
 	draw_circle(bowl, 16.0 + 4.0 * glow, Color(0.9, 0.65, 0.1, 0.14 + 0.06 * glow) if gold else Color(0.8, 0.1, 0.25, 0.12 + 0.06 * glow))
 	draw_circle(bowl, 9.0 + 2.0 * glow, Color(1.0, 0.8, 0.2, 0.2 + 0.08 * glow) if gold else Color(0.9, 0.2, 0.4, 0.18 + 0.08 * glow))
 	_draw_rising_motes(bowl, Color(1.0, 0.85, 0.3) if gold else Color(1.0, 0.45, 0.6), 5, 10.0, 30.0)
@@ -265,7 +353,15 @@ func _draw_chest() -> void:
 	if tex == null:
 		return
 	var tint := Color(1, 1, 1)
-	if kind == "cache": tint = Color(0.6, 1.0, 0.7)
+	if kind == "frozen_chest":
+		var frozen: bool = _thaw < EventRooms.FROZEN_THAW_TIME
+		tint = Color(0.55, 0.8, 1.0).lerp(Color.WHITE, clampf(_thaw / EventRooms.FROZEN_THAW_TIME, 0.0, 1.0) * 0.6)
+		if frozen and not used:
+			var k: float = clampf(_thaw / EventRooms.FROZEN_THAW_TIME, 0.0, 1.0)
+			draw_arc(Vector2.ZERO, EventRooms.FROZEN_COLD_RADIUS, 0.0, TAU, 48, Color(0.6, 0.85, 1.0, 0.25 + 0.15 * sin(_t * 3.0)), 2.0)
+			draw_rect(Rect2(Vector2(-20.0, -34.0), Vector2(40.0, 5.0)), Color(0, 0, 0, 0.7))
+			draw_rect(Rect2(Vector2(-19.0, -33.0), Vector2(38.0 * k, 3.0)), Color(0.6, 0.9, 1.0))
+	elif kind == "cache": tint = Color(0.6, 1.0, 0.7)
 	elif kind == "reward": tint = Color(1.0, 0.9, 0.4)
 	elif kind == "gamble": tint = Color(1.0, 0.45, 0.4)
 	elif kind == "big_reward": tint = Color(1.0, 0.8, 0.2)

@@ -271,7 +271,7 @@ func _assign_event_rooms(floor_number: int) -> void:
 	dead_ends.shuffle()
 	others.shuffle()
 	var slots: Array = dead_ends + others
-	var picks: Array = EventRooms.pick_for_floor(floor_number, slots.size())
+	var picks: Array = EventRooms.pick_for_floor(floor_number, slots.size(), _biome_for_floor(floor_number))
 	for i in picks.size():
 		rooms[slots[i]]["type"] = picks[i]
 
@@ -466,6 +466,18 @@ func _enter_room(cell: Vector2i) -> void:
 			room["cleared"] = true
 			_spawn_prop("chest", room_center(cell), cell)
 			Global.message.emit("A lone chest...", Color(1.0, 0.85, 0.3))
+		"poison_font":
+			room["cleared"] = true
+			_spawn_prop("font", room_center(cell), cell)
+			Global.message.emit("Poison Font", Color(0.4, 0.9, 0.3))
+		"frozen_chest":
+			room["cleared"] = true
+			_spawn_prop("frozen_chest", room_center(cell), cell)
+			Global.message.emit("A frozen chest...", Color(0.6, 0.85, 1.0))
+		"pact":
+			room["cleared"] = true
+			_spawn_prop("pact", room_center(cell), cell)
+			Global.message.emit("A pact awaits...", Color(1.0, 0.35, 0.15))
 		"secret":
 			room["cleared"] = true
 			_spawn_prop("cache", room_center(cell), cell)
