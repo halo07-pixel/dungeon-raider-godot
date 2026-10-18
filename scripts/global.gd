@@ -193,14 +193,19 @@ var _hitstop_active: bool = false
 ## I/O đĩa + cấp phát lại mỗi lần gọi. Gom về 1 chỗ, load 1 lần/path rồi tái sử dụng.
 var _tex_cache: Dictionary = {}
 
-func load_tex(path: String) -> ImageTexture:
+## Ưu tiên load() (bản đã import — BẮT BUỘC để chạy được trong game đã xuất, vì file PNG gốc
+## không được đóng gói). Chỉ khi chưa có bản import (headless / chưa mở editor) mới đọc file thô.
+func load_tex(path: String) -> Texture2D:
 	if _tex_cache.has(path):
 		return _tex_cache[path]
-	var img := Image.new()
-	var tex: ImageTexture = null
-	if img.load(path) == OK:
-		tex = ImageTexture.create_from_image(img)
-	else:
+	var tex: Texture2D = null
+	if ResourceLoader.exists(path):
+		tex = load(path) as Texture2D
+	if tex == null:
+		var img := Image.new()
+		if img.load(path) == OK:
+			tex = ImageTexture.create_from_image(img)
+	if tex == null:
 		push_error("Không tải được ảnh: " + path)
 	_tex_cache[path] = tex
 	return tex
@@ -213,12 +218,18 @@ var _pixel_font: FontFile
 
 func pixel_font() -> FontFile:
 	if _pixel_font == null:
-		_pixel_font = FontFile.new()
-		var bytes := FileAccess.get_file_as_bytes(PIXEL_FONT_PATH)
-		if bytes.is_empty():
-			push_error("Không tải được pixel font: " + PIXEL_FONT_PATH)
+		var imported: FontFile = null
+		if ResourceLoader.exists(PIXEL_FONT_PATH):
+			imported = load(PIXEL_FONT_PATH) as FontFile # bản đã import — dùng được khi xuất game
+		if imported != null:
+			_pixel_font = imported
 		else:
-			_pixel_font.data = bytes
+			_pixel_font = FontFile.new()
+			var bytes := FileAccess.get_file_as_bytes(PIXEL_FONT_PATH)
+			if bytes.is_empty():
+				push_error("Không tải được pixel font: " + PIXEL_FONT_PATH)
+			else:
+				_pixel_font.data = bytes
 	return _pixel_font
 
 
