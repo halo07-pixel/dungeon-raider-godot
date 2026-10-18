@@ -633,11 +633,12 @@ func _spawn_wave(cell: Vector2i, count_override: int = -1) -> void:
 			affixed += 1
 
 
-func _spawn_enemy(kind: String, pos: Vector2, cell: Vector2i, allow_affix: bool = false) -> Node:
+func _spawn_enemy(kind: String, pos: Vector2, cell: Vector2i, allow_affix: bool = false, hp_mult: float = 1.0) -> Node:
 	var e = ENEMY.instantiate()
-	e.setup(kind, 1.0, allow_affix) # HP theo tầng do enemy.gd::setup() nhân đúng 1 lần (Global.hp_scale_for_floor)
+	e.setup(kind, hp_mult, allow_affix) # HP theo tầng do enemy.gd::setup() nhân đúng 1 lần (Global.hp_scale_for_floor)
 	e.died.connect(_on_enemy_died.bind(cell))
 	e.summon_requested.connect(_on_affix_summon.bind(cell))
+	e.split_requested.connect(_on_affix_split.bind(cell))
 	entities.add_child(e)
 	e.global_position = pos
 	alive_enemies += 1
@@ -645,6 +646,20 @@ func _spawn_enemy(kind: String, pos: Vector2, cell: Vector2i, allow_affix: bool 
 
 
 ## Affix Summoner: dựng 1 quái nhỏ theo biome cạnh quái triệu hồi; gắn meta để đếm và không rơi xu.
+## Affix Splitter: tách quái chết thành SPLIT_COUNT quái nhỏ cùng loại. Chạy TRƯỚC khi _on_enemy_died
+## trừ bộ đếm (affix nối signal died sớm hơn dungeon) nên phòng không bị tính là đã dọn sạch.
+func _on_affix_split(owner_enemy: Node, cell: Vector2i) -> void:
+	if not is_instance_valid(owner_enemy):
+		return
+	var r: Rect2 = _room_rect(cell, 3)
+	for i in AffixScript.SPLIT_COUNT:
+		var off := Vector2.from_angle(TAU * float(i) / float(AffixScript.SPLIT_COUNT) + randf() * 0.6) * 26.0
+		var p: Vector2 = owner_enemy.global_position + off
+		p = Vector2(clampf(p.x, r.position.x, r.end.x), clampf(p.y, r.position.y, r.end.y))
+		var c = _spawn_enemy(owner_enemy.kind, p, cell, false, AffixScript.SPLIT_HP_FRACTION)
+		c.set_meta("split_child", true)
+
+
 func _on_affix_summon(owner_enemy: Node, cell: Vector2i) -> void:
 	if not is_instance_valid(owner_enemy) or not owner_enemy.alive:
 		return

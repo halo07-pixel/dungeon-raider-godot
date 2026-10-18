@@ -3,9 +3,14 @@ extends Node2D
 ##   volatile — chết thì nổ (vùng báo trước 0.5s rồi gây sát thương)
 ##   summoner — định kỳ triệu hồi quái nhỏ (tối đa MAX_MINIONS con đang sống)
 ##   warden   — định kỳ cấp khiên tạm cho quái xung quanh; giết warden thì khiên tan ngay
+##   splitter — chết (do sát thương) thì tách thành 2 quái nhỏ cùng loại (máu thấp, không rơi xu, không tách tiếp)
+##   frenzy   — mỗi quái khác chết thì nhanh thêm một chút (có trần)
+##   blink    — định kỳ báo trước rồi dịch chuyển ra sau lưng người chơi
+##   leech    — mỗi lần gây sát thương cho người chơi thì hồi một phần sát thương đó
 ## Tinh Anh Q-learning (archer/shaman) KHÔNG nhận affix. Mọi hằng số cân bằng nằm ở đầu file.
 
 signal summon_requested(owner_enemy: Node)
+signal split_requested(owner_enemy: Node)
 
 const BOSS_HAZARD = preload("res://scripts/boss_hazard.gd")
 
@@ -17,6 +22,14 @@ const AFFIXES: Dictionary = {
 		"kinds": ["archer", "shaman", "brute", "masked_orc", "frost_big_zombie"]},
 	"summoner": {"label": "Summoner", "color": Color(0.75, 0.4, 1.0), "min_floor": 4,
 		"kinds": ["archer", "shaman", "brute", "masked_orc", "frost_big_zombie"]},
+	"splitter": {"label": "Splitter", "color": Color(0.5, 0.95, 0.45), "min_floor": 3,
+		"kinds": ["slime", "chort", "frost_zombie", "brute", "masked_orc"]},
+	"frenzy": {"label": "Frenzy", "color": Color(1.0, 0.25, 0.25), "min_floor": 4,
+		"kinds": ["slime", "brute", "chort", "masked_orc", "frost_zombie", "frost_big_zombie"]},
+	"leech": {"label": "Leech", "color": Color(0.85, 0.2, 0.55), "min_floor": 5,
+		"kinds": ["slime", "brute", "chort", "masked_orc", "frost_zombie", "frost_big_zombie"]},
+	"blink": {"label": "Blink", "color": Color(0.4, 0.9, 0.95), "min_floor": 6,
+		"kinds": ["slime", "brute", "chort", "masked_orc", "frost_zombie", "frost_big_zombie"]},
 }
 const CHANCE_BASE: float = 0.05   # tỉ lệ ở tầng 2
 const CHANCE_PER_FLOOR: float = 0.02
@@ -32,6 +45,16 @@ const WARD_INTERVAL: float = 7.0
 const WARD_DURATION: float = 4.0
 const WARD_RADIUS: float = 170.0
 const WARD_FRACTION: float = 0.35 # khiên = 35% máu tối đa của quái được che
+const SPLIT_COUNT: int = 2
+const SPLIT_HP_FRACTION: float = 0.35  # máu mỗi quái con so với quái gốc cùng loại/tầng
+const FRENZY_PER_KILL: float = 0.08    # +8% tốc độ cho mỗi quái khác chết
+const FRENZY_MAX: float = 0.40
+const BLINK_INTERVAL_MIN: float = 5.0
+const BLINK_INTERVAL_MAX: float = 7.0
+const BLINK_MIN_DIST: float = 120.0    # chỉ dịch chuyển khi người chơi ở xa hơn mức này
+const BLINK_TELEGRAPH: float = 0.5
+const BLINK_BEHIND_DIST: float = 60.0  # đáp xuống sau lưng người chơi bấy nhiêu px
+const LEECH_FRACTION: float = 0.30     # hồi 30% sát thương đã gây
 
 var enemy: Node2D = null
 var id: String = ""
@@ -39,6 +62,10 @@ var _timer: float = 0.0
 var _ward_left: float = 0.0
 var _warded: Array = []
 var _t: float = 0.0
+var _frenzy: float = 0.0
+var _last_alive: int = -1
+var _blink_target: Vector2 = Vector2.ZERO
+var _blink_left: float = 0.0
 
 ## Tỉ lệ có affix ở một tầng (0 ở tầng 1).
 static func chance_for_floor(floor_num: int) -> float:
@@ -73,6 +100,10 @@ func attach(p_enemy: Node2D, p_id: String) -> void:
 		enemy.died.connect(_on_volatile_died)
 	elif id == "warden":
 		enemy.died.connect(_clear_wards)
+	elif id == "splitter":
+		enemy.died.connect(_on_splitter_died)
+	elif id == "blink":
+		_timer = randf_range(BLINK_INTERVAL_MIN, BLINK_INTERVAL_MAX)
 
 func _process(delta: float) -> void:
 	_t += delta
@@ -96,6 +127,64 @@ func _process(delta: float) -> void:
 				if _ward_left <= 0.0:
 					_clear_wards(null)
 			queue_redraw()
+		"frenzy":
+			_tick_frenzy()
+			queue_redraw()
+		"blink":
+			_tick_blink(delta)
+			queue_redraw()
+
+func _tick_frenzy() -> void:
+	var n: int = 0
+	for e in get_tree().get_nodes_in_group("enemies"):
+		if is_instance_valid(e) and e.alive:
+			n += 1
+	if _last_alive >= 0 and n < _last_alive:
+		_frenzy = minf(FRENZY_MAX, _frenzy + FRENZY_PER_KILL * float(_last_alive - n))
+		enemy.speed_mult = 1.0 + _frenzy
+	_last_alive = n
+
+func _tick_blink(delta: float) -> void:
+	if _blink_left > 0.0: # đang báo trước
+		_blink_left -= delta
+		if _blink_left <= 0.0:
+			Global.burst(enemy.global_position, color_of(id), 10, 160.0, 1.5)
+			enemy.global_position = _blink_target
+			Global.burst(_blink_target, color_of(id), 10, 160.0, 1.5)
+			Global.sfx("dodge")
+		return
+	_timer -= delta
+	if _timer > 0.0:
+		return
+	_timer = randf_range(BLINK_INTERVAL_MIN, BLINK_INTERVAL_MAX)
+	var p = Global.player
+	if not is_instance_valid(p) or not p.alive:
+		return
+	if enemy.global_position.distance_to(p.global_position) < BLINK_MIN_DIST:
+		return
+	var dir: Vector2 = (p.global_position - enemy.global_position).normalized()
+	var target: Vector2 = p.global_position + dir * BLINK_BEHIND_DIST
+	# Không đáp vào tường: nếu có vật cản giữa người chơi và điểm đáp thì dừng trước vật cản.
+	var q := PhysicsRayQueryParameters2D.create(p.global_position, target, Global.L_WORLD)
+	var hit: Dictionary = enemy.get_world_2d().direct_space_state.intersect_ray(q)
+	if not hit.is_empty():
+		target = Vector2(hit["position"]) - dir * 16.0
+	_blink_target = target
+	_blink_left = BLINK_TELEGRAPH
+
+## Splitter: chỉ tách khi bị hạ bằng sát thương; bị kill() ép chết thì không (dọn phòng).
+func _on_splitter_died(_e = null) -> void:
+	if not is_instance_valid(enemy) or enemy.hurtbox.hp > 0.0:
+		return
+	split_requested.emit(enemy)
+
+## Leech: melee_hitbox_component gọi khi quái gây sát thương cho người chơi.
+func on_hit_player(damage: int) -> void:
+	if id != "leech" or not is_instance_valid(enemy) or not bool(enemy.get("alive")):
+		return
+	var heal: float = float(damage) * LEECH_FRACTION
+	enemy.hurtbox.hp = minf(enemy.hurtbox.max_hp, enemy.hurtbox.hp + heal)
+	Global.burst(enemy.global_position, color_of(id), 6, 110.0, 1.0)
 
 func _minion_count() -> int:
 	var n: int = 0
@@ -138,6 +227,14 @@ func _on_volatile_died(_e = null) -> void:
 	hz.global_position = enemy.global_position
 
 func _draw() -> void:
+	if id == "frenzy" and is_instance_valid(enemy) and _frenzy > 0.0:
+		var k: float = _frenzy / FRENZY_MAX
+		draw_arc(Vector2.ZERO, 16.0 + 3.0 * sin(_t * 10.0), 0.0, TAU, 24, Color(color_of(id), 0.25 + 0.5 * k), 2.0)
+	if id == "blink" and _blink_left > 0.0:
+		var pos: Vector2 = to_local(_blink_target)
+		var ratio: float = 1.0 - _blink_left / BLINK_TELEGRAPH
+		draw_arc(pos, 18.0, 0.0, TAU, 24, Color(color_of(id), 0.4 + 0.5 * ratio), 2.0)
+		draw_circle(pos, 18.0 * ratio, Color(color_of(id), 0.25))
 	if id == "warden" and is_instance_valid(enemy) and bool(enemy.get("alive")):
 		var pulse: float = 0.5 + 0.5 * sin(_t * 3.0)
 		var c: Color = color_of(id)
