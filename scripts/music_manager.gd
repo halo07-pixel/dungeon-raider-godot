@@ -40,6 +40,7 @@ const LOOPS: Dictionary = {
 	"explore_stone": "explore_stone.ogg",
 	"explore_swamp": "explore_swamp.ogg",
 	"explore_ice": "explore_ice.ogg",
+	"explore_hell": "explore_hell.ogg",
 	"boss_warden": "boss_warden.ogg",
 	"boss_necromancer": "boss_necromancer.ogg",
 	"boss_frost": "boss_frost.ogg",
@@ -131,7 +132,7 @@ func set_music_volume(v: float, p_save: bool = true) -> void:
 
 
 # ---------------------------------------------------------------- Chọn bài theo ngữ cảnh
-## Biome theo tầng — khớp Dungeon._biome_for_floor: 1-3 đá · 4-6 đầm lầy · 7-9 băng · 10 = tầng Lord · 11+ băng.
+## Biome theo tầng — khớp Dungeon._biome_for_floor: 1-3 đá · 4-6 đầm lầy · 7-9 băng · 10 = tầng Lord (nhạc lord_intro) · 11+ địa ngục (Vô Hạn).
 func explore_key_for_floor(floor_num: int) -> String:
 	if floor_num == LORD_FLOOR:
 		return "lord_intro"
@@ -139,7 +140,9 @@ func explore_key_for_floor(floor_num: int) -> String:
 		return "explore_stone"
 	if floor_num <= 6:
 		return "explore_swamp"
-	return "explore_ice"
+	if floor_num <= 9:
+		return "explore_ice"
+	return "explore_hell"
 
 
 func boss_key_for_kind(kind: String) -> String:
