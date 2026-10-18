@@ -691,7 +691,7 @@ func _atk_fissure() -> void:
 	if phase >= 3:
 		angs.append(base_ang + deg_to_rad(FISSURE_SPREAD_DEG))
 		angs.append(base_ang - deg_to_rad(FISSURE_SPREAD_DEG))
-	Global.sfx("door")
+	Global.sfx("fissure_warn")
 	var tele: float = FISSURE_TELEGRAPH * _speed_mult()
 	for a in angs:
 		for i in FISSURE_COUNT:
@@ -706,6 +706,8 @@ func _atk_fissure() -> void:
 			hz.telegraph_time = tele + FISSURE_STAGGER * float(i)
 			hz.color = Color(0.8, 0.55, 0.3, 0.55)
 			hz.burst_on_fire = true
+			if a == angs[0] and i % 3 == 0:
+				hz.fire_sfx = "fissure_burst" # thưa tiếng: vài điểm trên vệt chính
 			Global.world.add_child(hz)
 			hz.global_position = pos
 	await get_tree().create_timer(tele + FISSURE_STAGGER * float(FISSURE_COUNT) + 0.2).timeout
@@ -729,7 +731,7 @@ func _atk_bog_spread() -> void:
 	var tp: Vector2 = global_position
 	if is_instance_valid(p):
 		tp = p.hurt_center() if p.has_method("hurt_center") else p.global_position
-	Global.sfx("door")
+	Global.sfx("bog_warn")
 	var spots: Array = [tp + Vector2.from_angle(randf() * TAU) * randf_range(20.0, 60.0)]
 	var n: int = BOG_POOLS_PHASE3 if phase >= 3 else BOG_POOLS
 	for i in n - 1:
@@ -751,6 +753,7 @@ func _atk_bog_spread() -> void:
 		hz.color = Color(0.4, 0.75, 0.25, 0.45)
 		hz.apply_poison_ticks = BOG_POISON_TICKS
 		hz.poison_amount = BOG_POISON_AMOUNT
+		hz.fire_sfx = "bog_burst"
 		Global.world.add_child(hz)
 		hz.global_position = q
 	await get_tree().create_timer(BOG_TELEGRAPH * _speed_mult() + 0.1).timeout
@@ -773,7 +776,7 @@ func _atk_ice_sheet() -> void:
 	if arena_rect.size != Vector2.ZERO:
 		var safe_rect: Rect2 = arena_rect.grow(-60.0)
 		center = center.clamp(safe_rect.position, safe_rect.end)
-	Global.sfx("door")
+	Global.sfx("ice_sheet_warn")
 	var hz := Area2D.new()
 	hz.set_script(BOSS_HAZARD)
 	hz.damage = 0 # chỉ trượt; sát thương đến từ cú húc nối tiếp
@@ -783,6 +786,7 @@ func _atk_ice_sheet() -> void:
 	hz.telegraph_time = ICE_SHEET_TELEGRAPH * _speed_mult()
 	hz.color = Color(0.6, 0.9, 1.0, 0.35)
 	hz.apply_slide_duration = ICE_SHEET_SLIDE
+	hz.fire_sfx = "ice_sheet_freeze"
 	Global.world.add_child(hz)
 	hz.global_position = center
 	var chance: float = ICE_SHEET_COMBO_CHANCE_P3 if phase >= 3 else ICE_SHEET_COMBO_CHANCE

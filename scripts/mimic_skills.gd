@@ -53,7 +53,7 @@ func _check_rage() -> void:
 	if _e.max_hp > 0.0 and _e.hp <= _e.max_hp * RAGE_HP_FRACTION:
 		enraged = true
 		_e.modulate = RAGE_TINT
-		Global.sfx("mimic_reveal")
+		Global.sfx("mimic_rage")
 		Global.burst(_e.global_position, Color(1.0, 0.3, 0.2), 14, 200.0, 1.5)
 
 ## Trả về [hướng_di_chuyển, hệ_số_tốc_độ]; enemy.gd dùng thay cho hướng thường.
@@ -72,6 +72,7 @@ func drive(delta: float, move: Vector2) -> Array:
 				var dist: float = _e.global_position.distance_to(p.global_position)
 				if _lunge_cd <= 0.0 and dist <= LUNGE_RANGE:
 					_begin("windup")
+					Global.sfx("mimic_windup")
 					_lunge_dir = (p.global_position - _e.global_position).normalized()
 				elif _spit_cd <= 0.0 and dist >= SPIT_MIN_RANGE:
 					_spit(p)
@@ -82,7 +83,7 @@ func drive(delta: float, move: Vector2) -> Array:
 			_e.modulate = Color(2.0, 0.5, 0.5) if int(_state_t * 14.0) % 2 == 0 else (RAGE_TINT if enraged else Color.WHITE)
 			if _state_t <= 0.0:
 				_begin("lunge")
-				Global.sfx("boss_charge")
+				Global.sfx("mimic_lunge")
 			return [Vector2.ZERO, 0.0]
 		"lunge":
 			_state_t -= delta
@@ -91,6 +92,7 @@ func drive(delta: float, move: Vector2) -> Array:
 				var dodged: bool = p.has_method("is_invulnerable") and p.is_invulnerable()
 				p.take_damage(LUNGE_DAMAGE, _e.global_position, LUNGE_KNOCK)
 				if not dodged:
+					Global.sfx("mimic_bite")
 					steal_from(p)
 			if _state_t <= 0.0:
 				_e.modulate = RAGE_TINT if enraged else Color.WHITE
@@ -120,11 +122,11 @@ func steal_from(p) -> void:
 	Global.coins -= amount
 	stolen += amount
 	Global.message.emit("Mimic stole %d gold! Kill it to get it back" % amount, Color(1.0, 0.8, 0.2))
-	Global.sfx("coin")
+	Global.sfx("mimic_steal")
 
 func _spit(p) -> void:
 	_spit_cd = SPIT_COOLDOWN * _rage_mult()
-	Global.sfx("door")
+	Global.sfx("mimic_spit")
 	for i in SPIT_COUNT:
 		var hz := Area2D.new()
 		hz.set_script(BOSS_HAZARD)
@@ -133,6 +135,7 @@ func _spit(p) -> void:
 		hz.single_shot = true
 		hz.radius = SPIT_RADIUS
 		hz.telegraph_time = SPIT_FUSE * _rage_mult()
+		hz.fire_sfx = "spit_pop" if i == 0 else "" # một tiếng nổ cho cả loạt
 		hz.color = Color(1.0, 0.8, 0.2, 0.5)
 		Global.world.add_child(hz)
 		hz.global_position = p.global_position + Vector2.from_angle(randf() * TAU) * randf_range(0.0, SPIT_SPREAD)

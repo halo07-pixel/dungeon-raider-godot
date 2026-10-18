@@ -20,6 +20,7 @@ var apply_stun_duration: float = 0.0 # >0: ngoài sát thương còn gây Choán
 var apply_poison_ticks: int = 0 # >0: gây Độc (DoT) khi đứng trong vùng (đòn "Đầm Độc Lan")
 var poison_amount: float = 0.0 # sát thương mỗi nhịp độc
 var apply_slide_duration: float = 0.0 # >0: làm Player trượt mất kiểm soát hướng đi bấy nhiêu giây (đòn "Mặt Băng")
+var fire_sfx: String = "" # tên âm phát một lần khi vùng kích hoạt (hết báo trước)
 var burst_on_fire: bool = false # true: đòn 1 lần có tia lửa/đá văng khi nổ (Nứt Đất)
 var end_radius: float = 0.0 # >radius: vùng LAN RỘNG dần từ radius tới end_radius suốt thời gian tồn tại
 
@@ -69,6 +70,8 @@ func _process(delta: float) -> void:
 		if _t >= telegraph_time:
 			_armed = true
 			_t = 0.0
+			if fire_sfx != "":
+				Global.sfx(fire_sfx)
 			if single_shot and burst_on_fire:
 				Global.burst(global_position, Color(color.r, color.g, color.b, 1.0), 10, 180.0, 1.6)
 			if single_shot and player_inside:

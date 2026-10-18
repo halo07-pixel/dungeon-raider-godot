@@ -320,6 +320,62 @@ func _ready() -> void:
 			{"freq": 0.0, "vol": 0.30, "dur": 0.50, "wave": "noise", "lp": 0.45, "swell": 0.3, "decay": 1.2},
 			{"freq": 90.0, "slide": 40.0, "vol": 0.18, "dur": 0.45, "wave": "saw", "swell": 0.3, "decay": 1.2},
 			{"freq": 0.0, "vol": 0.14, "dur": 0.25, "wave": "noise", "lp": 0.95, "delay": 0.20, "decay": 1.8}]),
+		# Boss Biome Đá/Đầm Lầy/Băng (Nứt Đất, Đầm Độc Lan, Mặt Băng), Mimic và vàng
+		"fissure_warn": _mix(0.80, [
+			{"freq": 48.0, "slide": 40.0, "vol": 0.38, "dur": 0.75, "wave": "sine", "swell": 0.9, "decay": 0.3},
+			{"freq": 0.0, "vol": 0.24, "dur": 0.75, "wave": "noise", "lp": 0.07, "swell": 0.9, "decay": 0.3}]),
+		"fissure_burst": _mix(0.40, [
+			{"freq": 0.0, "vol": 0.34, "dur": 0.32, "wave": "noise", "lp": 0.45, "decay": 2.0},
+			{"freq": 130.0, "slide": -80.0, "vol": 0.30, "dur": 0.25, "wave": "sine", "decay": 1.4},
+			{"freq": 0.0, "vol": 0.20, "dur": 0.08, "wave": "noise", "lp": 0.95, "delay": 0.01}]),
+		"bog_warn": _mix(0.85, [
+			{"freq": 0.0, "vol": 0.22, "dur": 0.80, "wave": "noise", "lp": 0.09, "swell": 0.9, "decay": 0.3},
+			{"freq": 110.0, "slide": 160.0, "vol": 0.16, "dur": 0.07, "wave": "sine", "delay": 0.10},
+			{"freq": 140.0, "slide": 180.0, "vol": 0.16, "dur": 0.07, "wave": "sine", "delay": 0.32},
+			{"freq": 170.0, "slide": 200.0, "vol": 0.16, "dur": 0.07, "wave": "sine", "delay": 0.50},
+			{"freq": 200.0, "slide": 240.0, "vol": 0.18, "dur": 0.08, "wave": "sine", "delay": 0.66}]),
+		"bog_burst": _mix(0.50, [
+			{"freq": 0.0, "vol": 0.30, "dur": 0.40, "wave": "noise", "lp": 0.55, "decay": 1.7},
+			{"freq": 210.0, "slide": -120.0, "vol": 0.22, "dur": 0.25, "wave": "sine", "decay": 1.2}]),
+		"ice_sheet_warn": _mix(0.90, [
+			{"freq": 900.0, "slide": 900.0, "vol": 0.14, "dur": 0.85, "wave": "sine", "swell": 0.9, "decay": 0.3},
+			{"freq": 1350.0, "slide": 1350.0, "vol": 0.10, "dur": 0.80, "wave": "sine", "swell": 0.9, "decay": 0.3},
+			{"freq": 0.0, "vol": 0.12, "dur": 0.80, "wave": "noise", "lp": 0.95, "swell": 0.9, "decay": 0.3}]),
+		"ice_sheet_freeze": _mix(0.70, [
+			{"freq": 0.0, "vol": 0.30, "dur": 0.20, "wave": "noise", "lp": 0.95, "decay": 2.4},
+			{"freq": 1800.0, "slide": -1400.0, "vol": 0.18, "dur": 0.30, "wave": "sine", "decay": 1.3},
+			{"freq": 70.0, "slide": -20.0, "vol": 0.34, "dur": 0.40, "wave": "sine", "decay": 1.3}]),
+		"mimic_windup": _mix(0.65, [
+			{"freq": 90.0, "slide": 120.0, "vol": 0.26, "dur": 0.60, "wave": "saw", "swell": 0.85, "decay": 0.4},
+			{"freq": 0.0, "vol": 0.18, "dur": 0.60, "wave": "noise", "lp": 0.3, "swell": 0.85, "decay": 0.4}]),
+		"mimic_lunge": _mix(0.38, [
+			{"freq": 0.0, "vol": 0.30, "dur": 0.34, "wave": "noise", "lp": 0.5, "swell": 0.2, "decay": 1.2},
+			{"freq": 240.0, "slide": -140.0, "vol": 0.20, "dur": 0.30, "wave": "saw", "decay": 1.2}]),
+		"mimic_bite": _mix(0.28, [
+			{"freq": 0.0, "vol": 0.30, "dur": 0.05, "wave": "noise", "lp": 0.9},
+			{"freq": 190.0, "slide": -120.0, "vol": 0.28, "dur": 0.09, "wave": "square", "decay": 1.2},
+			{"freq": 0.0, "vol": 0.30, "dur": 0.05, "wave": "noise", "lp": 0.9, "delay": 0.12},
+			{"freq": 160.0, "slide": -100.0, "vol": 0.26, "dur": 0.10, "wave": "square", "delay": 0.12, "decay": 1.2}]),
+		"coin": _mix(0.28, [
+			{"freq": 1568.0, "vol": 0.18, "dur": 0.08, "wave": "sine", "decay": 0.8},
+			{"freq": 2093.0, "vol": 0.18, "dur": 0.20, "wave": "sine", "delay": 0.06, "decay": 1.5}]),
+		"mimic_steal": _mix(0.55, [
+			{"freq": 0.0, "vol": 0.28, "dur": 0.05, "wave": "noise", "lp": 0.9},
+			{"freq": 170.0, "slide": -100.0, "vol": 0.26, "dur": 0.10, "wave": "square", "decay": 1.2},
+			{"freq": 1568.0, "vol": 0.16, "dur": 0.08, "wave": "sine", "delay": 0.14},
+			{"freq": 2093.0, "vol": 0.16, "dur": 0.10, "wave": "sine", "delay": 0.20},
+			{"freq": 1397.0, "vol": 0.14, "dur": 0.22, "wave": "sine", "delay": 0.27, "decay": 1.6}]),
+		"mimic_spit": _mix(0.30, [
+			{"freq": 0.0, "vol": 0.26, "dur": 0.22, "wave": "noise", "lp": 0.5, "decay": 1.3},
+			{"freq": 620.0, "slide": -380.0, "vol": 0.20, "dur": 0.16, "wave": "sine"}]),
+		"spit_pop": _mix(0.32, [
+			{"freq": 0.0, "vol": 0.26, "dur": 0.20, "wave": "noise", "lp": 0.8, "decay": 2.4},
+			{"freq": 300.0, "slide": -220.0, "vol": 0.26, "dur": 0.18, "wave": "sine", "decay": 1.4},
+			{"freq": 1850.0, "vol": 0.12, "dur": 0.12, "wave": "sine", "delay": 0.03, "decay": 1.6}]),
+		"mimic_rage": _mix(0.85, [
+			{"freq": 140.0, "slide": -70.0, "vol": 0.30, "dur": 0.70, "wave": "saw", "decay": 1.0},
+			{"freq": 0.0, "vol": 0.24, "dur": 0.60, "wave": "noise", "lp": 0.25, "decay": 1.2},
+			{"freq": 66.0, "vol": 0.30, "dur": 0.50, "wave": "sine", "decay": 1.2}]),
 	}
 
 
