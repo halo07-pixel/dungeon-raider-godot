@@ -220,7 +220,7 @@ func _build_saved_run() -> Dictionary:
 		"max_hp": player.max_hp,
 		"shield": player.shield,
 		"run_buffs": Global.run_buffs.duplicate(),
-		"gold": Global.coins, # xu đang cầm (trước đây không lưu nên Continue mất sạch xu)
+		"gold": Global.coins + Global.stolen_gold_held, # xu đang cầm (trước đây không lưu nên Continue mất sạch xu)
 		"stats": Global.run_stats.duplicate() if Global.get("run_stats") else {}
 	}
 

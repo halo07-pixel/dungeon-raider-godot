@@ -121,6 +121,7 @@ func steal_from(p) -> void:
 	var amount: int = maxi(1, int(float(Global.coins) * STEAL_FRACTION))
 	Global.coins -= amount
 	stolen += amount
+	Global.stolen_gold_held += amount
 	Global.message.emit("Mimic stole %d gold! Kill it to get it back" % amount, Color(1.0, 0.8, 0.2))
 	Global.sfx("mimic_steal")
 
@@ -142,6 +143,17 @@ func _spit(p) -> void:
 
 func _on_died(_enemy) -> void:
 	if stolen > 0:
-		Global.coins += stolen
-		Global.message.emit("Recovered %d gold" % stolen, Color(1.0, 0.85, 0.3))
-		stolen = 0
+		var back: int = _return_gold()
+		Global.message.emit("Recovered %d gold" % back, Color(1.0, 0.85, 0.3))
+
+## Trả vàng đã cướp về cho người chơi (chết, hoặc bị dọn đi cùng tầng/cảnh khi còn sống).
+func _return_gold() -> int:
+	var back: int = stolen
+	Global.coins += back
+	Global.stolen_gold_held = maxi(0, Global.stolen_gold_held - back)
+	stolen = 0
+	return back
+
+func _exit_tree() -> void:
+	if stolen > 0:
+		_return_gold() # tầng mới / thoát về menu khi Mimic còn sống: không để mất vàng
