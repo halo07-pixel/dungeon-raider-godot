@@ -13,7 +13,8 @@ Toàn bộ nhạc dưới đây thuộc **CC0 1.0 Universal (public domain)**. K
 | Main Menu | `menu.ogg` | Night in the Castle | 0.5 - 187.0 |
 | Biome 1 (đá, tầng 1-3) | `explore_stone.ogg` | Ancient Rite | 0 - 110.0 |
 | Biome 2 (đầm lầy, tầng 4-6) | `explore_swamp.ogg` | Murder On The Bayou | 0 - 119.5 |
-| Biome 3 (băng, tầng 7-9 và 11+) | `explore_ice.ogg` | Icicles Melting | 1.0 - 176.5 |
+| Biome 3 (băng, tầng 7-9) | `explore_ice.ogg` | Icicles Melting | 1.0 - 176.5 |
+| Biome Địa Ngục (tầng 11+, Vô Hạn) | `explore_hell.ogg` | The Land of the Dead | 0 - 107.4 (nối đầu-cuối bằng crossfade 3s) |
 | Boss Dungeon Warden | `boss_warden.ogg` | Black Knight | 66.2 - 114.8 |
 | Boss Dark Necromancer | `boss_necromancer.ogg` | Evil Incoming | 0 - 168.5 |
 | Boss Frozen Horror | `boss_frost.ogg` | Jokull | 101.0 - 242.5 |

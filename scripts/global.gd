@@ -279,6 +279,36 @@ func _ready() -> void:
 			{"freq": 320.0, "slide": -260.0, "vol": 0.30, "dur": 0.45, "wave": "saw", "decay": 1.2},
 			{"freq": 0.0, "vol": 0.26, "dur": 0.30, "wave": "noise", "lp": 0.4},
 			{"freq": 60.0, "vol": 0.28, "dur": 0.30, "wave": "sine", "delay": 0.20}]),
+		# Biome Địa Ngục: Lava Tile, trạng thái Burn, Magma Eruption, Flame Trail
+		"lava_burn": _mix(0.40, [
+			{"freq": 0.0, "vol": 0.30, "dur": 0.34, "wave": "noise", "lp": 0.75, "decay": 1.7},
+			{"freq": 140.0, "slide": -70.0, "vol": 0.20, "dur": 0.20, "wave": "saw", "decay": 1.3},
+			{"freq": 0.0, "vol": 0.16, "dur": 0.20, "wave": "noise", "lp": 0.95, "delay": 0.12, "decay": 2.0}]),
+		"burn_tick": _mix(0.14, [
+			{"freq": 0.0, "vol": 0.22, "dur": 0.05, "wave": "noise", "lp": 0.95, "decay": 1.5},
+			{"freq": 0.0, "vol": 0.16, "dur": 0.05, "wave": "noise", "lp": 0.8, "delay": 0.06, "decay": 1.5}]),
+		"burn_douse": _mix(0.40, [
+			{"freq": 0.0, "vol": 0.28, "dur": 0.34, "wave": "noise", "lp": 0.6, "decay": 0.9},
+			{"freq": 520.0, "slide": -320.0, "vol": 0.16, "dur": 0.14, "wave": "sine"}]),
+		"magma_warn": _mix(0.85, [
+			{"freq": 55.0, "slide": 60.0, "vol": 0.38, "dur": 0.80, "wave": "saw", "swell": 0.9, "decay": 0.3},
+			{"freq": 0.0, "vol": 0.26, "dur": 0.80, "wave": "noise", "lp": 0.10, "swell": 0.9, "decay": 0.3},
+			{"freq": 240.0, "slide": 360.0, "vol": 0.10, "dur": 0.70, "wave": "sine", "swell": 0.9, "decay": 0.3}]),
+		"magma_eruption": _mix(1.0, [
+			{"freq": 85.0, "slide": -50.0, "vol": 0.46, "dur": 0.60, "wave": "sine", "decay": 1.3},
+			{"freq": 0.0, "vol": 0.40, "dur": 0.70, "wave": "noise", "lp": 0.14, "decay": 1.6},
+			{"freq": 320.0, "slide": -260.0, "vol": 0.20, "dur": 0.35, "wave": "saw", "decay": 1.4},
+			{"freq": 0.0, "vol": 0.22, "dur": 0.55, "wave": "noise", "lp": 0.85, "delay": 0.08, "decay": 2.2},
+			{"freq": 0.0, "vol": 0.14, "dur": 0.40, "wave": "noise", "lp": 0.9, "delay": 0.45, "decay": 1.8}]),
+		"magma_pool": _mix(0.55, [
+			{"freq": 0.0, "vol": 0.14, "dur": 0.50, "wave": "noise", "lp": 0.08, "decay": 0.6},
+			{"freq": 130.0, "slide": 180.0, "vol": 0.16, "dur": 0.07, "wave": "sine", "delay": 0.04},
+			{"freq": 100.0, "slide": 200.0, "vol": 0.14, "dur": 0.08, "wave": "sine", "delay": 0.21},
+			{"freq": 150.0, "slide": 160.0, "vol": 0.12, "dur": 0.06, "wave": "sine", "delay": 0.36}]),
+		"flame_trail": _mix(0.55, [
+			{"freq": 0.0, "vol": 0.30, "dur": 0.50, "wave": "noise", "lp": 0.45, "swell": 0.3, "decay": 1.2},
+			{"freq": 90.0, "slide": 40.0, "vol": 0.18, "dur": 0.45, "wave": "saw", "swell": 0.3, "decay": 1.2},
+			{"freq": 0.0, "vol": 0.14, "dur": 0.25, "wave": "noise", "lp": 0.95, "delay": 0.20, "decay": 1.8}]),
 	}
 
 
@@ -584,7 +614,8 @@ func _tone(freq: float, dur: float, vol: float, slide: float = 0.0, noise: bool 
 
 ## Trộn nhiều lớp âm thành một AudioStreamWAV. Mỗi lớp: freq, slide (Hz trượt hết lớp), vol, dur (s),
 ## wave ("sine"|"square"|"saw"|"noise"), delay (s, mặc định 0), decay (số mũ tắt dần, mặc định 1),
-## lp (0..1, bộ lọc thông thấp cho noise; càng nhỏ càng trầm). total = độ dài tổng của clip.
+## lp (0..1, bộ lọc thông thấp cho noise; càng nhỏ càng trầm), swell (0..1, phần đầu lớp tăng dần từ 0 lên đủ to,
+## dùng cho tiếng dâng lên). total = độ dài tổng của clip.
 func _mix(total: float, layers: Array) -> AudioStreamWAV:
 	var rate: int = 22050
 	var n: int = int(float(rate) * total)
@@ -601,6 +632,7 @@ func _mix(total: float, layers: Array) -> AudioStreamWAV:
 		var vol: float = float(L["vol"])
 		var decay: float = float(L.get("decay", 1.0))
 		var lp: float = float(L.get("lp", 1.0))
+		var swell: float = float(L.get("swell", 0.0))
 		var phase: float = 0.0
 		var lp_state: float = 0.0
 		for i in len_s:
@@ -615,6 +647,8 @@ func _mix(total: float, layers: Array) -> AudioStreamWAV:
 					lp_state += lp * (randf_range(-1.0, 1.0) - lp_state)
 					v = lp_state * (1.0 + (1.0 - lp) * 1.5)
 			var env: float = pow(1.0 - k, decay) * minf(1.0, float(i) / 66.0) # attack ~3 ms chống lách tách
+			if swell > 0.0:
+				env = minf(1.0, k / swell) * pow(1.0 - k, decay)
 			buf[start + i] += v * env * vol
 	var data := PackedByteArray()
 	data.resize(n * 2)
