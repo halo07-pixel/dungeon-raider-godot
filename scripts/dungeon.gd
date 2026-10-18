@@ -134,11 +134,13 @@ func _make_tileset(biome: String = "stone") -> TileSet:
 	var n: int = tile_files.size()
 	var img := Image.create_empty(t * n, t, false, Image.FORMAT_RGBA8)
 	for i in n:
-		var src_img := Image.new()
-		var err := src_img.load("res://assets/dungeon/" + tile_files[i])
-		if err != OK:
+		var src_tex: Texture2D = Global.load_tex("res://assets/dungeon/" + tile_files[i])
+		if src_tex == null:
 			push_error("Không tải được asset tile: " + tile_files[i])
 			continue
+		var src_img: Image = src_tex.get_image()
+		if src_img.is_compressed():
+			src_img.decompress()
 		src_img.convert(Image.FORMAT_RGBA8)
 		src_img.resize(t, t, Image.INTERPOLATE_NEAREST)
 		img.blit_rect(src_img, Rect2i(Vector2i.ZERO, Vector2i(t, t)), Vector2i(i * t, 0))
