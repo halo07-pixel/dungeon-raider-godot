@@ -10,6 +10,7 @@ const PICKUP = preload("res://scenes/pickup.tscn")
 signal action_requested(action: String, pos: Vector2)
 
 var kind: String = "altar" # altar | shrine | chest | cache | reward
+var variant: String = "blood" # chỉ altar: blood | gold
 var used: bool = false
 var _near: bool = false
 var _t: float = 0.0
@@ -56,7 +57,10 @@ func _ready() -> void:
 
 func _prompt() -> String:
 	match kind:
-		"altar": return "[E] Offer blood"
+		"altar":
+			if variant == "gold":
+				return "[E] Offer %d gold" % EventRooms.altar_gold_cost(Global.floor_num)
+			return "[E] Offer blood"
 		"shrine": return "[E] Begin trial"
 		"chest": return "[E] Open chest"
 		"cache": return "[E] Open cache"
@@ -88,22 +92,32 @@ func _use_altar() -> void:
 	var p = Global.player
 	if not is_instance_valid(p):
 		return
-	var cost: int = maxi(1, int(ceil(float(p.max_hp) * EventRooms.ALTAR_HP_FRACTION)))
-	if p.hp <= cost:
-		Global.message.emit("Too weak to offer blood", Color(1.0, 0.4, 0.4))
-		Global.sfx("altar_deny")
-		return
-	var id: String = EventRooms.roll_epic_buff()
-	if id == "":
+	var gold: bool = variant == "gold"
+	var choices: Array = Global.roll_buff_choices(EventRooms.ALTAR_CHOICES, "rare" if gold else "epic")
+	if choices.is_empty():
 		Global.message.emit("The altar is silent", Color(0.7, 0.7, 0.7))
 		Global.sfx("altar_deny")
 		return
+	if gold:
+		var price: int = EventRooms.altar_gold_cost(Global.floor_num)
+		if Global.coins < price:
+			Global.message.emit("Not enough gold (%d)" % price, Color(1.0, 0.4, 0.4))
+			Global.sfx("altar_deny")
+			return
+		Global.coins -= price
+	else:
+		var cost: int = maxi(1, int(ceil(float(p.max_hp) * EventRooms.ALTAR_HP_FRACTION)))
+		if p.hp <= cost:
+			Global.message.emit("Too weak to offer blood", Color(1.0, 0.4, 0.4))
+			Global.sfx("altar_deny")
+			return
+		p.hp -= cost
 	used = true
-	p.hp -= cost
-	Global.apply_buff(id)
 	Global.shake(0.5, 0.3)
-	Global.burst(global_position, Color(0.8, 0.2, 0.9), 24, 240.0, 2.0)
+	Global.burst(global_position, Color(1.0, 0.8, 0.2) if gold else Color(0.8, 0.2, 0.9), 24, 240.0, 2.0)
 	Global.sfx("altar_offer")
+	# Phần thưởng là lượt chọn 1 trong N (buff_picker hiện, game tạm dừng tới khi chọn).
+	Global.request_buff_choice_of(choices, "GOLD ALTAR: CHOOSE A BUFF" if gold else "BLOOD ALTAR: CHOOSE A BUFF")
 
 # ------------------------------------------------------------------ Rương bẫy
 func _use_chest() -> void:
@@ -131,12 +145,13 @@ func _use_cache() -> void:
 	used = true
 	_pay_coins(EventRooms.SECRET_COINS)
 	_spawn_pickup("heal")
+	var gems: int = EventRooms.SECRET_GEM_GUARANTEED
 	if randf() < EventRooms.SECRET_GEM_CHANCE:
-		Global.purple_gems += 1
-		Global.save_game()
-		Global.message.emit("+1 Purple Gem", Color(0.8, 0.3, 0.9))
-	else:
-		Global.message.emit("Secret found!", Color(0.4, 0.9, 0.5))
+		gems += 1
+	Global.purple_gems += gems
+	Global.record_secret_found() # lưu luôn cả số gem
+	Global.message.emit("Secret found! +%d Purple Gem" % gems, Color(0.8, 0.3, 0.9))
+	Global.request_buff_choice_of(Global.roll_buff_choices(EventRooms.SECRET_BUFF_CHOICES, "rare"), "SECRET CACHE: CHOOSE A BUFF")
 
 func _use_reward() -> void:
 	used = true
@@ -189,9 +204,10 @@ func _draw_altar() -> void:
 		return
 	var glow: float = 0.5 + 0.5 * sin(_t * 3.0)
 	var bowl := Vector2(0, -11)
-	draw_circle(bowl, 16.0 + 4.0 * glow, Color(0.8, 0.1, 0.25, 0.12 + 0.06 * glow))
-	draw_circle(bowl, 9.0 + 2.0 * glow, Color(0.9, 0.2, 0.4, 0.18 + 0.08 * glow))
-	_draw_rising_motes(bowl, Color(1.0, 0.45, 0.6), 5, 10.0, 30.0)
+	var gold: bool = variant == "gold"
+	draw_circle(bowl, 16.0 + 4.0 * glow, Color(0.9, 0.65, 0.1, 0.14 + 0.06 * glow) if gold else Color(0.8, 0.1, 0.25, 0.12 + 0.06 * glow))
+	draw_circle(bowl, 9.0 + 2.0 * glow, Color(1.0, 0.8, 0.2, 0.2 + 0.08 * glow) if gold else Color(0.9, 0.2, 0.4, 0.18 + 0.08 * glow))
+	_draw_rising_motes(bowl, Color(1.0, 0.85, 0.3) if gold else Color(1.0, 0.45, 0.6), 5, 10.0, 30.0)
 
 func _draw_shrine() -> void:
 	_draw_prop_sprite()

@@ -11,8 +11,12 @@ const TYPES: Dictionary = {
 }
 const COUNT_WEIGHTS: Array = [0.25, 0.5, 0.25] # xác suất có 0 / 1 / 2 phòng sự kiện trong tầng
 
-# --- Altar
-const ALTAR_HP_FRACTION: float = 0.25   # hiến 25% máu tối đa
+# --- Altar: mỗi bàn thờ là Máu (buff Epic) hoặc Vàng (buff Hiếm); luôn chọn 1 trong N.
+const ALTAR_HP_FRACTION: float = 0.25   # Altar Máu: hiến 25% máu tối đa
+const ALTAR_GOLD_CHANCE: float = 0.5    # xác suất một bàn thờ là Altar Vàng
+const ALTAR_GOLD_BASE: int = 40         # giá Altar Vàng = base + per_floor * tầng
+const ALTAR_GOLD_PER_FLOOR: int = 10
+const ALTAR_CHOICES: int = 2
 # --- Challenge
 const CHALLENGE_WAVES: int = 3
 const CHALLENGE_WAVE_SCALE: float = 0.7  # số quái mỗi đợt so với phòng thường
@@ -26,7 +30,9 @@ const TRAP_HP_FRACTION: float = 0.15
 const MIMIC_GEM_REWARD: int = 1
 # --- Secret
 const SECRET_COINS: int = 25
-const SECRET_GEM_CHANCE: float = 0.3
+const SECRET_GEM_GUARANTEED: int = 1
+const SECRET_GEM_CHANCE: float = 0.3     # cơ hội thêm 1 viên nữa
+const SECRET_BUFF_CHOICES: int = 3       # chọn 1 trong N buff Hiếm
 const SECRET_REVEAL_DIST: float = 140.0  # lộ trên minimap khi đứng gần cửa từ phòng kề
 
 static func is_event(room_type: String) -> bool:
@@ -63,6 +69,9 @@ static func pick_for_floor(floor_num: int, max_slots: int) -> Array:
 		out.append(picked)
 		pool.erase(picked)
 	return out
+
+static func altar_gold_cost(floor_num: int) -> int:
+	return ALTAR_GOLD_BASE + ALTAR_GOLD_PER_FLOOR * floor_num
 
 ## Buff Epic ngẫu nhiên hợp với vũ khí đang cầm, chưa đạt trần stack ("" nếu hết).
 static func roll_epic_buff() -> String:

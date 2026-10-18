@@ -21,14 +21,14 @@ static func new_class_entry() -> Dictionary:
 	return {"runs": 0, "best_floor": 0, "kills": 0, "bosses": {}, "tier": 0}
 
 static func new_profile() -> Dictionary:
-	return {"runs": 0, "wins": 0, "best_floor": 0, "kills": 0, "bosses": {}, "classes": {}}
+	return {"runs": 0, "wins": 0, "best_floor": 0, "kills": 0, "secrets": 0, "bosses": {}, "classes": {}}
 
 ## Gộp dữ liệu đã lưu vào cấu trúc mặc định (save cũ thiếu khóa vẫn đọc được).
 static func merge_loaded(loaded) -> Dictionary:
 	var p: Dictionary = new_profile()
 	if not (loaded is Dictionary):
 		return p
-	for k in ["runs", "wins", "best_floor", "kills"]:
+	for k in ["runs", "wins", "best_floor", "kills", "secrets"]:
 		p[k] = int(loaded.get(k, 0))
 	var b = loaded.get("bosses", {})
 	if b is Dictionary:
@@ -64,6 +64,9 @@ static func record_floor(p: Dictionary, cid: String, floor_num: int) -> void:
 static func record_kill(p: Dictionary, cid: String) -> void:
 	p["kills"] += 1
 	cls(p, cid)["kills"] += 1
+
+static func record_secret(p: Dictionary) -> void:
+	p["secrets"] = int(p.get("secrets", 0)) + 1
 
 static func record_win(p: Dictionary) -> void:
 	p["wins"] += 1

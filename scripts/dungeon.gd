@@ -457,8 +457,11 @@ func _enter_room(cell: Vector2i) -> void:
 			Global.message.emit("Treasure Room!", Color(1.0, 0.85, 0.3))
 		"altar":
 			room["cleared"] = true
-			_spawn_prop("altar", room_center(cell), cell)
-			Global.message.emit("Altar Room", Color(0.8, 0.45, 0.95))
+			var altar = _spawn_prop("altar", room_center(cell), cell, {"variant": "gold" if randf() < EventRooms.ALTAR_GOLD_CHANCE else "blood"})
+			if altar.variant == "gold":
+				Global.message.emit("Gold Altar", Color(1.0, 0.85, 0.3))
+			else:
+				Global.message.emit("Blood Altar", Color(0.8, 0.45, 0.95))
 		"trapped_chest":
 			room["cleared"] = true
 			_spawn_prop("chest", room_center(cell), cell)
@@ -476,10 +479,12 @@ func _enter_room(cell: Vector2i) -> void:
 
 
 ## Dựng vật thể tương tác của phòng sự kiện; hành động cần biết phòng (thử thách, Mimic) đi qua signal.
-func _spawn_prop(kind: String, pos: Vector2, cell: Vector2i) -> Node:
+func _spawn_prop(kind: String, pos: Vector2, cell: Vector2i, props: Dictionary = {}) -> Node:
 	var prop := Node2D.new()
 	prop.set_script(EventPropScript)
 	prop.setup(kind)
+	for k in props:
+		prop.set(k, props[k]) # thuộc tính bổ sung (vd altar variant) đặt TRƯỚC khi vào cây
 	prop.action_requested.connect(_on_prop_action.bind(cell))
 	entities.add_child(prop)
 	prop.global_position = pos
@@ -675,6 +680,17 @@ func _on_enemy_died(_enemy, cell: Vector2i) -> void:
 			_challenge_next_wave.call_deferred(cell)
 		else:
 			_room_cleared.call_deferred(cell)
+
+## Số phòng bí mật chưa vào — chỉ báo cho người chơi sau khi đã dọn Boss của tầng (minimap hiện "?").
+func unfound_secret_count() -> int:
+	if not rooms.has(boss_cell) or not rooms[boss_cell]["cleared"]:
+		return 0
+	var n: int = 0
+	for c in rooms:
+		if rooms[c]["type"] == "secret" and not rooms[c]["visited"]:
+			n += 1
+	return n
+
 
 ## Phòng bí mật chỉ lộ trên minimap khi người chơi ở phòng kề và đứng gần cửa thông sang nó.
 func _update_secret_reveal() -> void:
