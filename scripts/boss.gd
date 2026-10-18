@@ -454,11 +454,42 @@ func _atk_charge() -> void:
 	Global.sfx("boss_charge")
 	charging = true
 	hitbox.set_deferred("monitoring", true)
-	await get_tree().create_timer(0.5).timeout
+	await _charge_wait(0.5)
 	if not alive:
 		return
 	_end_charge()
 	await get_tree().create_timer(0.35).timeout
+
+
+## Flame Trail (Lord): khi lao tới, để lại vệt dung nham gây Burn dọc đường lao.
+const TRAIL_INTERVAL: float = 0.09
+const TRAIL_RADIUS: float = 26.0
+const TRAIL_DURATION: float = 3.0
+const TRAIL_DAMAGE: int = 4
+
+func _charge_wait(duration: float) -> void:
+	if kind != "lord":
+		await get_tree().create_timer(duration).timeout
+		return
+	var t: float = 0.0
+	while t < duration and alive:
+		_drop_flame(global_position)
+		await get_tree().create_timer(TRAIL_INTERVAL).timeout
+		t += TRAIL_INTERVAL
+
+
+func _drop_flame(pos: Vector2) -> void:
+	var hz := Area2D.new()
+	hz.set_script(BOSS_HAZARD)
+	hz.damage = TRAIL_DAMAGE
+	hz.tick_interval = 0.6
+	hz.duration = TRAIL_DURATION
+	hz.radius = TRAIL_RADIUS
+	hz.telegraph_time = 0.0
+	hz.color = Color(1.0, 0.45, 0.1, 0.5)
+	hz.apply_burn_ticks = 3
+	Global.world.add_child(hz)
+	hz.global_position = pos
 
 
 func _end_charge() -> void:
@@ -719,7 +750,7 @@ func _atk_frost_charge() -> void:
 	Global.sfx("boss_charge")
 	charging = true
 	hitbox.set_deferred("monitoring", true)
-	await get_tree().create_timer(0.65).timeout
+	await _charge_wait(0.65)
 	if not alive:
 		return
 	_end_charge()
