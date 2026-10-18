@@ -9,7 +9,8 @@ const PICKUP = preload("res://scenes/pickup.tscn")
 
 signal action_requested(action: String, pos: Vector2)
 
-var kind: String = "altar" # altar | shrine | chest | cache | reward
+var kind: String = "altar" # altar | shrine | chest | cache | reward | gamble | big_reward
+var variant: String = "blood" # chỉ altar: blood | gold
 var used: bool = false
 var _near: bool = false
 var _t: float = 0.0
@@ -50,33 +51,58 @@ func _ready() -> void:
 	elif kind == "shrine":
 		_tex_closed = Global.load_tex("res://assets/dungeon/shrine_idle.png")
 		_tex_open = Global.load_tex("res://assets/dungeon/shrine_used.png")
-	elif kind in ["chest", "cache", "reward"]:
+	elif kind in ["chest", "cache", "reward", "gamble", "big_reward"]:
 		_tex_closed = Global.load_tex("res://assets/dungeon/chest_full_open_anim_f0.png")
 		_tex_open = Global.load_tex("res://assets/dungeon/chest_full_open_anim_f2.png")
 
 func _prompt() -> String:
 	match kind:
-		"altar": return "[E] Offer blood"
+		"altar":
+			if variant == "gold":
+				return "[E] Offer %d gold" % EventRooms.altar_gold_cost(Global.floor_num)
+			return "[E] Offer blood"
 		"shrine": return "[E] Begin trial"
-		"chest": return "[E] Open chest"
 		"cache": return "[E] Open cache"
-		"reward": return "[E] Claim reward"
+		"reward": return "[E] Take reward now"
+		"gamble": return "[E] Gamble: bonus wave"
+		"big_reward": return "[E] Claim big reward"
+		"chest": return "[E] Open  |  hold E: pry (no trap)"
 	return "[E]"
 
 func _process(delta: float) -> void:
 	_t += delta
 	_label.visible = _near and not used
 	queue_redraw()
-	if _near and not used and Input.is_action_just_pressed("interact"):
+	if kind == "chest":
+		_tick_chest_input(delta)
+	elif _near and not used and Input.is_action_just_pressed("interact"):
 		_interact()
 
 func _interact() -> void:
 	match kind:
 		"altar": _use_altar()
 		"shrine": _finish("start_challenge")
-		"chest": _use_chest()
 		"cache": _use_cache()
 		"reward": _use_reward()
+		"gamble": _use_gamble()
+		"big_reward": _use_big_reward()
+
+## Rương bẫy: nhấn nhanh E = mở thường; giữ E đủ lâu = nạy rương (không dính bẫy).
+var _hold: float = 0.0
+func _tick_chest_input(delta: float) -> void:
+	if used or not _near:
+		_hold = 0.0
+		return
+	if Input.is_action_pressed("interact"):
+		_hold += delta
+		if _hold >= EventRooms.PRY_TIME:
+			_hold = 0.0
+			_use_chest(true)
+	elif _hold > 0.0:
+		var was_tap: bool = _hold <= EventRooms.PRY_TAP_MAX
+		_hold = 0.0
+		if was_tap:
+			_use_chest(false)
 
 func _finish(action: String = "") -> void:
 	used = true
@@ -88,25 +114,35 @@ func _use_altar() -> void:
 	var p = Global.player
 	if not is_instance_valid(p):
 		return
-	var cost: int = maxi(1, int(ceil(float(p.max_hp) * EventRooms.ALTAR_HP_FRACTION)))
-	if p.hp <= cost:
-		Global.message.emit("Too weak to offer blood", Color(1.0, 0.4, 0.4))
-		Global.sfx("altar_deny")
-		return
-	var id: String = EventRooms.roll_epic_buff()
-	if id == "":
+	var gold: bool = variant == "gold"
+	var choices: Array = Global.roll_buff_choices(EventRooms.ALTAR_CHOICES, "rare" if gold else "epic")
+	if choices.is_empty():
 		Global.message.emit("The altar is silent", Color(0.7, 0.7, 0.7))
 		Global.sfx("altar_deny")
 		return
+	if gold:
+		var price: int = EventRooms.altar_gold_cost(Global.floor_num)
+		if Global.coins < price:
+			Global.message.emit("Not enough gold (%d)" % price, Color(1.0, 0.4, 0.4))
+			Global.sfx("altar_deny")
+			return
+		Global.coins -= price
+	else:
+		var cost: int = maxi(1, int(ceil(float(p.max_hp) * EventRooms.ALTAR_HP_FRACTION)))
+		if p.hp <= cost:
+			Global.message.emit("Too weak to offer blood", Color(1.0, 0.4, 0.4))
+			Global.sfx("altar_deny")
+			return
+		p.hp -= cost
 	used = true
-	p.hp -= cost
-	Global.apply_buff(id)
 	Global.shake(0.5, 0.3)
-	Global.burst(global_position, Color(0.8, 0.2, 0.9), 24, 240.0, 2.0)
+	Global.burst(global_position, Color(1.0, 0.8, 0.2) if gold else Color(0.8, 0.2, 0.9), 24, 240.0, 2.0)
 	Global.sfx("altar_offer")
+	# Phần thưởng là lượt chọn 1 trong N (buff_picker hiện, game tạm dừng tới khi chọn).
+	Global.request_buff_choice_of(choices, "GOLD ALTAR: CHOOSE A BUFF" if gold else "BLOOD ALTAR: CHOOSE A BUFF")
 
 # ------------------------------------------------------------------ Rương bẫy
-func _use_chest() -> void:
+func _use_chest(pried: bool = false) -> void:
 	used = true
 	var r: float = randf()
 	if r < EventRooms.CHEST_GOOD:
@@ -119,6 +155,8 @@ func _use_chest() -> void:
 		Global.message.emit("It's a Mimic!", Color(1.0, 0.3, 0.3))
 		Global.sfx("mimic_reveal")
 		action_requested.emit("spawn_mimic", global_position)
+	elif pried:
+		Global.message.emit("You disarmed the trap...", Color(0.7, 0.9, 0.7)) # nạy rương: bẫy không nổ
 	else:
 		var p = Global.player
 		if is_instance_valid(p):
@@ -131,18 +169,32 @@ func _use_cache() -> void:
 	used = true
 	_pay_coins(EventRooms.SECRET_COINS)
 	_spawn_pickup("heal")
+	var gems: int = EventRooms.SECRET_GEM_GUARANTEED
 	if randf() < EventRooms.SECRET_GEM_CHANCE:
-		Global.purple_gems += 1
-		Global.save_game()
-		Global.message.emit("+1 Purple Gem", Color(0.8, 0.3, 0.9))
-	else:
-		Global.message.emit("Secret found!", Color(0.4, 0.9, 0.5))
+		gems += 1
+	Global.purple_gems += gems
+	Global.record_secret_found() # lưu luôn cả số gem
+	Global.message.emit("Secret found! +%d Purple Gem" % gems, Color(0.8, 0.3, 0.9))
+	Global.request_buff_choice_of(Global.roll_buff_choices(EventRooms.SECRET_BUFF_CHOICES, "rare"), "SECRET CACHE: CHOOSE A BUFF")
 
 func _use_reward() -> void:
 	used = true
 	_pay_coins(EventRooms.CHALLENGE_REWARD_COINS)
 	Global.request_buff_choice()
 	Global.message.emit("Trial complete!", Color(1.0, 0.85, 0.3))
+	action_requested.emit("challenge_choice_done", global_position)
+
+## Cược: không nhận thưởng ngay, đổi lấy một đợt quái thêm (dungeon xử lý) để mở rương lớn.
+func _use_gamble() -> void:
+	used = true
+	Global.message.emit("Bonus wave! Survive for a bigger reward", Color(1.0, 0.4, 0.3))
+	action_requested.emit("challenge_gamble", global_position)
+
+func _use_big_reward() -> void:
+	used = true
+	_pay_coins(EventRooms.CHALLENGE_BIG_COINS)
+	Global.request_buff_choice_of(Global.roll_buff_choices(EventRooms.CHALLENGE_BIG_CHOICES, "epic"), "BIG REWARD: CHOOSE A BUFF")
+	Global.message.emit("Gamble paid off!", Color(1.0, 0.85, 0.3))
 
 func _pay_coins(n: int) -> void:
 	for i in n:
@@ -189,9 +241,10 @@ func _draw_altar() -> void:
 		return
 	var glow: float = 0.5 + 0.5 * sin(_t * 3.0)
 	var bowl := Vector2(0, -11)
-	draw_circle(bowl, 16.0 + 4.0 * glow, Color(0.8, 0.1, 0.25, 0.12 + 0.06 * glow))
-	draw_circle(bowl, 9.0 + 2.0 * glow, Color(0.9, 0.2, 0.4, 0.18 + 0.08 * glow))
-	_draw_rising_motes(bowl, Color(1.0, 0.45, 0.6), 5, 10.0, 30.0)
+	var gold: bool = variant == "gold"
+	draw_circle(bowl, 16.0 + 4.0 * glow, Color(0.9, 0.65, 0.1, 0.14 + 0.06 * glow) if gold else Color(0.8, 0.1, 0.25, 0.12 + 0.06 * glow))
+	draw_circle(bowl, 9.0 + 2.0 * glow, Color(1.0, 0.8, 0.2, 0.2 + 0.08 * glow) if gold else Color(0.9, 0.2, 0.4, 0.18 + 0.08 * glow))
+	_draw_rising_motes(bowl, Color(1.0, 0.85, 0.3) if gold else Color(1.0, 0.45, 0.6), 5, 10.0, 30.0)
 
 func _draw_shrine() -> void:
 	_draw_prop_sprite()
@@ -204,11 +257,17 @@ func _draw_shrine() -> void:
 	_draw_rising_motes(Vector2(0, 4), Color(1.0, 0.7, 0.25), 6, 14.0, 34.0)
 
 func _draw_chest() -> void:
+	if kind == "chest" and _hold > EventRooms.PRY_TAP_MAX and not used:
+		var ratio: float = clampf(_hold / EventRooms.PRY_TIME, 0.0, 1.0)
+		draw_rect(Rect2(Vector2(-20.0, -34.0), Vector2(40.0, 5.0)), Color(0, 0, 0, 0.7))
+		draw_rect(Rect2(Vector2(-19.0, -33.0), Vector2(38.0 * ratio, 3.0)), Color(1.0, 0.85, 0.3))
 	var tex: Texture2D = _tex_open if used else _tex_closed
 	if tex == null:
 		return
 	var tint := Color(1, 1, 1)
 	if kind == "cache": tint = Color(0.6, 1.0, 0.7)
 	elif kind == "reward": tint = Color(1.0, 0.9, 0.4)
+	elif kind == "gamble": tint = Color(1.0, 0.45, 0.4)
+	elif kind == "big_reward": tint = Color(1.0, 0.8, 0.2)
 	var sz: Vector2 = tex.get_size() * 2.0
 	draw_texture_rect(tex, Rect2(-sz * 0.5 + Vector2(0, 6), sz), false, tint)

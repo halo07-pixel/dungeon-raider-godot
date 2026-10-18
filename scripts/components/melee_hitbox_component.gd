@@ -15,6 +15,7 @@ var _owner2d: CharacterBody2D
 var _hurtbox: HurtboxComponent
 var _data: Dictionary = {}
 var _in_touch: bool = false
+var _hit_landed: bool = true
 
 func setup(p_owner: CharacterBody2D, p_hurtbox: HurtboxComponent, p_touch_zone: Area2D, p_data: Dictionary) -> void:
 	_owner2d = p_owner
@@ -53,6 +54,7 @@ func try_attack() -> void:
 	var p = Global.player
 	if not is_instance_valid(p) or not p.alive:
 		return
+	_hit_landed = not (p.has_method("is_invulnerable") and p.is_invulnerable()) # lăn né = đòn trượt
 	p.take_damage(int(_data["touch"]), _owner2d.global_position, float(_data["touch_knock"]))
 	_apply_touch_effect(p)
 	if _owner2d.kind == "frost_tiny":
@@ -66,6 +68,10 @@ func _apply_touch_effect(p) -> void:
 	if not p.has_method("apply_status"):
 		return
 	match _owner2d.kind:
+		"mimic":
+			var sk = _owner2d.get("skills")
+			if sk != null and _hit_landed:
+				sk.steal_from(p) # Cướp Vàng
 		"chort":
 			p.apply_status("poison", 2, 3) # Cắn Độc: độc nhẹ, cộng dồn được với Shaman
 		"masked_orc":

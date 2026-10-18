@@ -42,3 +42,7 @@ func _draw() -> void:
 		if c == dungeon.current_cell:
 			col = Color.WHITE
 		draw_rect(Rect2(Vector2(c.x * CW + 2.0, c.y * CH + 2.0), Vector2(CW - 4.0, CH - 4.0)), col)
+	# Gợi ý "còn phòng bí mật chưa tìm" (chỉ sau khi dọn Boss) — không lộ vị trí.
+	var left: int = dungeon.unfound_secret_count()
+	if left > 0:
+		draw_string(Global.pixel_font(), Vector2(size.x - 34.0, size.y - 4.0), "?x%d" % left, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 10, Color(0.4, 0.9, 0.5))

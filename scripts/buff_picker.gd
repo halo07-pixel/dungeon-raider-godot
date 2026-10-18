@@ -162,8 +162,8 @@ func _input(event: InputEvent) -> void:
 
 func _on_buff_choice_requested(choices: Array) -> void:
 	if _title:
-		_title.text = "CHOOSE A BUFF"
-		if Global.BUFF_PICKS_PER_BOSS > 1:
+		_title.text = Global.buff_choice_title
+		if Global.BUFF_PICKS_PER_BOSS > 1 and Global.buff_choice_title == Global.BUFF_TITLE_DEFAULT:
 			_title.text += " (%d/%d)" % [Global.BUFF_PICKS_PER_BOSS - Global.buff_picks_left + 1, Global.BUFF_PICKS_PER_BOSS]
 	for i in _cards.size():
 		var c: Dictionary = _cards[i]
