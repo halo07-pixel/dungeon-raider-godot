@@ -57,6 +57,10 @@ func try_attack() -> void:
 	_hit_landed = not (p.has_method("is_invulnerable") and p.is_invulnerable()) # lăn né = đòn trượt
 	p.take_damage(int(_data["touch"]), _owner2d.global_position, float(_data["touch_knock"]))
 	_apply_touch_effect(p)
+	if _hit_landed:
+		var af = _owner2d.get("affix_node")
+		if af != null and af.has_method("on_hit_player"):
+			af.on_hit_player(int(_data["touch"])) # Leech hồi máu
 	if _owner2d.kind == "frost_tiny":
 		_owner2d.kill() # Vỡ Băng: lao tới, chạm 1 phát rồi tự huỷ, không trụ lại đánh dai dẳng
 		return

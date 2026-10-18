@@ -28,6 +28,8 @@ var is_elite: bool = false
 var q_agent: Node = null
 var affix_id: String = "" ## Biến thể (volatile/summoner/warden); "" = quái thường
 var affix_node: Node2D = null
+var speed_mult: float = 1.0 ## Hệ số tốc độ do affix (Frenzy) đặt; 1.0 = bình thường
+signal split_requested(owner_enemy: Node)
 var skills: Node = null ## Kỹ năng riêng (hiện chỉ Mimic); null = quái thường
 
 var kind: String = "slime"
@@ -131,6 +133,7 @@ func setup(p_kind: String, hp_mult: float = 1.0, allow_affix: bool = false) -> v
 		add_child(affix_node)
 		affix_node.attach(self, affix_id)
 		affix_node.summon_requested.connect(func(o): summon_requested.emit(o))
+		affix_node.split_requested.connect(func(o): split_requested.emit(o))
 
 func _ready() -> void:
 	if data.is_empty():
@@ -432,12 +435,12 @@ func _physics_process(delta: float) -> void:
 	if hurtbox.consume_slow(delta):
 		move *= hurtbox.SLOW_MOVE_MULT # chậm 25% (trước đây 50%) — xem HurtboxComponent.CC_*
 
-	var speed_mult: float = 1.0
+	var skill_speed: float = 1.0
 	if skills != null: # kỹ năng riêng có thể ghi đè hướng/tốc độ (Lao Cắn, nổi giận...)
 		var drv: Array = skills.drive(delta, move)
 		move = drv[0]
-		speed_mult = float(drv[1])
-	velocity = move * float(data["speed"]) * speed_mult + knockback
+		skill_speed = float(drv[1])
+	velocity = move * float(data["speed"]) * skill_speed * speed_mult + knockback
 	knockback = knockback.move_toward(Vector2.ZERO, 900.0 * delta)
 	move_and_slide()
 	_update_sprite(move.length() > 0.05)
@@ -485,8 +488,8 @@ const HEAL_DROP_CHANCE: float = 0.06
 
 func _drop_and_free() -> void:
 	var n: int = data["coins"]
-	if has_meta("summoner"):
-		n = 0 # quái do Summoner triệu hồi không rơi xu (chống cày)
+	if has_meta("summoner") or has_meta("split_child"):
+		n = 0 # quái do Summoner triệu hồi / Splitter tách ra không rơi xu (chống cày)
 	elif affix_id != "":
 		n += 1 # thưởng thêm cho quái biến thể
 	for i in n:
