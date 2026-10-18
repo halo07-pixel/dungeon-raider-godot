@@ -499,9 +499,39 @@ func _on_prop_action(action: String, pos: Vector2, cell: Vector2i) -> void:
 			_lock_doors(room)
 			Global.message.emit("Wave 1/%d" % EventRooms.CHALLENGE_WAVES, Color(1.0, 0.55, 0.2))
 			_spawn_wave(cell, _challenge_wave_size())
+		"challenge_choice_done":
+			_challenge_close_choices()
+		"challenge_gamble":
+			_challenge_gamble(cell)
 		"spawn_mimic":
 			var m = _spawn_enemy("mimic", pos, cell, false)
 			m.died.connect(_on_mimic_died)
+
+
+var _challenge_props: Array = []
+
+func _challenge_close_choices() -> void:
+	for pr in _challenge_props:
+		if is_instance_valid(pr):
+			pr.used = true # chọn một thì cái còn lại bị khóa
+	_challenge_props = []
+
+
+func _challenge_gamble(cell: Vector2i) -> void:
+	_challenge_close_choices()
+	var room: Dictionary = rooms[cell]
+	room["gamble_wave"] = true
+	_lock_doors(room)
+	var count: int = maxi(4, int(round(float(_challenge_wave_size()) * EventRooms.CHALLENGE_BONUS_WAVE_SCALE)))
+	_spawn_wave(cell, count)
+
+
+func _challenge_gamble_cleared(cell: Vector2i) -> void:
+	rooms[cell]["gamble_wave"] = false
+	_unlock_doors(rooms[cell])
+	rooms_updated.emit()
+	_spawn_prop("big_reward", room_center(cell), cell)
+	Global.message.emit("Bonus wave cleared!", Color(1.0, 0.85, 0.3))
 
 
 func _on_mimic_died(_enemy) -> void:
@@ -676,7 +706,9 @@ func _on_enemy_died(_enemy, cell: Vector2i) -> void:
 	alive_enemies -= 1
 	alive_enemies = maxi(alive_enemies, 0)
 	if alive_enemies <= 0 and not boss_alive:
-		if rooms.has(cell) and rooms[cell]["type"] == "challenge" and int(rooms[cell].get("waves_left", 0)) > 0:
+		if rooms.has(cell) and rooms[cell].get("gamble_wave", false):
+			_challenge_gamble_cleared.call_deferred(cell)
+		elif rooms.has(cell) and rooms[cell]["type"] == "challenge" and int(rooms[cell].get("waves_left", 0)) > 0:
 			_challenge_next_wave.call_deferred(cell)
 		else:
 			_room_cleared.call_deferred(cell)
@@ -768,8 +800,11 @@ func _room_cleared(cell: Vector2i) -> void:
 		# giờ chỉ 1 lần chọn buff duy nhất mỗi tầng, ngay sau khi hạ Boss.
 		Global.request_buff_choice()
 	elif room["type"] == "challenge":
-		_spawn_prop("reward", room_center(cell), cell)
-		Global.message.emit("Trial cleared!", Color(1.0, 0.85, 0.3))
+		# Hai lựa chọn: nhận thưởng ngay (an toàn) hoặc cược thêm một đợt để lấy thưởng lớn.
+		_challenge_props = [
+			_spawn_prop("reward", room_center(cell) + Vector2(-48.0, 0.0), cell),
+			_spawn_prop("gamble", room_center(cell) + Vector2(48.0, 0.0), cell)]
+		Global.message.emit("Trial cleared! Take the reward or gamble", Color(1.0, 0.85, 0.3))
 	else:
 		Global.message.emit("Room cleared!", Color(0.6, 1.0, 0.6))
 		if randf() < 0.35:

@@ -17,6 +17,7 @@ const BULLET = preload("res://scenes/bullet.tscn")
 const QAgentScript = preload("res://scripts/q_agent.gd")
 const HpBarScript = preload("res://scripts/enemy_hp_bar.gd")
 const AffixScript = preload("res://scripts/enemy_affix.gd")
+const MimicSkillsScript = preload("res://scripts/mimic_skills.gd")
 
 ## AI Tầng 2 (Q-Learning): % quái tầm xa (archer/shaman) trở thành "Tinh Anh" mỗi lần spawn —
 ## HP cao hơn, tint tím nhận diện, và dùng QAgent (scripts/q_agent.gd) để quyết định hành vi
@@ -27,6 +28,7 @@ var is_elite: bool = false
 var q_agent: Node = null
 var affix_id: String = "" ## Biến thể (volatile/summoner/warden); "" = quái thường
 var affix_node: Node2D = null
+var skills: Node = null ## Kỹ năng riêng (hiện chỉ Mimic); null = quái thường
 
 var kind: String = "slime"
 var data: Dictionary = {}
@@ -116,6 +118,12 @@ func setup(p_kind: String, hp_mult: float = 1.0, allow_affix: bool = false) -> v
 		q_agent.set_script(QAgentScript)
 		add_child(q_agent)
 		q_agent.attach(self)
+	if kind == "mimic":
+		skills = Node.new()
+		skills.set_script(MimicSkillsScript)
+		skills.name = "Skills"
+		add_child(skills)
+		skills.attach(self)
 	if affix_id != "":
 		affix_node = Node2D.new()
 		affix_node.set_script(AffixScript)
@@ -424,7 +432,12 @@ func _physics_process(delta: float) -> void:
 	if hurtbox.consume_slow(delta):
 		move *= hurtbox.SLOW_MOVE_MULT # chậm 25% (trước đây 50%) — xem HurtboxComponent.CC_*
 
-	velocity = move * float(data["speed"]) + knockback
+	var speed_mult: float = 1.0
+	if skills != null: # kỹ năng riêng có thể ghi đè hướng/tốc độ (Lao Cắn, nổi giận...)
+		var drv: Array = skills.drive(delta, move)
+		move = drv[0]
+		speed_mult = float(drv[1])
+	velocity = move * float(data["speed"]) * speed_mult + knockback
 	knockback = knockback.move_toward(Vector2.ZERO, 900.0 * delta)
 	move_and_slide()
 	_update_sprite(move.length() > 0.05)
