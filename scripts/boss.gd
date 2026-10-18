@@ -156,7 +156,7 @@ const RL_PICK_BIAS: float = 0.7        # độ mạnh thiên lệch chọn đòn
 ## Chính sách đã huấn luyện offline cho Dungeon Lord (tools/rl/train_lord.py). Thiếu file -> chạy như cũ.
 const LORD_POLICY_PATH: String = "res://assets/ai/lord_policy.json"
 ## Đòn diện rộng/đón đầu (ưu tiên khi Player ở xa/chạy nhanh) và đòn trực diện (ưu tiên khi gần).
-const AREA_ATTACKS: Array = ["ring", "slam", "blizzard", "spike_field", "ice_prison", "judgement", "frost_breath", "necro_curse"]
+const AREA_ATTACKS: Array = ["ring", "slam", "blizzard", "spike_field", "ice_prison", "judgement", "frost_breath", "necro_curse", "magma_eruption"]
 const DIRECT_ATTACKS: Array = ["charge", "necro_bolt", "frost_charge"]
 var _rl_timer: float = 0.0
 var _rl_move: Vector2 = Vector2.ZERO
@@ -315,8 +315,8 @@ func _attack_pool() -> Array:
 			match phase:
 				1: return ["charge", "ring", "ring"] # Pha 1: áp sát kiểu Warden
 				2: return ["necro_bolt", "necro_bolt", "necro_curse", "necro_summon", "charge"] # Pha 2: tầm xa + triệu hồi
-				3: return ["frost_breath", "spike_field", "frost_charge", "ice_prison", "necro_bolt"] # Pha 3: khống chế vùng
-				_: return ["judgement", "lord_summon_all", "ring", "necro_bolt", "ice_prison"] # Pha 4: tổng lực
+				3: return ["frost_breath", "spike_field", "frost_charge", "ice_prison", "necro_bolt", "magma_eruption"] # Pha 3: khống chế vùng
+				_: return ["judgement", "lord_summon_all", "ring", "necro_bolt", "ice_prison", "magma_eruption"] # Pha 4: tổng lực
 		_: # warden
 			var pool: Array = ["charge", "ring"]
 			if phase >= 2:
@@ -405,6 +405,7 @@ func _on_attack_timer_timeout() -> void:
 		"necro_bolt": await _atk_necro_bolt()
 		"necro_summon": await _atk_necro_summon()
 		"necro_curse": await _atk_necro_curse()
+		"magma_eruption": await _atk_magma_eruption()
 		"frost_breath": await _atk_frost_breath()
 		"spike_field": await _atk_frost_spike_field()
 		"frost_charge": await _atk_frost_charge()
@@ -585,6 +586,44 @@ func _atk_necro_curse() -> void:
 	Global.world.add_child(hz)
 	hz.global_position = target_pos
 	await get_tree().create_timer(0.7 * _speed_mult() + 0.1).timeout
+
+
+## Lord (biome Địa Ngục): vũng dung nham báo trước quanh Player và quanh Lord, tồn tại lâu, gây Burn.
+const MAGMA_POOLS_AROUND_PLAYER: int = 3
+const MAGMA_POOLS_AROUND_SELF: int = 2
+const MAGMA_RADIUS: float = 52.0
+const MAGMA_DURATION: float = 6.0
+const MAGMA_DAMAGE: int = 6
+const MAGMA_TELEGRAPH: float = 0.8
+
+func _atk_magma_eruption() -> void:
+	var p = Global.player
+	var tp: Vector2 = global_position
+	if is_instance_valid(p):
+		tp = p.hurt_center() if p.has_method("hurt_center") else p.global_position
+	Global.sfx("door")
+	var spots: Array = [tp] # một vũng ngay dưới chân Player
+	for i in MAGMA_POOLS_AROUND_PLAYER - 1:
+		spots.append(tp + Vector2.from_angle(randf() * TAU) * randf_range(70.0, 130.0))
+	for i in MAGMA_POOLS_AROUND_SELF:
+		spots.append(global_position + Vector2.from_angle(randf() * TAU) * randf_range(70.0, 120.0))
+	for pos in spots:
+		var q: Vector2 = pos
+		if arena_rect.size != Vector2.ZERO:
+			var safe_rect: Rect2 = arena_rect.grow(-30.0)
+			q = q.clamp(safe_rect.position, safe_rect.end)
+		var hz := Area2D.new()
+		hz.set_script(BOSS_HAZARD)
+		hz.damage = MAGMA_DAMAGE
+		hz.tick_interval = 0.6
+		hz.duration = MAGMA_DURATION
+		hz.radius = MAGMA_RADIUS
+		hz.telegraph_time = MAGMA_TELEGRAPH * _speed_mult()
+		hz.color = Color(1.0, 0.4, 0.1, 0.5)
+		hz.apply_burn_ticks = 3
+		Global.world.add_child(hz)
+		hz.global_position = q
+	await get_tree().create_timer(MAGMA_TELEGRAPH * _speed_mult() + 0.1).timeout
 
 
 func _necro_blink() -> void:

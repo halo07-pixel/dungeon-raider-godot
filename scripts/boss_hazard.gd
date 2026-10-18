@@ -15,6 +15,7 @@ var single_shot: bool = false
 var apply_slow: bool = false # true: ngoài sát thương còn làm chậm Player khi đứng trong vùng
 var follow_target: Node2D = null # != null: vùng báo trước bám theo mục tiêu trong follow_time giây đầu (Phán Quyết)
 var follow_time: float = 0.0
+var apply_burn_ticks: int = 0 # >0: gây Burn (DoT) khi đứng trong vùng
 var apply_stun_duration: float = 0.0 # >0: ngoài sát thương còn gây Choáng bấy nhiêu giây (đòn "Giam Băng")
 
 var _t: float = 0.0
@@ -86,6 +87,8 @@ func _deal_damage() -> void:
 			if p.has_method("apply_status"):
 				if apply_slow:
 					p.apply_status("slow", 1.0)
+				if apply_burn_ticks > 0:
+					p.apply_status("burn", apply_burn_ticks)
 				if apply_stun_duration > 0.0:
 					p.apply_status("stun", apply_stun_duration)
 
