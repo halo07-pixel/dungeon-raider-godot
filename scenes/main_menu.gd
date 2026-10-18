@@ -350,7 +350,7 @@ func _refresh_profile() -> void:
 		c.queue_free()
 	var P: Dictionary = Global.profile
 	profile_box.add_child(_profile_label("PROFILE", 24, Color(1.0, 0.8, 0.3)))
-	profile_box.add_child(_profile_label("Runs: %d   Wins: %d   Best floor: %d   Kills: %d" % [P["runs"], P["wins"], P["best_floor"], P["kills"]], 12))
+	profile_box.add_child(_profile_label("Runs: %d   Wins: %d   Best floor: %d   Kills: %d   Secrets: %d" % [P["runs"], P["wins"], P["best_floor"], P["kills"], int(P.get("secrets", 0))], 12))
 	profile_box.add_child(HSeparator.new())
 
 	for cid in ["ranger", "brawler"]:

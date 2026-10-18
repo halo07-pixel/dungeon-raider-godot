@@ -454,12 +454,14 @@ func _buff_tier_weight(tier: String) -> float:
 
 ## Random n lựa chọn buff (không trùng nhau trong 1 lượt, loại buff đã đạt trần stack),
 ## random có trọng số theo tier (common > rare > epic).
-func roll_buff_choices(n: int = 3) -> Array:
+func roll_buff_choices(n: int = 3, only_tier: String = "") -> Array:
 	var candidates: Array = []
 	var wclass: String = player_weapon_class()
 	for id in buff_pool:
 		var bclass: String = String(buff_pool[id].get("class", "any"))
 		if bclass != "any" and bclass != wclass:
+			continue
+		if only_tier != "" and String(buff_pool[id]["tier"]) != only_tier:
 			continue
 		if buff_stack(id) < int(BUFF_MAX_STACK.get(id, 1)):
 			candidates.append(id)
@@ -485,6 +487,19 @@ func roll_buff_choices(n: int = 3) -> Array:
 const BUFF_PICKS_PER_BOSS: int = 1
 var buff_picks_left: int = 0
 
+## Tiêu đề màn chọn buff (phòng sự kiện đổi tiêu đề riêng, về mặc định khi chọn xong).
+const BUFF_TITLE_DEFAULT: String = "CHOOSE A BUFF"
+var buff_choice_title: String = BUFF_TITLE_DEFAULT
+
+## Một lượt chọn buff với danh sách do bên gọi chọn sẵn (Altar, kho bí mật...). false nếu rỗng.
+func request_buff_choice_of(choices: Array, title: String) -> bool:
+	if choices.is_empty():
+		return false
+	buff_picks_left = 1
+	buff_choice_title = title
+	buff_choice_requested.emit(choices)
+	return true
+
 func request_buff_choice() -> void:
 	buff_picks_left = BUFF_PICKS_PER_BOSS
 	_offer_next_buff_pick()
@@ -501,6 +516,8 @@ func _offer_next_buff_pick() -> void:
 
 func consume_buff_pick() -> void:
 	buff_picks_left = maxi(0, buff_picks_left - 1)
+	if buff_picks_left <= 0:
+		buff_choice_title = BUFF_TITLE_DEFAULT
 	_offer_next_buff_pick()
 
 ## Điểm CHUNG cho hiệu ứng nguyên tố khi đòn của Player trúng mục tiêu (cận chiến + đạn đều gọi).
@@ -794,6 +811,10 @@ func record_floor_reached(f: int) -> void:
 
 func record_kill() -> void:
 	MetaProgress.record_kill(profile, current_class)
+
+func record_secret_found() -> void:
+	MetaProgress.record_secret(profile)
+	save_game()
 
 func record_win() -> void:
 	MetaProgress.record_win(profile)
