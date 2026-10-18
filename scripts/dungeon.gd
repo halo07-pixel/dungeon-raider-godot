@@ -11,6 +11,7 @@ const BOSS = preload("res://scenes/boss.tscn")
 const PICKUP = preload("res://scenes/pickup.tscn")
 const SpikeTrapScript = preload("res://scripts/spike_trap.gd")
 const PoisonTileScript = preload("res://scripts/poison_tile.gd")
+const SquadDirectorScript = preload("res://scripts/squad_director.gd")
 const LavaTileScript = preload("res://scripts/lava_tile.gd")
 const IceTileScript = preload("res://scripts/ice_tile.gd")
 const LordArenaRuneScript = preload("res://scripts/lord_arena_rune.gd")
@@ -95,8 +96,14 @@ var boss_alive: bool = false
 var current_biome: String = "" # "" = chưa dựng tileset lần nào -> generate() đầu tiên sẽ ép dựng lại
 
 
+var squad: Node = null ## Điều phối nhóm quái (squad_director.gd)
+
 func _ready() -> void:
 	add_to_group("dungeon")
+	squad = Node.new()
+	squad.set_script(SquadDirectorScript)
+	squad.name = "SquadDirector"
+	add_child(squad)
 	floor_layer = TileMapLayer.new()
 	add_child(floor_layer)
 	door_layer = TileMapLayer.new()
@@ -701,6 +708,7 @@ func _spawn_wave(cell: Vector2i, count_override: int = -1) -> void:
 func _spawn_enemy(kind: String, pos: Vector2, cell: Vector2i, allow_affix: bool = false, hp_mult: float = 1.0) -> Node:
 	var e = ENEMY.instantiate()
 	e.setup(kind, hp_mult, allow_affix) # HP theo tầng do enemy.gd::setup() nhân đúng 1 lần (Global.hp_scale_for_floor)
+	e.squad_register.connect(squad.register)
 	e.nav = self # quái hỏi đường qua find_path() khi bị tường chặn
 	e.died.connect(_on_enemy_died.bind(cell))
 	e.summon_requested.connect(_on_affix_summon.bind(cell))

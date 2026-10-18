@@ -28,6 +28,10 @@ var is_elite: bool = false
 var q_agent: Node = null
 var affix_id: String = "" ## Biến thể (volatile/summoner/warden); "" = quái thường
 var affix_node: Node2D = null
+signal squad_register(enemy: Node) ## Đăng ký với điều phối nhóm khi thức dậy (dungeon nối signal)
+var squad_offset: Vector2 = Vector2.ZERO ## Điều phối ghi: độ lệch hướng (gọng kìm), cộng vào hướng đuổi
+var squad_speed: float = 1.0             ## Điều phối ghi: hệ số tốc độ (chờ nhau)
+var squad_anchor: Vector2 = Vector2.ZERO ## Điều phối ghi: điểm đứng sau trâu bò (quái tầm xa); ZERO = không dùng
 var nav: Node = null ## Dungeon (cấp lúc spawn): cung cấp find_path(from, to); null = đi thẳng như cũ
 var _path: PackedVector2Array = PackedVector2Array()
 var _path_i: int = 0
@@ -268,6 +272,7 @@ func _on_far_exited(body: Node) -> void:
 
 func _on_spawn_done() -> void:
 	active = true
+	squad_register.emit(self)
 	create_tween().tween_property(self, "modulate:a", 1.0, 0.15)
 	if kind == "archer" or kind == "shaman":
 		action_timer.start(float(data["shoot_cd"]))
@@ -462,9 +467,15 @@ func _physics_process(delta: float) -> void:
 			"archer", "shaman":
 				if player_too_close: move = -dir
 				elif player_in_range and has_los: move = dir.orthogonal() * strafe_sign * 0.5
+				elif squad_anchor != Vector2.ZERO and not player_in_range and global_position.distance_to(squad_anchor) > 24.0:
+					move = (squad_anchor - global_position).normalized() # tiến tới điểm đứng sau trâu bò
 				else: move = _chase_dir(dir, delta)
 			"slime": move = _chase_dir(dir, delta) * (0.55 + 0.45 * absf(sin(_t * 4.0)))
 			_: move = _chase_dir(dir, delta)
+		# Phối hợp nhóm: chỉ cộng độ lệch khi đang đi thẳng (thấy người chơi); bị tường chặn thì để A* lo.
+		if squad_offset != Vector2.ZERO and has_los and not player_too_close and (kind != "archer" and kind != "shaman"):
+			var mlen: float = move.length()
+			move = (move + squad_offset).normalized() * mlen
 		# QAgent chọn "retreat": chủ động lùi ra xa Player và lách ngang (ghi đè hướng thường)
 		if retreat_timer > 0.0:
 			retreat_timer -= delta
@@ -478,7 +489,7 @@ func _physics_process(delta: float) -> void:
 		var drv: Array = skills.drive(delta, move)
 		move = drv[0]
 		skill_speed = float(drv[1])
-	velocity = move * float(data["speed"]) * skill_speed * speed_mult + knockback
+	velocity = move * float(data["speed"]) * skill_speed * speed_mult * squad_speed + knockback
 	knockback = knockback.move_toward(Vector2.ZERO, 900.0 * delta)
 	move_and_slide()
 	_update_sprite(move.length() > 0.05)
