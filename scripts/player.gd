@@ -43,6 +43,27 @@ const PIERCE_SUPER: int = 2       # buff Mega Shot (phát thứ 6): tối thiể
 var shield_delay_timer: float = 0.0
 ## Đổi vũ khí bị chặn trong khoảng này sau khi đổi (giây) — không dùng đổi để "bỏ" hồi chiêu bắn.
 const SWAP_COOLDOWN: float = 0.25
+## Longbow: hệ số theo mức căng dây r (0..1) cho tốc độ/tầm bay; xuyên thêm khi căng nửa/đầy; Epic xuyên thêm 1 khi đầy.
+const CHARGE_SPEED_MIN: float = 0.75
+const CHARGE_SPEED_MAX: float = 1.2
+const CHARGE_LIFE_MIN: float = 0.8
+const CHARGE_LIFE_MAX: float = 1.2
+const BOW_PIERCE_HALF: int = 1
+const BOW_PIERCE_FULL: int = 1
+const BOW_EPIC_EXTRA_PIERCE: int = 1
+const BOW_RARE_DRAW_MULT: float = 0.8   # Rare: căng dây nhanh hơn 20%
+const BOW_LEGEND_ARROWS: int = 3        # Legendary: căng đầy bắn 3 mũi tên...
+const BOW_LEGEND_SPREAD: float = 14.0
+const BOW_LEGEND_DMG_MULT: float = 0.75 # ...mỗi mũi 75% sát thương
+## Railgun / Staff
+const BEAM_TRAIL_LEN: float = 260.0
+const RAILGUN_RARE_CD_MULT: float = 0.8
+const RAILGUN_LEGEND_DMG_MULT: float = 1.5
+const STAFF_RARE_RADIUS_MULT: float = 1.25
+const STAFF_LEGEND_RADIUS_MULT: float = 1.3
+## Trạng thái căng dây (chỉ vũ khí có charge_time): giây đã căng, đang căng hay không.
+var charge: float = 0.0
+var charging: bool = false
 ## Kỹ năng class (vd Overdrive) nhân thời gian hồi đòn đánh; 1.0 = bình thường. Chỉ ClassSkill được ghi vào đây.
 var skill_attack_cd_mult: float = 1.0
 ## 2 ô vũ khí: mỗi ô {"id": String, "rarity": String} hoặc {} nếu trống. weapon_id/weapon_rarity/weapon/
@@ -250,6 +271,7 @@ func _physics_process(delta: float) -> void:
 			take_damage(BURN_DAMAGE, global_position, 0.0, true, true)
 
 	if stun_timer > 0.0:
+		_cancel_charge()
 		stun_timer = maxf(0.0, stun_timer - delta)
 		velocity = knockback
 		knockback = knockback.move_toward(Vector2.ZERO, KNOCK_DECAY * delta)
@@ -279,7 +301,9 @@ func _physics_process(delta: float) -> void:
 	knockback = knockback.move_toward(Vector2.ZERO, KNOCK_DECAY * delta)
 	move_and_slide()
 
-	if Input.is_action_pressed("shoot") and not rolling and fire_timer.is_stopped() and not swinging:
+	if weapon.has("charge_time") and not weapon.get("is_melee", false):
+		_tick_charge(delta)
+	elif Input.is_action_pressed("shoot") and not rolling and fire_timer.is_stopped() and not swinging:
 		if weapon.get("is_melee", false): _swing()
 		else: _shoot()
 	_update_sprite()
@@ -356,7 +380,39 @@ func _roll_slash() -> void:
 # ==============================================================================
 # HỆ THỐNG HIỆU ỨNG VŨ KHÍ TẦM XA
 # ==============================================================================
-func _shoot() -> void:
+## Thời gian (giây) cần để căng đầy: gốc của vũ khí, nhanh hơn theo Rare / buff Haste / Overdrive.
+func _charge_time_needed() -> float:
+	var t: float = float(weapon.get("charge_time", 0.5))
+	if weapon_id == "bow" and weapon_rarity == "rare":
+		t *= BOW_RARE_DRAW_MULT
+	t *= pow(0.9, float(Global.buff_stack("buff_haste")))
+	t *= skill_attack_cd_mult
+	return maxf(0.05, t)
+
+## Mức căng hiện tại 0..1.
+func charge_ratio() -> float:
+	return clampf(charge / _charge_time_needed(), 0.0, 1.0) if charging else 0.0
+
+func _cancel_charge() -> void:
+	charge = 0.0
+	charging = false
+
+## Giữ chuột = căng dây (chỉ khi hết hồi đòn); nhả chuột = bắn với mức căng hiện có; lăn = huỷ.
+func _tick_charge(delta: float) -> void:
+	var holding: bool = Input.is_action_pressed("shoot")
+	if rolling:
+		_cancel_charge()
+		return
+	if holding:
+		if fire_timer.is_stopped():
+			charging = true
+			charge = minf(_charge_time_needed(), charge + delta)
+	elif charging:
+		var ratio: float = charge_ratio()
+		_cancel_charge()
+		_shoot(ratio)
+
+func _shoot(charge_ratio_arg: float = -1.0) -> void:
 	var w: Dictionary = weapon
 	var base_dmg = int(w["damage"])
 	var mult = rarity_data["mult"]
@@ -383,6 +439,12 @@ func _shoot() -> void:
 	var eff: String = ""
 	var p_color: Color = w["color"]
 	var is_crit: bool = false
+	var beam: bool = bool(w.get("beam", false))
+	var blast_r: float = float(w.get("blast_radius", 0.0))
+	var blast_status: String = ""
+	var blast_echo: bool = false
+	if blast_r > 0.0:
+		eff = "orb"
 
 	# LOGIC ĐỘ HIẾM TẦM XA CHUYÊN SÂU
 	if weapon_id == "pistol":
@@ -398,6 +460,14 @@ func _shoot() -> void:
 		if weapon_rarity == "rare": cd *= 0.7; dmg = int(base_dmg * 1.3)
 		elif weapon_rarity == "epic": eff = "slow"
 		elif weapon_rarity == "legendary": eff = "chain"; p_color = Color.RED; dmg = base_dmg * 2
+	elif weapon_id == "railgun":
+		if weapon_rarity == "rare": cd *= RAILGUN_RARE_CD_MULT
+		elif weapon_rarity == "epic": eff = "slow"
+		elif weapon_rarity == "legendary": eff = "chain"; p_color = Color(1.0, 0.4, 0.9); dmg = int(float(dmg) * RAILGUN_LEGEND_DMG_MULT)
+	elif weapon_id == "staff":
+		if weapon_rarity == "rare": blast_r *= STAFF_RARE_RADIUS_MULT
+		elif weapon_rarity == "epic": blast_status = "slow"
+		elif weapon_rarity == "legendary": blast_r *= STAFF_LEGEND_RADIUS_MULT; blast_status = "slow"; blast_echo = true; p_color = Color(1.0, 0.45, 0.8)
 
 	# ÁP DỤNG BUFF: Nhanh Nhẹn / Chí Mạng / Tầm Đánh (tầm xa = bay xa+nhanh hơn) / Vung Kiếm Càn Quét (tầm xa = xuyên)
 	cd *= pow(0.9, float(Global.buff_stack("buff_haste")))
@@ -416,6 +486,24 @@ func _shoot() -> void:
 	var is_super: bool = Global.buff_stack("buff_super") > 0 and shot_count % 6 == 0
 	var do_ring: bool = Global.buff_stack("buff_ring") > 0 and shot_count % 5 == 0
 	var bullet_radius: float = float(w["radius"])
+	# Cung: mức căng dây quyết định sát thương / tốc độ / tầm / số quái xuyên (gọi trực tiếp không truyền mức = căng đầy)
+	if w.has("charge_time"):
+		var r: float = 1.0 if charge_ratio_arg < 0.0 else clampf(charge_ratio_arg, 0.0, 1.0)
+		dmg = int(float(dmg) * lerpf(float(w["charge_min"]), float(w["charge_max"]), r))
+		speed *= lerpf(CHARGE_SPEED_MIN, CHARGE_SPEED_MAX, r)
+		life *= lerpf(CHARGE_LIFE_MIN, CHARGE_LIFE_MAX, r)
+		bullet_radius = lerpf(bullet_radius * 0.75, bullet_radius * 1.25, r)
+		if r >= 0.5:
+			pierce_n += BOW_PIERCE_HALF
+		if r >= 1.0:
+			pierce_n += BOW_PIERCE_FULL
+			p_color = Color(1.0, 0.95, 0.6)
+			if weapon_rarity == "epic":
+				pierce_n += BOW_EPIC_EXTRA_PIERCE
+			elif weapon_rarity == "legendary":
+				pellets = BOW_LEGEND_ARROWS
+				spread = BOW_LEGEND_SPREAD
+				dmg = int(float(dmg) * BOW_LEGEND_DMG_MULT)
 	if is_super:
 		dmg *= 3
 		pierce_n = maxi(pierce_n + 1, PIERCE_SUPER) # Laser (đã xuyên sẵn) được cộng thêm 1
@@ -434,8 +522,14 @@ func _shoot() -> void:
 			off += randf_range(-spread, spread) * 0.08
 		var dir: Vector2 = Vector2.from_angle(base_ang + off)
 		var b = BULLET.instantiate()
-		b.setup(true, dir, dmg, speed, life, p_color, bullet_radius, false, eff)
+		b.setup(true, dir, dmg, speed, life, p_color, bullet_radius, beam, eff)
 		b.pierce_left = pierce_n
+		if beam:
+			b.beam_len = BEAM_TRAIL_LEN
+		if blast_r > 0.0:
+			b.blast_radius = blast_r * (1.5 if is_super else 1.0)
+			b.blast_status = blast_status
+			b.blast_echo = blast_echo
 		_apply_ranged_buffs(b)
 		b.is_crit = is_crit
 		Global.world.add_child(b)
@@ -699,6 +793,7 @@ func _other_slot_empty() -> bool:
 
 ## Đồng bộ các biến weapon_* (đọc ở khắp nơi) + sprite theo ô đang cầm.
 func _apply_active_weapon() -> void:
+	_cancel_charge()
 	var entry: Dictionary = weapon_slots[active_slot]
 	weapon_id = String(entry["id"])
 	weapon_rarity = String(entry["rarity"])
@@ -917,6 +1012,8 @@ func _update_weapon_visual() -> void:
 	weapon_sprite.position = Vector2.from_angle(ang) * offset
 
 func _draw() -> void:
+	if charging and charge > 0.0:
+		_draw_charge()
 	if weapon.get("is_melee", false) and (swinging or _slash_fade > 0.0):
 		var gun_c: Color = weapon.get("color", Color.WHITE)
 		if rarity_data.has("color"): gun_c = rarity_data["color"].lerp(gun_c, 0.5)
@@ -926,6 +1023,15 @@ func _draw() -> void:
 		var progress: float = swing_progress if swinging else 1.0
 		var alpha: float = 1.0 if swinging else clampf(_slash_fade / SLASH_FADE_TIME, 0.0, 1.0)
 		_draw_slash(r, center_ang, half_angle, progress, gun_c, alpha)
+
+## Vòng căng dây quanh Player: đầy dần theo mức căng, sáng lên khi căng đầy.
+func _draw_charge() -> void:
+	var r: float = charge_ratio()
+	var full: bool = r >= 1.0
+	var col: Color = Color(1.0, 0.92, 0.45) if full else Color(0.85, 0.9, 1.0, 0.85)
+	draw_arc(Vector2.ZERO, 22.0, -PI * 0.5, -PI * 0.5 + TAU * r, 36, col, 3.0)
+	if full:
+		draw_arc(Vector2.ZERO, 26.0, 0.0, TAU, 36, Color(1.0, 0.95, 0.6, 0.55), 2.0)
 
 ## Vệt chém hình lưỡi liềm: đuôi mảnh + mờ, đầu dày + sáng, quét theo tiến độ vung. Tầm ngoài đúng
 ## bằng tầm gây sát thương (display_swing_range) nên vệt luôn khớp vùng trúng thật.

@@ -1,6 +1,8 @@
 extends Area2D
 ## Đạn (Area2D) nâng cấp: Tích hợp hiệu ứng Sử thi/Huyền thoại (Xuyên, Nổ, Chậm, Xích sét).
 
+const RingFx = preload("res://scripts/skill_ring_fx.gd")
+
 var dir: Vector2 = Vector2.RIGHT
 var damage: int = 10
 var speed: float = 500.0
@@ -39,6 +41,20 @@ const HOMING_MAX_TURN: float = 60.0
 const HOMING_ORBIT_FACTOR: float = 0.5 # bán kính vòng cua tối đa = 0.5 * khoảng cách
 const HOMING_LEAD_FADE_NEAR: float = 40.0 # dưới 40px: nhắm thẳng tâm, bỏ đón đầu
 var is_fragment: bool = false # mảnh tách ra từ Đạn Phân Tách — không tách tiếp
+## Railgun: độ dài vệt tia vẽ phía sau đạn (0 = đạn thường).
+var beam_len: float = 0.0
+## Arcane Staff (effect "orb"): nổ diện rộng khi va chạm/hết tầm. blast_status "slow" làm chậm quái trong vùng;
+## blast_echo = nổ thêm 1 lần nữa sau BLAST_ECHO_DELAY (Legendary).
+var blast_radius: float = 0.0
+var blast_status: String = ""
+var blast_echo: bool = false
+var _exploded: bool = false
+const BLAST_ECHO_DELAY: float = 0.4
+const BLAST_ECHO_DMG_MULT: float = 0.6
+const BLAST_ECHO_RADIUS_MULT: float = 0.8
+const BLAST_KNOCK_MULT: float = 1.2
+const BLAST_REACH: float = 12.0        # cộng thêm bán kính thân quái để quái to cũng bị tính
+const BLAST_SLOW_TIME: float = 1.8
 const HOMING_TURN_RATE: float = 2.2 # rad/s - bẻ hướng từ từ, không phải dính chắc chắn
 
 @onready var life_timer: Timer = $Life
@@ -168,6 +184,9 @@ func _physics_process(delta: float) -> void:
 
 func _on_body_entered(body: Node) -> void:
 	if body.has_method("take_damage"):
+		if effect == "orb" and from_player and blast_radius > 0.0:
+			_impact() # quả cầu phép nổ ngay khi chạm; sát thương do vụ nổ áp cho mọi quái trong vùng (kể cả quái bị chạm)
+			return
 		if not from_player and body.has_method("is_invulnerable") and body.is_invulnerable():
 			return
 		if pierce or pierce_left > 0:
@@ -266,6 +285,9 @@ func _on_timeout() -> void:
 	_impact()
 
 func _impact() -> void:
+	if effect == "orb" and from_player and blast_radius > 0.0:
+		_explode_orb()
+		return
 	if effect == "explode": # Shotgun Huyền thoại (Nổ dung nham)
 		Global.burst(global_position, Color(1.0, 0.3, 0.1), 15, 150.0, 2.0)
 		for e in get_tree().get_nodes_in_group("enemies"):
@@ -275,7 +297,48 @@ func _impact() -> void:
 		Global.burst(global_position, color, 5, 100.0, 1.0)
 	queue_free()
 
+## Quả cầu nổ: ẩn đạn, gây nổ tại chỗ; Legendary nổ lần 2 sau BLAST_ECHO_DELAY rồi mới huỷ đạn.
+func _explode_orb() -> void:
+	if _exploded:
+		return
+	_exploded = true
+	set_physics_process(false)
+	hide()
+	$Shape.set_deferred("disabled", true)
+	var pos: Vector2 = global_position
+	_orb_blast(pos, blast_radius, damage)
+	if blast_echo:
+		await get_tree().create_timer(BLAST_ECHO_DELAY).timeout
+		if is_inside_tree():
+			_orb_blast(pos, blast_radius * BLAST_ECHO_RADIUS_MULT, maxi(1, int(float(damage) * BLAST_ECHO_DMG_MULT)))
+	queue_free()
+
+func _orb_blast(pos: Vector2, rad: float, dmg: int) -> void:
+	Global.burst(pos, color, 14, 170.0, 1.8)
+	Global.shake(0.12, 0.1)
+	var fx := Node2D.new()
+	fx.set_script(RingFx)
+	fx.max_radius = rad
+	fx.color = color
+	fx.duration = 0.3
+	Global.world.add_child(fx)
+	fx.global_position = pos
+	var targets: Array = get_tree().get_nodes_in_group("enemies") + get_tree().get_nodes_in_group("boss")
+	for e in targets:
+		if not is_instance_valid(e) or not bool(e.get("alive")) or e.get("active") == false:
+			continue
+		if e.global_position.distance_to(pos) > rad + BLAST_REACH:
+			continue
+		e.take_damage(dmg, pos, 0.0 if e.is_in_group("boss") else knock * BLAST_KNOCK_MULT)
+		Global.on_player_hit(e, dmg, is_crit)
+		if blast_status == "slow" and e.has_method("apply_status"):
+			e.apply_status("slow", BLAST_SLOW_TIME)
+
 func _draw() -> void:
+	if beam_len > 0.0:
+		draw_line(Vector2(-beam_len, 0.0), Vector2.ZERO, Color(color, 0.30), radius * 3.0)
+		draw_line(Vector2(-beam_len, 0.0), Vector2.ZERO, Color(color, 0.85), radius * 1.4)
+		draw_line(Vector2(-beam_len * 0.8, 0.0), Vector2.ZERO, Color.WHITE, radius * 0.6)
 	var trail: float = radius * (6.0 if (pierce or pierce_left > 0) else 2.5)
 	draw_line(Vector2(-trail, 0.0), Vector2.ZERO, Color(color, 0.5), radius * 1.4)
 	draw_circle(Vector2.ZERO, radius, color)

@@ -121,6 +121,12 @@ static func weapons() -> String:
 		line += ", %.1f shots/s" % (1.0 / float(w["cooldown"]))
 		if int(w.get("pierce_count", 0)) > 0:
 			line += ", pierces %d enemies" % int(w["pierce_count"])
+		if w.has("charge_time"):
+			line += ". HOLD the mouse to draw the bow (%s s to full), release to fire: stronger, faster and more piercing the longer you draw" % _num(float(w["charge_time"]))
+		if bool(w.get("beam", false)):
+			line += ". Fires a beam that pierces every enemy in a line"
+		if w.has("blast_radius"):
+			line += ". The orb explodes in a %d px radius, hurting everything inside" % int(w["blast_radius"])
 		t += line + "\n"
 	t += _sub("Melee")
 	for wid in Global.weapons:
