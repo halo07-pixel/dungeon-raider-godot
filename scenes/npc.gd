@@ -280,9 +280,9 @@ func _roll_gacha(cost: int, is_premium: bool) -> void:
 	win_rarity = r_list[r_int - 1]
 	Global.run_stats["gacha_" + win_rarity] += 1
 	
-	# Xác định Vũ khí theo Class
-	var w_pool = ["pistol", "laser", "shotgun","smg"] if Global.current_class == "ranger" else ["broadsword", "daggers", "hammer"]
-	win_id = w_pool.pick_random()
+	# Vũ khí mọi class đều dùng được: random trong toàn bộ kho
+	var w_pool: Array = Global.weapons.keys()
+	win_id = String(w_pool.pick_random())
 	
 	# ----------------------------------------------------
 	# XÂY DỰNG BĂNG CHUYỀN CS:GO
@@ -373,13 +373,22 @@ func _on_spin_finished() -> void:
 	btn_box.add_theme_constant_override("separation", 40)
 	confirm_box.add_child(btn_box)
 	
-	btn_box.add_child(_create_btn("EQUIP NEW", _equip_new, Vector2(250, 60), Color(0.2, 0.6, 0.3)))
-	btn_box.add_child(_create_btn("KEEP CURRENT", _discard_new, Vector2(250, 60), Color(0.7, 0.2, 0.2)))
+	# Còn ô trống: vũ khí mới vào ô 2 (không mất vũ khí cũ). Đủ 2 ô: thay vũ khí đang cầm.
+	var has_free: bool = is_instance_valid(Global.player) and Global.player.has_method("has_free_weapon_slot") and Global.player.has_free_weapon_slot()
+	var note = Label.new()
+	note.text = "You have a free weapon slot: you keep both." if has_free else "Both slots full: this replaces the weapon in your hand."
+	note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_apply_font(note, 12)
+	confirm_box.add_child(note)
+	confirm_box.move_child(note, btn_box.get_index())
+
+	btn_box.add_child(_create_btn("TAKE NEW" if has_free else "EQUIP NEW", _equip_new, Vector2(250, 60), Color(0.2, 0.6, 0.3)))
+	btn_box.add_child(_create_btn("SKIP" if has_free else "KEEP CURRENT", _discard_new, Vector2(250, 60), Color(0.7, 0.2, 0.2)))
 
 
 func _equip_new() -> void:
-	if is_instance_valid(Global.player) and Global.player.has_method("set_weapon_with_rarity"):
-		Global.player.set_weapon_with_rarity(win_id, win_rarity)
+	if is_instance_valid(Global.player) and Global.player.has_method("equip_weapon"):
+		Global.player.equip_weapon(win_id, win_rarity) # vũ khí bị thay (nếu có) bỏ đi như trước đây
 	_reset_to_shop()
 
 func _discard_new() -> void:

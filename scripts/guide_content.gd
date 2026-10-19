@@ -67,7 +67,8 @@ static func basics() -> String:
 	t += "Aim and attack: [b]Mouse[/b] (hold to keep attacking)\n"
 	t += "Dodge roll: %s (brief invulnerability, short cooldown)\n" % _key("dodge")
 	t += "Class skill: %s (after your class evolves)\n" % _key("skill")
-	t += "Interact: %s (altars, chests, shrines)\n" % _key("interact")
+	t += "Interact: %s (altars, chests, shrines, picking up weapons)\n" % _key("interact")
+	t += "Swap weapon: %s or [b]Right mouse[/b] (you can carry 2 weapons; any class can use any weapon)\n" % _key("swap_weapon")
 	t += "Movement keys and dodge can be changed in Settings.\n"
 	t += _sub("A run")
 	t += "Each floor is a set of rooms. Clear a room to open its doors and pick 1 of 3 buffs. "
@@ -97,8 +98,9 @@ static func classes() -> String:
 			t += "  Evolves into [b]%s[/b] (%s).\n" % [evo["name"], need]
 			t += "  Skill [b]%s[/b], cooldown %s s: %s\n" % [evo["skill_name"], _num(float(sk.get("cooldown", 0.0))), String(evo["desc"]).replace("[Q]", Global.key_name_for_action("skill") + ":")]
 		t += "\n"
-	t += "Melee classes use short-range sweeping attacks and take hits better. Ranged classes keep distance, "
-	t += "and get ranged-only buffs such as Ricochet and Homing. Melee-only buffs such as Sword Wave only appear for melee weapons.\n"
+	t += "A class sets your HP, starting weapon and skill. Any class can use any weapon, and you carry two. "
+	t += "The weapon in your hand decides the buffs you are offered: ranged-only buffs such as Ricochet and Homing appear while holding a gun, "
+	t += "melee-only buffs such as Sword Wave while holding a blade.\n"
 	return t
 
 # ---------------------------------------------------------------- WEAPONS

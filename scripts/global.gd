@@ -14,6 +14,8 @@ signal floor_started(floor_num: int)
 signal player_hit_landed(target: Node, dmg: int, is_crit: bool)
 ## Player vừa nhận sát thương (HUD nghe để nháy viền đỏ khi đòn nặng).
 signal player_damaged(amount: int, max_hp: int)
+## Player đổi vũ khí lấy từ ô đang cầm (nhặt bằng E khi đủ ô) -> Dungeon nghe để đặt vũ khí cũ xuống sàn.
+signal weapon_drop_requested(weapon_id: String, rarity: String, pos: Vector2)
 
 const TILE: int = 32
 
@@ -111,6 +113,57 @@ var weapons: Dictionary = {
 	"daggers": {"name": "Daggers", "damage": 17, "cooldown": 0.22, "is_melee": true, "range": 40.0, "cleave_angle": 80.0, "knock": 120.0, "color": Color(0.6, 0.9, 0.6), "sfx": "dodge"},
 	"hammer": {"name": "War Hammer", "damage": 40, "cooldown": 0.90, "is_melee": true, "range": 65.0, "cleave_angle": 160.0, "knock": 550.0, "color": Color(1.0, 0.5, 0.2), "sfx": "slam"}
 }
+
+## Số ô vũ khí Player có thể cầm cùng lúc (đổi bằng phím "swap_weapon").
+const MAX_WEAPON_SLOTS: int = 2
+## Độ hiếm vũ khí rơi từ rương/boss dịch dần lên theo tầng: mỗi tầng sau tầng 1 cộng thêm
+## trọng số cho rare/epic/legendary (trừ từ common), dừng ở WEAPON_RARITY_MAX_FLOORS tầng.
+const WEAPON_RARITY_FLOOR_BONUS: Dictionary = {"rare": 1.0, "epic": 1.0, "legendary": 0.5}
+const WEAPON_RARITY_MAX_FLOORS: int = 12
+const WEAPON_RARITY_ORDER: Array = ["common", "rare", "epic", "legendary"]
+
+## Random độ hiếm vũ khí cho tầng `for_floor`. `min_rarity` nâng độ hiếm tối thiểu (vd boss thưởng từ "rare").
+func roll_weapon_rarity(for_floor: int, min_rarity: String = "common") -> String:
+	var steps: int = clampi(for_floor - 1, 0, WEAPON_RARITY_MAX_FLOORS)
+	var weights: Dictionary = {}
+	for rid in WEAPON_RARITY_ORDER:
+		weights[rid] = float(rarities[rid]["weight"])
+	for rid in WEAPON_RARITY_FLOOR_BONUS:
+		var bonus: float = float(WEAPON_RARITY_FLOOR_BONUS[rid]) * float(steps)
+		weights[rid] += bonus
+		weights["common"] = maxf(5.0, weights["common"] - bonus)
+	var total: float = 0.0
+	for rid in WEAPON_RARITY_ORDER:
+		total += float(weights[rid])
+	var pick: float = randf() * total
+	var chosen: String = "common"
+	for rid in WEAPON_RARITY_ORDER:
+		pick -= float(weights[rid])
+		if pick <= 0.0:
+			chosen = rid
+			break
+	if WEAPON_RARITY_ORDER.find(chosen) < WEAPON_RARITY_ORDER.find(min_rarity):
+		chosen = min_rarity
+	return chosen
+
+## Chọn ngẫu nhiên 1 vũ khí (mọi class đều dùng được), ưu tiên không trùng các id trong `exclude`.
+func random_weapon_id(exclude: Array = []) -> String:
+	var pool: Array = []
+	for w_id in weapons:
+		if not exclude.has(w_id):
+			pool.append(w_id)
+	if pool.is_empty():
+		pool = weapons.keys()
+	return String(pool.pick_random())
+
+## Dòng chỉ số ngắn cho gợi ý nhặt đồ: "DMG 12 · 0.30s" (đã nhân hệ số độ hiếm).
+func weapon_summary(w_id: String, rarity: String) -> String:
+	var w: Dictionary = weapons.get(w_id, {})
+	if w.is_empty():
+		return ""
+	var mult: float = float(rarities.get(rarity, rarities["common"])["mult"])
+	var kind: String = "melee" if bool(w.get("is_melee", false)) else "ranged"
+	return "%s · DMG %d · %.2fs" % [kind, int(float(w["damage"]) * mult), float(w["cooldown"])]
 
 var classes: Dictionary = {
 	"ranger": {"name": "Ranger", "max_hp": 100, "default_weapon": "pistol"},
@@ -658,6 +711,12 @@ func _setup_input() -> void:
 	_add_key("dodge", KEY_SPACE)
 	_add_key("skill", KEY_Q)
 	_add_key("interact", KEY_E)
+	_add_key("swap_weapon", KEY_TAB)
+	if not InputMap.has_action("swap_weapon"):
+		InputMap.add_action("swap_weapon")
+	var swap_mb := InputEventMouseButton.new()
+	swap_mb.button_index = MOUSE_BUTTON_RIGHT
+	InputMap.action_add_event("swap_weapon", swap_mb)
 	_add_key("confirm", KEY_ENTER)
 	_add_key("confirm", KEY_KP_ENTER)
 	_add_key("restart", KEY_R)

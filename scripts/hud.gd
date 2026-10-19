@@ -19,6 +19,7 @@ var boss_ticks: Control
 var _boss_phases: int = 3
 var info_label: Label
 var skill_label: Label
+var weapon_labels: Array = [] ## 2 nhãn, mỗi nhãn một ô vũ khí (ô đang cầm sáng + có dấu ">")
 var boss_box: Control
 var boss_bar: ProgressBar
 var boss_label: Label
@@ -52,12 +53,34 @@ func _process(_delta: float) -> void:
 	dodge_bar.value = p.dodge_ratio() * 100.0
 	_update_shield(p)
 	
-	var w_name = "None"
-	if p.get("weapon") and p.weapon.has("name"):
-		w_name = p.weapon["name"]
-	info_label.text = "Floor %d   ·   %s   ·   Gold: %d" % [Global.floor_num, w_name, Global.coins]
+	info_label.text = "Floor %d   ·   Gold: %d" % [Global.floor_num, Global.coins]
+	_update_weapon_labels(p)
 	_update_skill_label(p)
 	_update_debug_label()
+
+## Hai ô vũ khí: ô đang cầm có dấu ">" và sáng; ô kia mờ (đổi bằng phím swap_weapon). Màu chữ theo độ hiếm.
+func _update_weapon_labels(p) -> void:
+	var slots = p.get("weapon_slots")
+	if not (slots is Array):
+		return
+	var swap_key: String = Global.key_name_for_action("swap_weapon")
+	for i in weapon_labels.size():
+		var lbl: Label = weapon_labels[i]
+		var slot: Dictionary = slots[i] if i < slots.size() else {}
+		if slot.is_empty():
+			lbl.text = "  [%d] - empty -" % (i + 1)
+			lbl.modulate = Color(0.55, 0.55, 0.55, 0.7)
+			continue
+		var w: Dictionary = Global.weapons[String(slot["id"])]
+		var r: Dictionary = Global.rarities[String(slot["rarity"])]
+		var active: bool = (i == int(p.active_slot))
+		lbl.text = "%s[%d] %s (%s)%s" % ["> " if active else "  ", i + 1, w["name"], r["name"], ("   [%s] swap" % swap_key) if active and not _other_empty(slots, i) else ""]
+		var c: Color = r["color"]
+		lbl.modulate = c if active else Color(c.r, c.g, c.b, 0.55)
+
+func _other_empty(slots: Array, i: int) -> bool:
+	var j: int = 1 - i
+	return j >= slots.size() or (slots[j] as Dictionary).is_empty()
 
 ## Chỉ báo kỹ năng class tiến hoá: "[Q] Barrage READY" hoặc đếm ngược hồi chiêu.
 func _update_skill_label(p) -> void:
@@ -228,6 +251,8 @@ func _build_ui() -> void:
 	info_label = _label(self, "", 16, Vector2(20.0, 72.0), Vector2(500.0, 26.0))
 	skill_label = _label(self, "", 14, Vector2(20.0, 98.0), Vector2(300.0, 22.0))
 	skill_label.visible = false
+	for i in Global.MAX_WEAPON_SLOTS:
+		weapon_labels.append(_label(self, "", 14, Vector2(20.0, 122.0 + 20.0 * float(i)), Vector2(360.0, 22.0)))
 
 	var grad := Gradient.new()
 	grad.set_color(0, Color(0.9, 0.0, 0.0, 0.0))
