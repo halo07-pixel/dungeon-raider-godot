@@ -107,6 +107,13 @@ var weapons: Dictionary = {
 	"pistol": {"name": "Pistol", "damage": 10, "cooldown": 0.30, "speed": 640.0, "pellets": 1, "spread": 3.0, "pierce": false, "life": 1.1, "recoil": 45.0, "radius": 5.0, "color": Color(1.0, 0.9, 0.4), "sfx": "shoot", "is_melee": false},
 	"smg": {"name": "SMG", "damage": 5, "cooldown": 0.085, "speed": 700.0, "pellets": 1, "spread": 9.0, "pierce": false, "life": 1.0, "recoil": 18.0, "radius": 4.0, "color": Color(1.0, 0.65, 0.25), "sfx": "shoot", "is_melee": false},
 	"shotgun": {"name": "Shotgun", "damage": 7, "cooldown": 0.75, "speed": 560.0, "pellets": 6, "spread": 36.0, "pierce": false, "life": 0.45, "recoil": 150.0, "radius": 4.0, "color": Color(1.0, 0.5, 0.3), "sfx": "shotgun", "is_melee": false},
+	# --- Vũ khí tầm xa có cơ chế riêng (xem Player._shoot/_tick_charge và Bullet) ---
+	# Longbow: GIỮ chuột để căng dây, nhả để bắn. Càng căng lâu càng mạnh/nhanh/xuyên (charge_min..charge_max = hệ số sát thương).
+	"bow": {"name": "Longbow", "damage": 22, "cooldown": 0.35, "speed": 760.0, "pellets": 1, "spread": 0.0, "pierce": false, "life": 1.0, "recoil": 30.0, "radius": 4.0, "color": Color(0.95, 0.85, 0.55), "sfx": "shoot", "is_melee": false, "charge_time": 0.75, "charge_min": 0.3, "charge_max": 2.4},
+	# Railgun: bắn chậm, tia xuyên MỌI quái trên đường thẳng (beam = đạn xuyên vô hạn kèm vệt tia dài).
+	"railgun": {"name": "Railgun", "damage": 45, "cooldown": 1.6, "speed": 1500.0, "pellets": 1, "spread": 0.0, "pierce": false, "life": 0.6, "recoil": 220.0, "radius": 6.0, "color": Color(0.4, 0.9, 1.0), "sfx": "laser", "is_melee": false, "beam": true},
+	# Arcane Staff: quả cầu nổ diện rộng (blast_radius px) khi chạm quái/tường/hết tầm; sát thương nổ áp cho mọi quái trong vùng.
+	"staff": {"name": "Arcane Staff", "damage": 18, "cooldown": 0.75, "speed": 430.0, "pellets": 1, "spread": 2.0, "pierce": false, "life": 1.1, "recoil": 40.0, "radius": 7.0, "color": Color(0.7, 0.45, 1.0), "sfx": "laser", "is_melee": false, "blast_radius": 64.0},
 	"laser": {"name": "Laser Gun", "damage": 14, "cooldown": 0.50, "speed": 1100.0, "pellets": 1, "spread": 0.0, "pierce": false, "pierce_count": 2, "life": 0.9, "recoil": 60.0, "radius": 4.0, "color": Color(0.4, 1.0, 1.0), "sfx": "laser", "is_melee": false},
 
 	"broadsword": {"name": "Longsword", "damage": 25, "cooldown": 0.45, "is_melee": true, "range": 55.0, "cleave_angle": 180.0, "knock": 280.0, "color": Color(0.9, 0.9, 0.9), "sfx": "dodge"},
