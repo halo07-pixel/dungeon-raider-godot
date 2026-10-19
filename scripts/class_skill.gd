@@ -10,6 +10,7 @@ extends Node
 
 const BULLET = preload("res://scenes/bullet.tscn")
 const RingFx = preload("res://scripts/skill_ring_fx.gd")
+const SkillUpgrades = preload("res://scripts/skill_upgrades.gd")
 
 signal skill_used(skill_id: String)
 ## Hồi chiêu xong (sẵn sàng dùng lại).
@@ -30,6 +31,7 @@ var player: Node = null
 var skill_id: String = ""
 var skill_name: String = ""
 var cooldown_total: float = 1.0
+var base_cooldown: float = 1.0
 var cooldown_left: float = 0.0
 ## Thời gian còn lại của hiệu ứng kéo dài (0 = không có hiệu ứng đang chạy).
 var active_left: float = 0.0
@@ -39,7 +41,18 @@ func setup(p_player: Node, p_skill_id: String) -> void:
 	skill_id = p_skill_id
 	var cfg: Dictionary = SKILLS.get(p_skill_id, {})
 	skill_name = String(cfg.get("name", ""))
-	cooldown_total = float(cfg.get("cooldown", 8.0))
+	base_cooldown = float(cfg.get("cooldown", 8.0))
+	cooldown_total = _effective_cooldown()
+
+## Cộng / nhân dồn các nâng cấp trong run (Global.skill_upgrades_taken) áp cho kỹ năng này.
+func _add(key: String) -> float:
+	return SkillUpgrades.mod_add(skill_id, Global.skill_upgrades_taken, key)
+
+func _mult(key: String) -> float:
+	return SkillUpgrades.mod_mult(skill_id, Global.skill_upgrades_taken, key)
+
+func _effective_cooldown() -> float:
+	return maxf(1.0, base_cooldown + _add("cooldown_add"))
 
 func is_ready() -> bool:
 	return cooldown_left <= 0.0
@@ -66,6 +79,7 @@ func try_activate() -> bool:
 		return false
 	if player.rolling:
 		return false
+	cooldown_total = _effective_cooldown()
 	cooldown_left = cooldown_total
 	skill_used.emit(skill_id)
 	match skill_id:
@@ -100,18 +114,20 @@ const BARRAGE_PITCH: Array = [1.0, 1.1, 0.92] # cao độ từng loạt đạn k
 func _barrage() -> void:
 	Global.shake(0.35, 0.3)
 	Global.sfx("barrage_cast")
-	for v in BARRAGE_VOLLEYS:
+	var volleys: int = BARRAGE_VOLLEYS + int(_add("volleys_add"))
+	var bullets: int = BARRAGE_BULLETS + int(_add("bullets_add"))
+	for v in volleys:
 		if not is_instance_valid(player) or not player.alive:
 			return
-		_fire_volley(float(BARRAGE_PITCH[v % BARRAGE_PITCH.size()]))
+		_fire_volley(float(BARRAGE_PITCH[v % BARRAGE_PITCH.size()]), bullets)
 		await get_tree().create_timer(BARRAGE_GAP).timeout
 
-func _fire_volley(pitch: float = 1.0) -> void:
-	var dmg: int = maxi(1, int((8.0 + 1.2 * float(Global.floor_num)) * _dmg_mult()))
+func _fire_volley(pitch: float = 1.0, bullets: int = BARRAGE_BULLETS) -> void:
+	var dmg: int = maxi(1, int((8.0 + 1.2 * float(Global.floor_num)) * _dmg_mult() * _mult("dmg_mult")))
 	var base: float = player.aim_dir.angle()
 	var fan: float = deg_to_rad(BARRAGE_FAN_DEG)
-	for i in BARRAGE_BULLETS:
-		var off: float = lerpf(-fan * 0.5, fan * 0.5, float(i) / float(BARRAGE_BULLETS - 1))
+	for i in bullets:
+		var off: float = lerpf(-fan * 0.5, fan * 0.5, float(i) / float(bullets - 1))
 		var b = BULLET.instantiate()
 		b.setup(true, Vector2.from_angle(base + off), dmg, 680.0, 0.9, Color(0.5, 0.9, 1.0), 5.0)
 		Global.world.add_child(b)
@@ -140,10 +156,14 @@ func _slam() -> void:
 ## Vụ nổ quanh Player: gây sát thương + đẩy lùi quái/boss trong bán kính; tuỳ chọn xoá đạn địch.
 func _blast(radius: float, dmg_base: float, dmg_per_floor: float, knock: float, clear_bullets: bool, color: Color, burst_n: int, shake: float) -> void:
 	var origin: Vector2 = player.global_position
-	var dmg: int = maxi(1, int((dmg_base + dmg_per_floor * float(Global.floor_num)) * _dmg_mult()))
+	radius *= _mult("radius_mult") # nâng cấp trong run
+	var dmg: int = maxi(1, int((dmg_base + dmg_per_floor * float(Global.floor_num)) * _dmg_mult() * _mult("dmg_mult")))
+	var stun: float = _add("stun_add")
 	for e in get_tree().get_nodes_in_group("enemies"):
 		if is_instance_valid(e) and e.alive and e.global_position.distance_to(origin) <= radius:
 			e.take_damage(dmg, origin, knock)
+			if stun > 0.0 and e.alive and e.has_method("apply_status"):
+				e.apply_status("stun", stun)
 			Global.on_secondary_hit(e, dmg, false)
 	for b in get_tree().get_nodes_in_group("boss"):
 		if is_instance_valid(b) and b.alive and b.global_position.distance_to(origin) <= radius + 20.0:
@@ -169,8 +189,8 @@ const OVERDRIVE_DURATION: float = 4.0
 const OVERDRIVE_CD_MULT: float = 0.5
 
 func _overdrive() -> void:
-	active_left = OVERDRIVE_DURATION
-	player.skill_attack_cd_mult = OVERDRIVE_CD_MULT
+	active_left = OVERDRIVE_DURATION + _add("duration_add")
+	player.skill_attack_cd_mult = OVERDRIVE_CD_MULT * _mult("attack_cd_mult")
 	Global.burst(player.global_position, Color(1.0, 0.8, 0.3), 14, 200.0, 1.4)
 	Global.shake(0.3, 0.2)
 	Global.sfx("barrage_cast")

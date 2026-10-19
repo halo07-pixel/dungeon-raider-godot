@@ -877,6 +877,7 @@ func _room_cleared(cell: Vector2i) -> void:
 	if room["type"] == "boss":
 		_spawn_pickup("portal", "", room_center(cell))
 		Global.message.emit("The stairs down have opened!", Color(0.6, 0.6, 1.0))
+		Global.queue_skill_upgrade_for_floor(Global.floor_num) # nâng cấp kỹ năng được mời SAU lượt chọn buff bên dưới
 		if Global.floor_num % BOSS_WEAPON_REWARD_EVERY == 0:
 			_spawn_pickup("weapon", _roll_weapon_drop(Global.roll_weapon_rarity(Global.floor_num, "rare")), room_center(cell) + Vector2(-72.0, 0.0))
 			Global.message.emit("The boss dropped a weapon!", Color(1.0, 0.85, 0.3))

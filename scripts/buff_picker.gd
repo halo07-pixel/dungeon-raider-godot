@@ -174,7 +174,7 @@ func _on_buff_choice_requested(choices: Array) -> void:
 		_on_card_hover(i, false)
 		var id: String = choices[i]
 		c["id"] = id
-		var info: Dictionary = Global.buff_pool[id]
+		var info: Dictionary = Global.buff_info(id)
 		var tier: String = info["tier"]
 		var color: Color = Global.BUFF_TIER_COLOR.get(tier, Color.WHITE)
 

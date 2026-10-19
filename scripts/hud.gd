@@ -89,14 +89,16 @@ func _update_skill_label(p) -> void:
 		skill_label.visible = false
 		return
 	skill_label.visible = true
+	var ups: int = Global.skill_upgrade_count(String(sk.skill_id))
+	var up_tag: String = (" +%d" % ups) if ups > 0 else ""
 	if sk.active_left > 0.0:
-		skill_label.text = "[Q] %s  ACTIVE %.1fs" % [sk.skill_name, sk.active_left]
+		skill_label.text = "[Q] %s%s  ACTIVE %.1fs" % [sk.skill_name, up_tag, sk.active_left]
 		skill_label.modulate = Color(1.0, 0.6, 0.2)
 	elif sk.is_ready():
-		skill_label.text = "[Q] %s  READY" % sk.skill_name
+		skill_label.text = "[Q] %s%s  READY" % [sk.skill_name, up_tag]
 		skill_label.modulate = Color(1.0, 0.9, 0.4)
 	else:
-		skill_label.text = "[Q] %s  %.1fs" % [sk.skill_name, sk.cooldown_left]
+		skill_label.text = "[Q] %s%s  %.1fs" % [sk.skill_name, up_tag, sk.cooldown_left]
 		skill_label.modulate = Color(0.7, 0.7, 0.7)
 
 ## TẠM: debug overlay bắt bug "qua tầng mới spawn vào phòng quái thay vì phòng start"
