@@ -15,6 +15,8 @@ var is_game_over: bool = false
 var is_victory_screen: bool = false
 ## Thưởng Ngọc Tím một lần duy nhất khi lần đầu hạ Dungeon Lord (tầng 10) trong ván này.
 const VICTORY_GEM_BONUS: int = 20
+## Phiên bản định dạng saved_run. 1 = 1 vũ khí (weapon_id/weapon_rarity); 2 = thêm weapon_slots + active_slot.
+const SAVE_VERSION: int = 2
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS 
@@ -96,10 +98,15 @@ func _floor_label(f: int) -> String:
 
 func _restore_player_state() -> void:
 	if is_instance_valid(player):
-		var w_id = Global.saved_run.get("weapon_id", "pistol")
-		var w_rarity = Global.saved_run.get("weapon_rarity", "common")
-		if player.has_method("set_weapon_with_rarity"):
-			player.set_weapon_with_rarity(w_id, w_rarity)
+		# Save mới (save_version >= 2) lưu 2 ô vũ khí; save cũ chỉ có weapon_id/weapon_rarity -> vào ô 1.
+		var saved_slots = Global.saved_run.get("weapon_slots", null)
+		if saved_slots is Array and player.has_method("restore_weapons"):
+			player.restore_weapons(saved_slots, int(Global.saved_run.get("active_slot", 0)))
+		else:
+			var w_id = String(Global.saved_run.get("weapon_id", "pistol"))
+			var w_rarity = String(Global.saved_run.get("weapon_rarity", "common"))
+			if player.has_method("restore_weapons"):
+				player.restore_weapons([{"id": w_id, "rarity": w_rarity}, {}], 0)
 		# Buff phải được khôi phục TRƯỚC (một số buff đổi max_hp / giáp)
 		Global.run_buffs = Dictionary(Global.saved_run.get("run_buffs", {})).duplicate()
 		Global.run_buffs.erase("buff_lifesteal") # buff đã bị gỡ khỏi game; bỏ khỏi save cũ
@@ -212,10 +219,13 @@ func _add_btn(text: String, action: Callable) -> void:
 ## Gói trạng thái ván hiện tại để lưu (tách riêng khỏi việc đổi scene để test được).
 func _build_saved_run() -> Dictionary:
 	return {
+		"save_version": SAVE_VERSION,
 		"class": Global.current_class,
 		"hp": player.hp,
-		"weapon_id": player.weapon_id,
+		"weapon_id": player.weapon_id, # giữ để save mới vẫn đọc được bằng bản cũ (ô đang cầm)
 		"weapon_rarity": player.weapon_rarity,
+		"weapon_slots": player.weapon_slots.duplicate(true),
+		"active_slot": player.active_slot,
 		"has_revived": player.has_revived, # LƯU TRẠNG THÁI HỒI SINH
 		"max_hp": player.max_hp,
 		"shield": player.shield,

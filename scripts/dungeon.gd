@@ -14,6 +14,8 @@ const PoisonTileScript = preload("res://scripts/poison_tile.gd")
 const SquadDirectorScript = preload("res://scripts/squad_director.gd")
 const LavaTileScript = preload("res://scripts/lava_tile.gd")
 const IceTileScript = preload("res://scripts/ice_tile.gd")
+## Boss ở các tầng chia hết cho số này rơi thêm 1 vũ khí (tối thiểu Rare). Tầng 5, 10, 15...
+const BOSS_WEAPON_REWARD_EVERY: int = 5
 const LordArenaRuneScript = preload("res://scripts/lord_arena_rune.gd")
 const AffixScript = preload("res://scripts/enemy_affix.gd")
 const EventRooms = preload("res://scripts/event_rooms.gd")
@@ -114,6 +116,7 @@ func _ready() -> void:
 	entities.y_sort_enabled = false
 	add_child(entities)
 	Global.world = entities
+	Global.weapon_drop_requested.connect(_on_weapon_drop_requested)
 
 
 ## Chỉ dựng lại atlas tileset khi ĐỔI biome (giữa các tầng cùng biome thì giữ nguyên,
@@ -436,32 +439,9 @@ func _enter_room(cell: Vector2i) -> void:
 		"treasure":
 			room["cleared"] = true
 			
-			# LỌC VŨ KHÍ THEO CLASS
-			var is_brawler = (Global.current_class == "brawler")
-			var valid_weapons: Array = []
-			for w_id in Global.weapons:
-				if Global.weapons[w_id]["is_melee"] == is_brawler:
-					valid_weapons.append(w_id)
-			
-			var cur_id: String = Global.player.weapon_id
-			valid_weapons.erase(cur_id)
-			if valid_weapons.is_empty():
-				valid_weapons.append(cur_id) # Đề phòng lỗi thiếu đồ
-				
-			var chosen_weapon: String = valid_weapons.pick_random()
-			
-			# VÒNG QUAY GACHA ĐỘ HIẾM (50 - 30 - 15 - 5)
-			var roll = randi() % 100
-			var rarity = "common"
-			if roll >= 95:
-				rarity = "legendary"
-			elif roll >= 80:
-				rarity = "epic"
-			elif roll >= 50:
-				rarity = "rare"
-				
-			# Nối ID vũ khí và độ hiếm bằng dấu ":"
-			_spawn_pickup("weapon", chosen_weapon + ":" + rarity, room_center(cell) + Vector2(0.0, -24.0))
+			# Vũ khí mọi class đều dùng được (không còn lọc theo class); tránh trùng với 2 ô đang cầm.
+			var rarity: String = Global.roll_weapon_rarity(Global.floor_num)
+			_spawn_pickup("weapon", _roll_weapon_drop(rarity), room_center(cell) + Vector2(0.0, -24.0))
 			_spawn_chest_decor(room_center(cell) + Vector2(0.0, 10.0))
 			Global.message.emit("Treasure Room!", Color(1.0, 0.85, 0.3))
 		"altar":
@@ -897,6 +877,9 @@ func _room_cleared(cell: Vector2i) -> void:
 	if room["type"] == "boss":
 		_spawn_pickup("portal", "", room_center(cell))
 		Global.message.emit("The stairs down have opened!", Color(0.6, 0.6, 1.0))
+		if Global.floor_num % BOSS_WEAPON_REWARD_EVERY == 0:
+			_spawn_pickup("weapon", _roll_weapon_drop(Global.roll_weapon_rarity(Global.floor_num, "rare")), room_center(cell) + Vector2(-72.0, 0.0))
+			Global.message.emit("The boss dropped a weapon!", Color(1.0, 0.85, 0.3))
 		# Cân bằng lại: trước đây mời chọn buff sau MỌI phòng dọn sạch (quá dễ cày),
 		# giờ chỉ 1 lần chọn buff duy nhất mỗi tầng, ngay sau khi hạ Boss.
 		Global.request_buff_choice()
@@ -910,6 +893,21 @@ func _room_cleared(cell: Vector2i) -> void:
 		Global.message.emit("Room cleared!", Color(0.6, 1.0, 0.6))
 		if randf() < 0.35:
 			_spawn_pickup("heal", "", room_center(cell))
+
+
+## Chuỗi "id:rarity" cho một vũ khí rơi mới, tránh trùng id với các ô Player đang cầm.
+func _roll_weapon_drop(rarity: String) -> String:
+	var held: Array = []
+	if is_instance_valid(Global.player):
+		for slot in Global.player.weapon_slots:
+			if not slot.is_empty():
+				held.append(String(slot["id"]))
+	return Global.random_weapon_id(held) + ":" + rarity
+
+
+## Player đổi vũ khí tại chỗ (nhặt bằng E khi đủ ô): đặt vũ khí cũ xuống sàn để còn nhặt lại được.
+func _on_weapon_drop_requested(w_id: String, rarity: String, pos: Vector2) -> void:
+	_spawn_pickup("weapon", w_id + ":" + rarity, pos)
 
 
 ## Rương trang trí (tĩnh, không va chạm) đặt dưới vũ khí trong phòng Kho báu — chỉ để đẹp,

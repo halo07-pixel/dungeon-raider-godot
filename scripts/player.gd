@@ -2,6 +2,8 @@ extends CharacterBody2D
 ## Player: Tích hợp bảng hiệu ứng Sử thi/Huyền thoại chi tiết, Combo Dao Găm & Chém Đạn.
 
 signal died
+## Ô vũ khí / ô đang cầm vừa đổi (HUD đọc weapon_slots + active_slot khi nghe tín hiệu này).
+signal weapons_changed
 
 const BULLET = preload("res://scenes/bullet.tscn")
 const ClassSkillScript = preload("res://scripts/class_skill.gd")
@@ -39,6 +41,12 @@ const PIERCE_PISTOL_EPIC: int = 1 # Pistol Epic
 const PIERCE_SWEEP: int = 1       # buff Sweep (tầm xa)
 const PIERCE_SUPER: int = 2       # buff Mega Shot (phát thứ 6): tối thiểu 2, Laser = cơ bản + 1
 var shield_delay_timer: float = 0.0
+## Đổi vũ khí bị chặn trong khoảng này sau khi đổi (giây) — không dùng đổi để "bỏ" hồi chiêu bắn.
+const SWAP_COOLDOWN: float = 0.25
+## 2 ô vũ khí: mỗi ô {"id": String, "rarity": String} hoặc {} nếu trống. weapon_id/weapon_rarity/weapon/
+## rarity_data bên dưới LUÔN phản ánh ô đang cầm (active_slot) nên toàn bộ code bắn/chém cũ không đổi.
+var weapon_slots: Array = [{}, {}]
+var active_slot: int = 0
 var weapon_id: String = "pistol"
 var weapon_rarity: String = "common"
 var rarity_data: Dictionary = {}
@@ -255,6 +263,8 @@ func _physics_process(delta: float) -> void:
 
 	if Input.is_action_just_pressed("dodge") and not rolling and dodge_cooldown.is_stopped():
 		_start_roll(input_dir if input_dir != Vector2.ZERO else aim_dir)
+	if Input.is_action_just_pressed("swap_weapon"):
+		swap_weapon()
 
 	var speed_mult: float = 0.55 if slow_timer > 0.0 else 1.0
 	if rolling: velocity = roll_dir * ROLL_SPEED
@@ -612,14 +622,83 @@ func _swing() -> void:
 # ==============================================================================
 # HỆ THỐNG TIỆN ÍCH
 # ==============================================================================
+## Đặt thẳng vũ khí vào ô ĐANG CẦM (ghi đè) — dùng cho vũ khí khởi đầu và tương thích code cũ.
+## Nhặt vũ khí mới trong lúc chơi dùng equip_weapon() (biết dùng ô trống trước).
 func set_weapon_with_rarity(id: String, rarity: String) -> void:
-	weapon_id = id
-	weapon_rarity = rarity
-	weapon = Global.weapons[id]
-	rarity_data = Global.rarities[rarity]
-	weapon_sprite.texture = Global.load_tex("res://assets/dungeon/weapon_%s.png" % id)
+	weapon_slots[active_slot] = {"id": id, "rarity": rarity}
+	_apply_active_weapon()
+	weapons_changed.emit()
 	var display_name = weapon["name"] + " (" + rarity_data["name"] + ")"
 	Global.message.emit("Picked up: " + display_name, rarity_data["color"])
+
+## Nhặt vũ khí: còn ô trống thì vào ô trống (và cầm luôn), đủ ô thì thay vũ khí ô đang cầm.
+## Trả về vũ khí bị thay ({"id","rarity"}) hoặc {} nếu không có — nơi gọi quyết định thả xuống sàn hay bỏ.
+func equip_weapon(id: String, rarity: String) -> Dictionary:
+	var displaced: Dictionary = {}
+	var target: int = _first_empty_slot()
+	if target == -1:
+		target = active_slot
+		displaced = weapon_slots[target]
+	weapon_slots[target] = {"id": id, "rarity": rarity}
+	active_slot = target
+	_apply_active_weapon()
+	weapons_changed.emit()
+	var display_name = weapon["name"] + " (" + rarity_data["name"] + ")"
+	Global.message.emit("Picked up: " + display_name, rarity_data["color"])
+	return displaced
+
+func has_free_weapon_slot() -> bool:
+	return _first_empty_slot() != -1
+
+## Đổi sang ô vũ khí còn lại. Không đổi được khi đang lăn/vung hoặc ô kia trống. Trả về true nếu đổi.
+func swap_weapon() -> bool:
+	if not alive or rolling or swinging or _other_slot_empty():
+		return false
+	active_slot = 1 - active_slot
+	_apply_active_weapon()
+	display_swing_range = 0.0
+	fire_timer.start(maxf(fire_timer.time_left, SWAP_COOLDOWN))
+	weapons_changed.emit()
+	Global.sfx("pickup")
+	Global.message.emit("%s (%s)" % [weapon["name"], rarity_data["name"]], rarity_data["color"])
+	return true
+
+## Khôi phục 2 ô vũ khí từ save. Id/độ hiếm không còn tồn tại bị bỏ; không còn gì thì dùng vũ khí khởi đầu của class.
+func restore_weapons(slots: Array, active: int) -> void:
+	var cleaned: Array = [{}, {}]
+	for i in mini(slots.size(), Global.MAX_WEAPON_SLOTS):
+		var entry = slots[i]
+		if entry is Dictionary and Global.weapons.has(String(entry.get("id", ""))) \
+				and Global.rarities.has(String(entry.get("rarity", ""))):
+			cleaned[i] = {"id": String(entry["id"]), "rarity": String(entry["rarity"])}
+	weapon_slots = cleaned
+	active_slot = clampi(active, 0, Global.MAX_WEAPON_SLOTS - 1)
+	if weapon_slots[active_slot].is_empty():
+		var other: int = 1 - active_slot
+		if weapon_slots[other].is_empty():
+			weapon_slots[active_slot] = {"id": Global.classes[Global.current_class]["default_weapon"], "rarity": "common"}
+		else:
+			active_slot = other
+	_apply_active_weapon()
+	weapons_changed.emit()
+
+func _first_empty_slot() -> int:
+	for i in weapon_slots.size():
+		if weapon_slots[i].is_empty():
+			return i
+	return -1
+
+func _other_slot_empty() -> bool:
+	return weapon_slots[1 - active_slot].is_empty()
+
+## Đồng bộ các biến weapon_* (đọc ở khắp nơi) + sprite theo ô đang cầm.
+func _apply_active_weapon() -> void:
+	var entry: Dictionary = weapon_slots[active_slot]
+	weapon_id = String(entry["id"])
+	weapon_rarity = String(entry["rarity"])
+	weapon = Global.weapons[weapon_id]
+	rarity_data = Global.rarities[weapon_rarity]
+	weapon_sprite.texture = Global.load_tex("res://assets/dungeon/weapon_%s.png" % weapon_id)
 
 func _tick_buff_timers(delta: float) -> void:
 	_tick_arc(delta)
