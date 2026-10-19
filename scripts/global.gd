@@ -166,8 +166,8 @@ func weapon_summary(w_id: String, rarity: String) -> String:
 	return "%s · DMG %d · %.2fs" % [kind, int(float(w["damage"]) * mult), float(w["cooldown"])]
 
 var classes: Dictionary = {
-	"ranger": {"name": "Ranger", "max_hp": 100, "default_weapon": "pistol"},
-	"brawler": {"name": "Brawler", "max_hp": 200, "default_weapon": "broadsword"}
+	"ranger": {"name": "Ranger", "max_hp": 100, "default_weapon": "pistol", "skill": "overdrive"},
+	"brawler": {"name": "Brawler", "max_hp": 200, "default_weapon": "broadsword", "skill": "slam"}
 }
 var current_class: String = "brawler"
 
@@ -948,7 +948,14 @@ func record_boss_kill(kind: String) -> void:
 	save_game()
 
 func class_skill_id() -> String:
-	return MetaProgress.active_skill(profile, current_class)
+	return class_skill_id_for(current_class)
+
+## Kỹ năng đang có của một class: bản tiến hoá nếu đã mở, không thì kỹ năng khởi đầu.
+func class_skill_id_for(cid: String) -> String:
+	var evolved: String = MetaProgress.active_skill(profile, cid)
+	if evolved != "":
+		return evolved
+	return String(classes.get(cid, {}).get("skill", ""))
 
 func save_game() -> void:
 	var file = FileAccess.open(save_path, FileAccess.WRITE)

@@ -66,7 +66,7 @@ static func basics() -> String:
 	t += "Move: %s %s %s %s\n" % [_key("move_up"), _key("move_left"), _key("move_down"), _key("move_right")]
 	t += "Aim and attack: [b]Mouse[/b] (hold to keep attacking)\n"
 	t += "Dodge roll: %s (brief invulnerability, short cooldown)\n" % _key("dodge")
-	t += "Class skill: %s (after your class evolves)\n" % _key("skill")
+	t += "Class skill: %s (every class starts with one; evolving your class unlocks a stronger one)\n" % _key("skill")
 	t += "Interact: %s (altars, chests, shrines, picking up weapons)\n" % _key("interact")
 	t += "Swap weapon: %s or [b]Right mouse[/b] (you can carry 2 weapons; any class can use any weapon)\n" % _key("swap_weapon")
 	t += "Movement keys and dodge can be changed in Settings.\n"
@@ -86,6 +86,9 @@ static func classes() -> String:
 		var c: Dictionary = Global.classes[cid]
 		var w: Dictionary = Global.weapons.get(String(c["default_weapon"]), {})
 		t += "[b][color=#ffd700]%s[/color][/b]: %d HP, starts with %s.\n" % [c["name"], int(c["max_hp"]), String(w.get("name", "?"))]
+		var base_sk: Dictionary = ClassSkillScript.SKILLS.get(String(c.get("skill", "")), {})
+		if not base_sk.is_empty():
+			t += "  Starting skill [b]%s[/b], cooldown %s s: %s\n" % [base_sk["name"], _num(float(base_sk["cooldown"])), String(base_sk["desc"]).replace("[Q]", Global.key_name_for_action("skill") + ":")]
 		var list: Array = MetaProgress.EVOLUTIONS.get(cid, [])
 		for evo in list:
 			var req: Dictionary = evo["req"]
