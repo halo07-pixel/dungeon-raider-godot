@@ -89,7 +89,10 @@ func _update_skill_label(p) -> void:
 		skill_label.visible = false
 		return
 	skill_label.visible = true
-	if sk.is_ready():
+	if sk.active_left > 0.0:
+		skill_label.text = "[Q] %s  ACTIVE %.1fs" % [sk.skill_name, sk.active_left]
+		skill_label.modulate = Color(1.0, 0.6, 0.2)
+	elif sk.is_ready():
 		skill_label.text = "[Q] %s  READY" % sk.skill_name
 		skill_label.modulate = Color(1.0, 0.9, 0.4)
 	else:

@@ -43,6 +43,8 @@ const PIERCE_SUPER: int = 2       # buff Mega Shot (phát thứ 6): tối thiể
 var shield_delay_timer: float = 0.0
 ## Đổi vũ khí bị chặn trong khoảng này sau khi đổi (giây) — không dùng đổi để "bỏ" hồi chiêu bắn.
 const SWAP_COOLDOWN: float = 0.25
+## Kỹ năng class (vd Overdrive) nhân thời gian hồi đòn đánh; 1.0 = bình thường. Chỉ ClassSkill được ghi vào đây.
+var skill_attack_cd_mult: float = 1.0
 ## 2 ô vũ khí: mỗi ô {"id": String, "rarity": String} hoặc {} nếu trống. weapon_id/weapon_rarity/weapon/
 ## rarity_data bên dưới LUÔN phản ánh ô đang cầm (active_slot) nên toàn bộ code bắn/chém cũ không đổi.
 var weapon_slots: Array = [{}, {}]
@@ -135,7 +137,7 @@ func _ready() -> void:
 	sprite.play("idle")
 
 
-## Class đã tiến hoá (meta-progression) → gắn Node kỹ năng riêng, bấm phím "skill" (Q).
+## Mọi class đều có kỹ năng (khởi đầu, hoặc bản tiến hoá nếu đã mở) → gắn Node kỹ năng, bấm phím "skill" (Q).
 func _attach_class_skill() -> void:
 	var sid: String = Global.class_skill_id()
 	if sid == "":
@@ -173,6 +175,8 @@ func _update_sprite() -> void:
 		sprite.modulate = Color(2.2, 1.2, 1.2) if int(float(Time.get_ticks_msec()) / 70.0) % 2 == 0 else Color.WHITE
 		return
 	sprite.modulate = Color(1.0, 1.0, 1.0, 0.6) if rolling else Color.WHITE
+	if skill_attack_cd_mult < 1.0 and not rolling:
+		sprite.modulate = Color(1.0, 0.9, 0.55) # đang Overdrive
 	if burn_ticks > 0 and not rolling:
 		sprite.modulate = Color(1.6, 0.8, 0.45)
 	if rolling or velocity.length() > 5.0:
@@ -397,6 +401,7 @@ func _shoot() -> void:
 
 	# ÁP DỤNG BUFF: Nhanh Nhẹn / Chí Mạng / Tầm Đánh (tầm xa = bay xa+nhanh hơn) / Vung Kiếm Càn Quét (tầm xa = xuyên)
 	cd *= pow(0.9, float(Global.buff_stack("buff_haste")))
+	cd *= skill_attack_cd_mult
 	if randf() < 0.08 * float(Global.buff_stack("buff_crit")):
 		is_crit = true
 	if Global.buff_stack("buff_reach") > 0:
@@ -503,6 +508,7 @@ func _swing() -> void:
 
 	# ÁP DỤNG BUFF: Nhanh Nhẹn / Chí Mạng / Tầm Đánh / Vung Kiếm Càn Quét
 	cd *= pow(0.9, float(Global.buff_stack("buff_haste")))
+	cd *= skill_attack_cd_mult
 	if randf() < 0.08 * float(Global.buff_stack("buff_crit")):
 		is_crit = true
 	if Global.buff_stack("buff_reach") > 0:

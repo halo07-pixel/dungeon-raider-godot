@@ -6,6 +6,7 @@ extends Control
 
 const BG_SCALE: float = 2.0 # 32px gốc -> 64px trên màn hình
 const SETTINGS_MENU_SCENE = preload("res://scenes/settings_menu.tscn")
+const ClassSkillScript = preload("res://scripts/class_skill.gd")
 
 ## Ánh xạ lớp nhân vật -> bộ sprite 0x72 dùng làm thân người (khớp với player.gd).
 const SPRITE_SET: Dictionary = {
@@ -219,10 +220,9 @@ func _class_card_text(cid: String, stats: String) -> String:
 	var P: Dictionary = Global.profile
 	var nm: String = Global.MetaProgress.display_name(P, cid, String(Global.classes[cid]["name"])).to_upper()
 	var t: String = "%s\n\n%s" % [nm, stats]
-	var sid: String = Global.MetaProgress.active_skill(P, cid)
+	var sid: String = Global.class_skill_id_for(cid)
 	if sid != "":
-		var cur: Dictionary = Global.MetaProgress.EVOLUTIONS[cid][Global.MetaProgress.tier_of(P, cid) - 1]
-		t += "\nSkill: %s" % cur["skill_name"]
+		t += "\nSkill: %s" % String(ClassSkillScript.SKILLS.get(sid, {}).get("name", sid))
 	return t
 
 func _build_class_option(prefix: String, label_text: String, action: Callable, color: Color) -> Control:
@@ -367,6 +367,10 @@ func _refresh_profile() -> void:
 			var tier_idx: int = Global.MetaProgress.tier_of(P, cid) - 1
 			var cur: Dictionary = Global.MetaProgress.EVOLUTIONS[cid][tier_idx]
 			profile_box.add_child(_profile_label("%s: %s" % [cur["skill_name"], cur["desc"]], 11, Color(0.6, 1.0, 0.6)))
+		else:
+			var base_sk: Dictionary = ClassSkillScript.SKILLS.get(Global.class_skill_id_for(cid), {})
+			if not base_sk.is_empty():
+				profile_box.add_child(_profile_label("%s: %s" % [base_sk["name"], base_sk["desc"]], 11, Color(0.6, 1.0, 0.6)))
 		if not evo.is_empty():
 			var pr: Array = Global.MetaProgress.progress(P, cid)
 			var req: Dictionary = evo["req"]
