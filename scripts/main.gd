@@ -108,6 +108,10 @@ func _restore_player_state() -> void:
 			if player.has_method("restore_weapons"):
 				player.restore_weapons([{"id": w_id, "rarity": w_rarity}, {}], 0)
 		# Buff phải được khôi phục TRƯỚC (một số buff đổi max_hp / giáp)
+		Global.skill_upgrades_taken.clear()
+		for uid in Global.saved_run.get("skill_upgrades", []):
+			if Global.SkillUpgrades.has(String(uid)):
+				Global.skill_upgrades_taken.append(String(uid))
 		Global.run_buffs = Dictionary(Global.saved_run.get("run_buffs", {})).duplicate()
 		Global.run_buffs.erase("buff_lifesteal") # buff đã bị gỡ khỏi game; bỏ khỏi save cũ
 		Global.run_buffs.erase("buff_deflect") # Deflect đã bị gỡ (thay bằng Fortify); bỏ khỏi save cũ
@@ -226,6 +230,7 @@ func _build_saved_run() -> Dictionary:
 		"weapon_rarity": player.weapon_rarity,
 		"weapon_slots": player.weapon_slots.duplicate(true),
 		"active_slot": player.active_slot,
+		"skill_upgrades": Global.skill_upgrades_taken.duplicate(),
 		"has_revived": player.has_revived, # LƯU TRẠNG THÁI HỒI SINH
 		"max_hp": player.max_hp,
 		"shield": player.shield,

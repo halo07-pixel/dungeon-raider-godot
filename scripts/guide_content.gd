@@ -67,6 +67,7 @@ static func basics() -> String:
 	t += "Aim and attack: [b]Mouse[/b] (hold to keep attacking)\n"
 	t += "Dodge roll: %s (brief invulnerability, short cooldown)\n" % _key("dodge")
 	t += "Class skill: %s (every class starts with one; evolving your class unlocks a stronger one)\n" % _key("skill")
+	t += "After the boss on floors 5 and 10 you also pick 1 of 2 upgrades for your class skill (this run only).\n"
 	t += "Interact: %s (altars, chests, shrines, picking up weapons)\n" % _key("interact")
 	t += "Swap weapon: %s or [b]Right mouse[/b] (you can carry 2 weapons; any class can use any weapon)\n" % _key("swap_weapon")
 	t += "Movement keys and dodge can be changed in Settings.\n"

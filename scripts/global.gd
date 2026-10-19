@@ -440,6 +440,8 @@ func reset_run() -> void:
 	coins = 0
 	stolen_gold_held = 0
 	buff_picks_left = 0
+	skill_upgrades_taken.clear()
+	skill_upgrade_pending = false
 	Engine.time_scale = 1.0
 	_hitstop_active = false
 	reset_run_buffs()
@@ -453,6 +455,7 @@ signal buff_choice_requested(choices: Array)
 signal room_cleared
 
 const BUFF_TIER_COLOR: Dictionary = {
+	"skill": Color(1.0, 0.65, 0.2),
 	"common": Color(0.85, 0.85, 0.85),
 	"rare": Color(0.3, 0.75, 1.0),
 	"epic": Color(0.75, 0.35, 0.95),
@@ -618,14 +621,63 @@ func request_buff_choice() -> void:
 	_offer_next_buff_pick()
 
 ## Phát 3 lựa chọn cho lượt kế tiếp (nếu còn lượt). buff_picker gọi lại sau mỗi lần chọn.
+## Hết lượt buff thường thì mới tới lượt nâng cấp kỹ năng (nếu đang chờ).
 func _offer_next_buff_pick() -> void:
 	if buff_picks_left <= 0:
+		_offer_pending_skill_upgrade()
 		return
 	var choices: Array = roll_buff_choices(3)
 	if choices.is_empty():
 		buff_picks_left = 0
+		_offer_pending_skill_upgrade()
 		return
 	buff_choice_requested.emit(choices)
+
+# ---------------------------------------------------------------- Nâng cấp kỹ năng class trong run
+## Boss ở các tầng này mời chọn 1 nâng cấp kỹ năng (sau lượt chọn buff thường).
+const SKILL_UPGRADE_FLOORS: Array = [5, 10]
+const SKILL_UPGRADE_CHOICES: int = 2
+## Id các nâng cấp đã lấy trong ván này (reset khi bắt đầu ván mới, lưu trong saved_run).
+var skill_upgrades_taken: Array = []
+var skill_upgrade_pending: bool = false
+
+## Dungeon gọi khi hạ boss: đánh dấu có lượt nâng cấp nếu tầng này thuộc SKILL_UPGRADE_FLOORS.
+func queue_skill_upgrade_for_floor(for_floor: int) -> void:
+	if SKILL_UPGRADE_FLOORS.has(for_floor):
+		skill_upgrade_pending = true
+
+func current_skill_id() -> String:
+	if is_instance_valid(player) and player.get("class_skill") != null and is_instance_valid(player.class_skill):
+		return String(player.class_skill.skill_id)
+	return class_skill_id()
+
+func skill_upgrade_count(skill_id: String) -> int:
+	return SkillUpgrades.count_taken(skill_id, skill_upgrades_taken)
+
+## Chọn ngẫu nhiên tối đa n nâng cấp chưa lấy của kỹ năng hiện tại.
+func roll_skill_upgrade_choices(n: int = SKILL_UPGRADE_CHOICES) -> Array:
+	var pool: Array = SkillUpgrades.available(current_skill_id(), skill_upgrades_taken)
+	pool.shuffle()
+	return pool.slice(0, n)
+
+func _offer_pending_skill_upgrade() -> void:
+	if not skill_upgrade_pending:
+		return
+	skill_upgrade_pending = false
+	var choices: Array = roll_skill_upgrade_choices()
+	if choices.is_empty():
+		return
+	var sk_name: String = String(player.class_skill.skill_name) if is_instance_valid(player) and player.get("class_skill") != null and is_instance_valid(player.class_skill) else "SKILL"
+	request_buff_choice_of(choices, "UPGRADE: %s" % sk_name.to_upper())
+
+## Thông tin hiển thị cho 1 thẻ chọn: buff thường hoặc nâng cấp kỹ năng (tier "skill").
+func buff_info(id: String) -> Dictionary:
+	if buff_pool.has(id):
+		return buff_pool[id]
+	var up: Dictionary = SkillUpgrades.find(id)
+	if not up.is_empty():
+		return {"name": up["name"], "desc": up["desc"], "tier": "skill"}
+	return {"name": id, "desc": "", "tier": "common"}
 
 func consume_buff_pick() -> void:
 	buff_picks_left = maxi(0, buff_picks_left - 1)
@@ -682,6 +734,11 @@ func chain_lightning(origin_target: Node, dmg: int, n: int) -> int:
 ## mọi buff khác đọc Global.buff_stack(id) trực tiếp tại điểm hook (player.gd/bullet.gd/
 ## enemy.gd/boss.gd) mỗi lần bắn/chém/nhận dmg, không cần cache lại giá trị ở đây.
 func apply_buff(id: String) -> void:
+	if SkillUpgrades.has(id):
+		if not skill_upgrades_taken.has(id):
+			skill_upgrades_taken.append(id)
+		message.emit("Skill upgrade: " + String(SkillUpgrades.find(id)["name"]), BUFF_TIER_COLOR["skill"])
+		return
 	if not buff_pool.has(id):
 		return
 	run_buffs[id] = buff_stack(id) + 1
@@ -887,6 +944,7 @@ var save_path: String = "user://dungeon_raider_save.dat"
 var purple_gems: int = 0
 ## Hồ sơ vĩnh viễn (thống kê + tiến hoá class). Cấu trúc/logic nằm ở scripts/meta_progress.gd.
 const MetaProgress = preload("res://scripts/meta_progress.gd")
+const SkillUpgrades = preload("res://scripts/skill_upgrades.gd")
 var profile: Dictionary = MetaProgress.new_profile()
 var upgrades: Dictionary = {
 	"hp_boost": 0, "start_coin": 0, "mastery": 0, "revive": 0
