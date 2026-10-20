@@ -3,6 +3,8 @@ extends Area2D
 ## VŨ KHÍ thì KHÔNG tự nhặt: đứng gần và bấm "interact" (E). Còn ô trống thì vào ô trống, đủ ô thì đổi với
 ## vũ khí đang cầm và vũ khí cũ được thả xuống chỗ này (qua Global.weapon_drop_requested).
 
+const WeaponInfo = preload("res://scripts/weapon_info.gd")
+
 ## Sau khi xuất hiện, vũ khí chưa nhặt được trong khoảng này (giây) — tránh nhặt nhầm ngay vũ khí vừa thả.
 const WEAPON_PICKUP_LOCK: float = 0.4
 
@@ -138,6 +140,47 @@ func _on_body_entered(body: Node) -> void:
 	Global.sfx("pickup")
 	queue_free()
 
+## Ánh sáng quanh vũ khí theo độ hiếm: Rare/Epic/Legendary có vầng sáng nhấp nháy; Epic/Legendary thêm cột sáng hướng lên.
+func _draw_rarity_glow(color: Color, rarity: String, bob: float) -> void:
+	var tier: int = ["common", "rare", "epic", "legendary"].find(rarity)
+	if tier <= 0:
+		return
+	var pulse: float = 0.5 + 0.5 * sin(_t * 3.0)
+	draw_circle(Vector2(0.0, bob), 20.0 + 4.0 * pulse, Color(color, 0.10 + 0.05 * float(tier)))
+	draw_circle(Vector2(0.0, bob), 15.0 + 2.0 * pulse, Color(color, 0.16))
+	if tier >= 2:
+		var h: float = 34.0 + 14.0 * float(tier - 2)
+		draw_line(Vector2(0.0, bob - 14.0), Vector2(0.0, bob - 14.0 - h), Color(color, 0.30 + 0.2 * pulse), 4.0)
+		draw_line(Vector2(0.0, bob - 14.0), Vector2(0.0, bob - 14.0 - h * 0.7), Color(1.0, 1.0, 1.0, 0.35), 1.5)
+
+## Thẻ so sánh khi đứng gần: gợi ý phím + DPS / sát thương / tốc độ so với vũ khí đang cầm (xanh = tốt hơn, đỏ = kém hơn) + đặc tính.
+func _draw_compare_card() -> void:
+	var p = Global.player
+	var swap_note: String = "[E] Pick up"
+	var cur_id: String = ""
+	var cur_rarity: String = "common"
+	if is_instance_valid(p):
+		cur_id = String(p.get("weapon_id"))
+		cur_rarity = String(p.get("weapon_rarity"))
+		if not p.has_free_weapon_slot():
+			swap_note = "[E] Swap with %s" % String(p.weapon.get("name", "current"))
+	var lines: Array = [{"text": swap_note, "color": Color.WHITE}]
+	if cur_id != "":
+		lines.append({"text": "vs %s (%s)" % [String(Global.weapons[cur_id]["name"]), String(Global.rarities[cur_rarity]["name"])], "color": Color(0.7, 0.7, 0.78)})
+	lines.append_array(WeaponInfo.compare_rows(weapon_id, weapon_rarity, cur_id, cur_rarity))
+	for t in WeaponInfo.traits(weapon_id, weapon_rarity):
+		lines.append({"text": String(t), "color": Color(0.8, 0.85, 1.0)})
+	var line_h: float = 15.0
+	var top: float = 30.0
+	var panel := Rect2(Vector2(-120.0, top), Vector2(240.0, line_h * float(lines.size()) + 8.0))
+	draw_rect(panel, Color(0.05, 0.05, 0.09, 0.82))
+	draw_rect(panel, Color(Global.rarities[weapon_rarity]["color"], 0.8), false, 1.5)
+	var y: float = top + 15.0
+	for L in lines:
+		if String(L["text"]) != "":
+			draw_string(ThemeDB.fallback_font, Vector2(-112.0, y), String(L["text"]), HORIZONTAL_ALIGNMENT_LEFT, 224.0, 12, L["color"])
+		y += line_h
+
 func _draw() -> void:
 	var bob: float = sin(_t * 5.0) * 3.0
 	match kind:
@@ -147,6 +190,7 @@ func _draw() -> void:
 			var r_color: Color = r_data["color"]
 			var display_name: String = w["name"] + " (" + r_data["name"] + ")"
 			
+			_draw_rarity_glow(r_color, weapon_rarity, bob)
 			draw_circle(Vector2(0.0, bob), 13.0, Color(0.1, 0.1, 0.15))
 			# Vòng sáng mang màu của độ hiếm
 			draw_arc(Vector2(0.0, bob), 13.0, 0.0, TAU, 24, r_color, 3.0)
@@ -158,12 +202,7 @@ func _draw() -> void:
 			# Text hiển thị Tên Vũ khí + Độ Hiếm
 			draw_string(ThemeDB.fallback_font, Vector2(-100.0, bob - 22.0), display_name, HORIZONTAL_ALIGNMENT_CENTER, 200.0, 14, r_color)
 			if _near:
-				var p = Global.player
-				var swap_note: String = "[E] Pick up"
-				if is_instance_valid(p) and not p.has_free_weapon_slot():
-					swap_note = "[E] Swap with %s" % String(p.weapon.get("name", "current"))
-				draw_string(ThemeDB.fallback_font, Vector2(-110.0, 34.0), swap_note, HORIZONTAL_ALIGNMENT_CENTER, 220.0, 13, Color.WHITE)
-				draw_string(ThemeDB.fallback_font, Vector2(-110.0, 50.0), Global.weapon_summary(weapon_id, weapon_rarity), HORIZONTAL_ALIGNMENT_CENTER, 220.0, 12, Color(0.8, 0.8, 0.85))
+				_draw_compare_card()
 		"portal":
 			var pulse: float = 1.0 + 0.1 * sin(_t * 4.0)
 			draw_circle(Vector2.ZERO, 28.0 * pulse, Color(0.3, 0.2, 0.9, 0.35))

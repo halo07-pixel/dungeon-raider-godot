@@ -19,6 +19,8 @@ var boss_ticks: Control
 var _boss_phases: int = 3
 var info_label: Label
 var skill_label: Label
+var weapon_bar: ProgressBar ## cung: mức căng dây; vũ khí khác: hồi đòn
+var weapon_bar_fill: StyleBoxFlat
 var weapon_labels: Array = [] ## 2 nhãn, mỗi nhãn một ô vũ khí (ô đang cầm sáng + có dấu ">")
 var boss_box: Control
 var boss_bar: ProgressBar
@@ -55,6 +57,7 @@ func _process(_delta: float) -> void:
 	
 	info_label.text = "Floor %d   ·   Gold: %d" % [Global.floor_num, Global.coins]
 	_update_weapon_labels(p)
+	_update_weapon_bar(p)
 	_update_skill_label(p)
 	_update_debug_label()
 
@@ -77,6 +80,23 @@ func _update_weapon_labels(p) -> void:
 		lbl.text = "%s[%d] %s (%s)%s" % ["> " if active else "  ", i + 1, w["name"], r["name"], ("   [%s] swap" % swap_key) if active and not _other_empty(slots, i) else ""]
 		var c: Color = r["color"]
 		lbl.modulate = c if active else Color(c.r, c.g, c.b, 0.55)
+
+## Thanh dưới ô vũ khí: cung hiện mức căng dây (vàng khi đầy), vũ khí khác hiện hồi đòn (ẩn khi đã sẵn sàng).
+func _update_weapon_bar(p) -> void:
+	var charge_weapon: bool = p.get("weapon") != null and p.weapon.has("charge_time")
+	if charge_weapon and bool(p.charging):
+		var r: float = float(p.charge_ratio())
+		weapon_bar.visible = true
+		weapon_bar.value = r * 100.0
+		weapon_bar_fill.bg_color = Color(1.0, 0.9, 0.35) if r >= 1.0 else Color(0.75, 0.85, 1.0)
+		return
+	var ft: Timer = p.get("fire_timer")
+	if ft != null and not ft.is_stopped() and ft.wait_time > 0.0:
+		weapon_bar.visible = true
+		weapon_bar.value = (1.0 - ft.time_left / ft.wait_time) * 100.0
+		weapon_bar_fill.bg_color = Color(0.6, 0.6, 0.65)
+	else:
+		weapon_bar.visible = false
 
 func _other_empty(slots: Array, i: int) -> bool:
 	var j: int = 1 - i
@@ -258,6 +278,9 @@ func _build_ui() -> void:
 	skill_label.visible = false
 	for i in Global.MAX_WEAPON_SLOTS:
 		weapon_labels.append(_label(self, "", 14, Vector2(20.0, 122.0 + 20.0 * float(i)), Vector2(360.0, 22.0)))
+	weapon_bar = _bar(self, Vector2(20.0, 126.0 + 20.0 * float(Global.MAX_WEAPON_SLOTS)), Vector2(220.0, 6.0), Color(0.6, 0.6, 0.65))
+	weapon_bar.visible = false
+	weapon_bar_fill = weapon_bar.get_theme_stylebox("fill") as StyleBoxFlat
 
 	var grad := Gradient.new()
 	grad.set_color(0, Color(0.9, 0.0, 0.0, 0.0))
