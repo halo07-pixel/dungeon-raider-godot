@@ -77,6 +77,25 @@ const SWAP_BONUS_WINDOW: float = 1.5
 const SWAP_BONUS_MULT: float = 1.5
 const COMBO_WINDOW: float = 2.0
 const COMBO_BONUS_MULT: float = 2.0
+## Hạng vũ khí (Weapon Rank, chỉ trong ván): mỗi vũ khí tích số quái hạ gục; đạt mốc thì lên hạng, mỗi hạng +% sát thương,
+## hạng 3 (tối đa) thêm 1 đặc tính nhỏ riêng. (Khác với kỹ năng meta "mastery" của Global.upgrades.)
+const RANK_KILLS: Array = [10, 30, 60]    # số quái cần cho hạng 1, 2, 3
+const RANK_DMG_PER_LEVEL: float = 0.08
+## Đặc tính hạng 3: cd_mult (nhân hồi đòn / thời gian căng cung), pierce_add, range_mult (tầm cận chiến), blast_mult (vùng nổ), crit_add.
+const RANK_PERKS: Dictionary = {
+	"pistol": {"pierce_add": 1},
+	"smg": {"cd_mult": 0.9},
+	"shotgun": {"pierce_add": 1},
+	"laser": {"crit_add": 0.10},
+	"bow": {"cd_mult": 0.9},
+	"railgun": {"cd_mult": 0.9},
+	"staff": {"blast_mult": 1.15},
+	"broadsword": {"range_mult": 1.1},
+	"daggers": {"crit_add": 0.10},
+	"hammer": {"range_mult": 1.1},
+	"spear": {"range_mult": 1.1},
+	"scythe": {"cd_mult": 0.9},
+}
 ## Buff riêng từng vũ khí
 const PERFECT_DRAW_WINDOW: float = 0.2     # giây sau khi căng đầy mà nhả vẫn tính "Perfect"
 const PERFECT_DRAW_DMG_MULT: float = 1.5
@@ -103,6 +122,7 @@ const STAFF_LEGEND_RADIUS_MULT: float = 1.3
 ## Trạng thái căng dây (chỉ vũ khí có charge_time): giây đã căng, đang căng hay không.
 var charge: float = 0.0
 var charging: bool = false
+var weapon_kills: Dictionary = {}   # id vũ khí -> số quái đã hạ gục trong ván này (Weapon Rank)
 var swap_bonus_timer: float = 0.0   # còn bao lâu thì thưởng đổi vũ khí hết hiệu lực
 var swap_bonus_mult: float = 1.0
 var swap_bonus_combo: bool = false
@@ -453,7 +473,7 @@ func _charge_time_needed() -> float:
 	var t: float = float(weapon.get("charge_time", 0.5))
 	if weapon_id == "bow" and weapon_rarity == "rare":
 		t *= BOW_RARE_DRAW_MULT
-	t *= pow(0.9, float(Global.buff_stack("buff_haste")))
+	t *= pow(0.9, float(Global.buff_stack("buff_haste"))) * _rank_perk("cd_mult", 1.0)
 	if weapon_id == "bow":
 		t *= pow(QUICKDRAW_PER_STACK, float(Global.buff_stack("buff_quickdraw")))
 	t *= skill_attack_cd_mult
@@ -492,6 +512,7 @@ func _shoot(charge_ratio_arg: float = -1.0, perfect: bool = false) -> void:
 	var mult = rarity_data["mult"]
 	# ÁP DỤNG KỸ NĂNG: Cộng % sát thương (mastery)
 	mult += Global.upgrades["mastery"] * 0.05
+	mult += RANK_DMG_PER_LEVEL * float(weapon_rank(weapon_id))
 	# ÁP DỤNG BUFF: Sức Mạnh / Đà Chiến Đấu / Cuồng Nộ
 	mult += 0.08 * float(Global.buff_stack("buff_dmg"))
 	if Global.buff_stack("buff_momentum") > 0:
@@ -546,14 +567,17 @@ func _shoot(charge_ratio_arg: float = -1.0, perfect: bool = false) -> void:
 
 	# ÁP DỤNG BUFF: Nhanh Nhẹn / Chí Mạng / Tầm Đánh (tầm xa = bay xa+nhanh hơn) / Vung Kiếm Càn Quét (tầm xa = xuyên)
 	cd *= pow(0.9, float(Global.buff_stack("buff_haste")))
-	cd *= skill_attack_cd_mult
-	if randf() < 0.08 * float(Global.buff_stack("buff_crit")):
+	cd *= skill_attack_cd_mult * _rank_perk("cd_mult", 1.0)
+	if randf() < 0.08 * float(Global.buff_stack("buff_crit")) + _rank_perk("crit_add", 0.0):
 		is_crit = true
 	if Global.buff_stack("buff_reach") > 0:
 		life *= 1.0 + 0.15 * float(Global.buff_stack("buff_reach"))
 		speed *= 1.0 + 0.08 * float(Global.buff_stack("buff_reach"))
 	if Global.buff_stack("buff_sweep") > 0:
 		pierce_n += PIERCE_SWEEP
+	pierce_n += int(_rank_perk("pierce_add", 0.0))
+	if blast_r > 0.0:
+		blast_r *= _rank_perk("blast_mult", 1.0)
 	if is_crit: dmg *= 2
 
 	# Siêu Đạn / Loạt Đạn Vòng: đếm phát bắn
@@ -692,6 +716,7 @@ func _swing() -> void:
 	var mult = rarity_data["mult"]
 	# ÁP DỤNG KỸ NĂNG: Cộng % sát thương (mastery)
 	mult += Global.upgrades["mastery"] * 0.05
+	mult += RANK_DMG_PER_LEVEL * float(weapon_rank(weapon_id))
 	# ÁP DỤNG BUFF: Sức Mạnh / Đà Chiến Đấu / Cuồng Nộ
 	mult += 0.08 * float(Global.buff_stack("buff_dmg"))
 	if Global.buff_stack("buff_momentum") > 0:
@@ -755,14 +780,15 @@ func _swing() -> void:
 
 	# ÁP DỤNG BUFF: Nhanh Nhẹn / Chí Mạng / Tầm Đánh / Vung Kiếm Càn Quét
 	cd *= pow(0.9, float(Global.buff_stack("buff_haste")))
-	cd *= skill_attack_cd_mult
-	if randf() < 0.08 * float(Global.buff_stack("buff_crit")):
+	cd *= skill_attack_cd_mult * _rank_perk("cd_mult", 1.0)
+	if randf() < 0.08 * float(Global.buff_stack("buff_crit")) + _rank_perk("crit_add", 0.0):
 		is_crit = true
 	if Global.buff_stack("buff_reach") > 0:
 		aoe_range *= 1.0 + 0.15 * float(Global.buff_stack("buff_reach"))
 	if Global.buff_stack("buff_sweep") > 0:
 		aoe_range *= 1.5
 		aoe_angle += 40.0
+	aoe_range *= _rank_perk("range_mult", 1.0)
 
 	if is_crit: dmg *= 2
 	dmg = int(float(dmg) * swap_mult)
@@ -1066,11 +1092,45 @@ func _tick_shield(delta: float) -> void:
 	elif shield < float(max_shield):
 		shield = minf(float(max_shield), shield + SHIELD_REGEN_RATE * (1.0 + 0.25 * float(Global.buff_stack("buff_shield_regen"))) * delta)
 
+## Hạng của vũ khí theo số quái đã hạ (0..3).
+func weapon_rank(id: String) -> int:
+	var k: int = int(weapon_kills.get(id, 0))
+	var r: int = 0
+	for need in RANK_KILLS:
+		if k >= int(need):
+			r += 1
+	return r
+
+## Đặc tính hạng 3 của vũ khí đang cầm (đã đạt hạng 3), không thì trả về mặc định.
+func _rank_perk(key: String, default_val: float) -> float:
+	if weapon_rank(weapon_id) < RANK_KILLS.size():
+		return default_val
+	return float(RANK_PERKS.get(weapon_id, {}).get(key, default_val))
+
+## Chữ HUD: "R2 12/30" hoặc "R3 MAX" (rỗng nếu chưa có quái nào).
+func rank_text(id: String) -> String:
+	var r: int = weapon_rank(id)
+	if r >= RANK_KILLS.size():
+		return "R%d MAX" % r
+	return "R%d %d/%d" % [r, int(weapon_kills.get(id, 0)), int(RANK_KILLS[r])]
+
+func _add_weapon_kill() -> void:
+	var before: int = weapon_rank(weapon_id)
+	weapon_kills[weapon_id] = int(weapon_kills.get(weapon_id, 0)) + 1
+	var after: int = weapon_rank(weapon_id)
+	if after > before:
+		var nm: String = String(weapon.get("name", weapon_id))
+		Global.float_text(global_position + Vector2(0, -44), "%s RANK %d" % [nm.to_upper(), after], Color(1.0, 0.9, 0.4), 18)
+		Global.burst(global_position, Color(1.0, 0.9, 0.4), 12, 160.0, 1.5)
+		Global.message.emit("%s rank %d!" % [nm, after], Color(1.0, 0.9, 0.4))
+		Global.sfx("pickup")
+
 ## Buff riêng vũ khí phản ứng khi hạ gục: Capacitor (Railgun) cắt hồi đòn, Reap (Lưỡi Liềm) cộng stack tốc độ.
 ## player_hit_landed phát SAU take_damage nên target.alive == false nghĩa là đòn này vừa hạ gục.
 func _on_hit_landed_weapon_buffs(target: Node, _dmg: int, _is_crit: bool) -> void:
 	if not is_instance_valid(target) or bool(target.get("alive")):
 		return
+	_add_weapon_kill()
 	if weapon_id == "railgun":
 		var cap: int = Global.buff_stack("buff_capacitor")
 		if cap > 0 and not fire_timer.is_stopped():
