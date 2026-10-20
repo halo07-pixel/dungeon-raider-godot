@@ -56,6 +56,21 @@ const BOW_LEGEND_ARROWS: int = 3        # Legendary: căng đầy bắn 3 mũi t
 const BOW_LEGEND_SPREAD: float = 14.0
 const BOW_LEGEND_DMG_MULT: float = 0.75 # ...mỗi mũi 75% sát thương
 ## Railgun / Staff
+## Spear: quái phía sau mũi giáo (không phải quái đầu tiên) ăn bấy nhiêu phần sát thương.
+const SPEAR_BEHIND_MULT: float = 0.6
+const SPEAR_RARE_RANGE_MULT: float = 1.2
+const SPEAR_EPIC_BEHIND_MULT: float = 1.0
+const SPEAR_LEGEND_RANGE_MULT: float = 1.3
+const SPEAR_LEGEND_DMG_MULT: float = 1.5
+## Scythe: Epic/Legendary đổi máu để vung. Mỗi nhát trừ cost% máu tối đa (không bao giờ giết, tối thiểu còn 1 HP),
+## bù lại mỗi quái trúng hồi heal% sát thương gây ra; Legendary hồi thêm khi hạ gục.
+const SCYTHE_RARE_RANGE_MULT: float = 1.15
+const SCYTHE_EPIC_COST_PCT: float = 0.04
+const SCYTHE_EPIC_HEAL_PCT: float = 0.20
+const SCYTHE_LEGEND_COST_PCT: float = 0.07
+const SCYTHE_LEGEND_HEAL_PCT: float = 0.30
+const SCYTHE_LEGEND_DMG_MULT: float = 1.5
+const SCYTHE_LEGEND_KILL_HEAL_PCT: float = 0.03
 const BEAM_TRAIL_LEN: float = 260.0
 const RAILGUN_RARE_CD_MULT: float = 0.8
 const RAILGUN_LEGEND_DMG_MULT: float = 1.5
@@ -558,6 +573,32 @@ func _shoot(charge_ratio_arg: float = -1.0) -> void:
 # ==============================================================================
 # HỆ THỐNG HIỆU ỨNG CẬN CHIẾN & CHÉM ĐẠN
 # ==============================================================================
+## Mục tiêu GẦN NHẤT trong vùng đâm của Giáo (quái hoặc boss) — ăn đủ sát thương.
+func _spear_front_target(aoe_range: float, rad_angle: float) -> Node:
+	var best: Node = null
+	var best_d: float = INF
+	for e in get_tree().get_nodes_in_group("enemies"):
+		if e.has_method("kill") and e.alive:
+			var to_e: Vector2 = (e.hurt_center() if e.has_method("hurt_center") else e.global_position) - global_position
+			if to_e.length() <= aoe_range + float(e.data["radius"]) and absf(aim_dir.angle_to(to_e)) <= rad_angle * 0.5 and to_e.length() < best_d:
+				best_d = to_e.length(); best = e
+	for b in get_tree().get_nodes_in_group("boss"):
+		if b.has_method("take_damage") and b.alive:
+			var to_b: Vector2 = (b.hurt_center() if b.has_method("hurt_center") else b.global_position) - global_position
+			if to_b.length() <= aoe_range + 34.0 and absf(aim_dir.angle_to(to_b)) <= rad_angle * 0.5 and to_b.length() < best_d:
+				best_d = to_b.length(); best = b
+	return best
+
+## Đổi máu của Lưỡi Liềm: trừ pct% máu tối đa, bỏ qua giáp/bất tử, KHÔNG BAO GIỜ giết Player (còn tối thiểu 1 HP).
+func _pay_blood_cost(pct: float) -> void:
+	var cost: int = maxi(1, int(ceil(float(max_hp) * pct)))
+	cost = mini(cost, hp - 1)
+	if cost <= 0:
+		return
+	hp -= cost
+	Global.burst(global_position, Color(0.8, 0.1, 0.2), 6, 90.0, 1.2)
+	Global.float_text(global_position + Vector2(0, -14), "-%d" % cost, Color(0.85, 0.2, 0.3), 16)
+
 func _swing() -> void:
 	var w: Dictionary = weapon
 	var base_dmg = int(w["damage"])
@@ -583,6 +624,9 @@ func _swing() -> void:
 	var apply_bleed = false
 	var apply_stun = false
 	var stun_duration = 0.0
+	var behind_mult: float = SPEAR_BEHIND_MULT
+	var scythe_cost_pct: float = 0.0
+	var scythe_heal_pct: float = 0.0
 	
 	# LOGIC ĐỘ HIẾM CẬN CHIẾN CHUYÊN SÂU
 	if weapon_id == "broadsword":
@@ -595,6 +639,16 @@ func _swing() -> void:
 			if dagger_combo >= 4: apply_bleed = true; dagger_combo = 0; Global.sfx("hit")
 		elif weapon_rarity == "legendary":
 			cd *= 0.4; if randf() < 0.5: is_crit = true
+	elif weapon_id == "spear":
+		if weapon_rarity == "rare": aoe_range *= SPEAR_RARE_RANGE_MULT
+		elif weapon_rarity == "epic": behind_mult = SPEAR_EPIC_BEHIND_MULT
+		elif weapon_rarity == "legendary": behind_mult = SPEAR_EPIC_BEHIND_MULT; aoe_range *= SPEAR_LEGEND_RANGE_MULT; dmg = int(float(dmg) * SPEAR_LEGEND_DMG_MULT)
+	elif weapon_id == "scythe":
+		if weapon_rarity == "rare": aoe_range *= SCYTHE_RARE_RANGE_MULT
+		elif weapon_rarity == "epic": scythe_cost_pct = SCYTHE_EPIC_COST_PCT; scythe_heal_pct = SCYTHE_EPIC_HEAL_PCT
+		elif weapon_rarity == "legendary":
+			scythe_cost_pct = SCYTHE_LEGEND_COST_PCT; scythe_heal_pct = SCYTHE_LEGEND_HEAL_PCT
+			dmg = int(float(dmg) * SCYTHE_LEGEND_DMG_MULT)
 	elif weapon_id == "hammer":
 		if weapon_rarity == "rare": aoe_range *= 1.25; knock *= 1.5
 		elif weapon_rarity == "epic": apply_stun = true; stun_duration = 1.0
@@ -630,6 +684,9 @@ func _swing() -> void:
 	display_swing_range = aoe_range
 	display_swing_half_angle = deg_to_rad(aoe_angle) * 0.5
 
+	if scythe_cost_pct > 0.0:
+		_pay_blood_cost(scythe_cost_pct)
+
 	PlayerProfiler.record_attack(true) # AI Tầng 1: ghi nhận lối chơi cận chiến
 	fire_timer.start(cd)
 	swinging = true
@@ -656,6 +713,11 @@ func _swing() -> void:
 					b.queue_free() # Xóa đạn!
 					Global.sfx("dodge")
 					
+	# GIÁO: tìm mục tiêu đứng trước nhất trong đường đâm (ăn đủ sát thương), phần còn lại ăn behind_mult
+	var spear_front: Node = null
+	if bool(w.get("thrust", false)):
+		spear_front = _spear_front_target(aoe_range, rad_angle)
+
 	# CHÉM QUÁI VÀ BOSS
 	for e in get_tree().get_nodes_in_group("enemies"):
 		if e.has_method("kill") and e.alive:
@@ -663,13 +725,20 @@ func _swing() -> void:
 			var to_e = e_center - global_position
 			if to_e.length() <= aoe_range + float(e.data["radius"]):
 				if absf(aim_dir.angle_to(to_e)) <= rad_angle * 0.5:
-					e.take_damage(dmg, global_position, knock)
-					Global.on_player_hit(e, dmg, is_crit)
+					var hit_dmg: int = dmg
+					if spear_front != null and e != spear_front:
+						hit_dmg = maxi(1, int(float(dmg) * behind_mult))
+					e.take_damage(hit_dmg, global_position, knock)
+					Global.on_player_hit(e, hit_dmg, is_crit)
 					hit_something = true
+					if scythe_heal_pct > 0.0:
+						total_heal += maxi(1, int(float(hit_dmg) * scythe_heal_pct))
+						if not e.alive and weapon_rarity == "legendary":
+							total_heal += maxi(1, int(float(max_hp) * SCYTHE_LEGEND_KILL_HEAL_PCT))
 					Global.burst(e_center, Color(1.0, 0.95, 0.7), 5, 150.0, 1.2) # tia lửa chỗ trúng
 					if apply_bleed and e.has_method("apply_status"): e.apply_status("bleed", 0.0)
 					if apply_stun and e.has_method("apply_status"): e.apply_status("stun", stun_duration)
-					if lifesteal > 0.0: total_heal += maxi(1, int(float(dmg) * lifesteal))
+					if lifesteal > 0.0: total_heal += maxi(1, int(float(hit_dmg) * lifesteal))
 					# ÁP DỤNG BUFF: Phá Giáp / Lưỡi Rỉ Máu / Đạn Băng
 					if Global.buff_stack("buff_sunder") > 0 and e.has_method("apply_sunder"): e.apply_sunder()
 					if e.has_method("apply_status"):
@@ -684,9 +753,14 @@ func _swing() -> void:
 			var to_b = b_center - global_position
 			if to_b.length() <= aoe_range + 34.0:
 				if absf(aim_dir.angle_to(to_b)) <= rad_angle * 0.5:
-					b.take_damage(dmg, global_position, knock)
-					Global.on_player_hit(b, dmg, is_crit)
+					var boss_dmg: int = dmg
+					if spear_front != null and b != spear_front:
+						boss_dmg = maxi(1, int(float(dmg) * behind_mult))
+					b.take_damage(boss_dmg, global_position, knock)
+					Global.on_player_hit(b, boss_dmg, is_crit)
 					hit_something = true
+					if scythe_heal_pct > 0.0:
+						total_heal += maxi(1, int(float(boss_dmg) * scythe_heal_pct * 0.5)) # boss: hồi một nửa như hút máu thường
 					Global.burst(b_center, Color(1.0, 0.95, 0.7), 5, 150.0, 1.2) # tia lửa chỗ trúng
 					if lifesteal > 0.0: total_heal += maxi(1, int(float(dmg) * lifesteal * 0.5))
 					if Global.buff_stack("buff_sunder") > 0 and b.has_method("apply_sunder"): b.apply_sunder()
