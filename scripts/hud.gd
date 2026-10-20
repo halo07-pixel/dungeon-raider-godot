@@ -77,7 +77,10 @@ func _update_weapon_labels(p) -> void:
 		var w: Dictionary = Global.weapons[String(slot["id"])]
 		var r: Dictionary = Global.rarities[String(slot["rarity"])]
 		var active: bool = (i == int(p.active_slot))
-		lbl.text = "%s[%d] %s (%s)%s" % ["> " if active else "  ", i + 1, w["name"], r["name"], ("   [%s] swap" % swap_key) if active and not _other_empty(slots, i) else ""]
+		var rank_note: String = ""
+		if p.has_method("rank_text"):
+			rank_note = "  " + String(p.rank_text(String(slot["id"])))
+		lbl.text = "%s[%d] %s (%s)%s%s" % ["> " if active else "  ", i + 1, w["name"], r["name"], rank_note, ("   [%s] swap" % swap_key) if active and not _other_empty(slots, i) else ""]
 		var c: Color = r["color"]
 		lbl.modulate = c if active else Color(c.r, c.g, c.b, 0.55)
 
