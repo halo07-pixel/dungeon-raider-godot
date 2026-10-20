@@ -71,6 +71,12 @@ const SCYTHE_LEGEND_COST_PCT: float = 0.07
 const SCYTHE_LEGEND_HEAL_PCT: float = 0.30
 const SCYTHE_LEGEND_DMG_MULT: float = 1.5
 const SCYTHE_LEGEND_KILL_HEAL_PCT: float = 0.03
+## Cộng hưởng đổi vũ khí: đòn ĐẦU TIÊN sau khi đổi trong SWAP_BONUS_WINDOW giây được nhân sát thương.
+## Combo: vừa đánh trúng bằng 1 loại (cận chiến/tầm xa) rồi đổi sang loại KHÁC trong COMBO_WINDOW giây => thưởng lớn hơn.
+const SWAP_BONUS_WINDOW: float = 1.5
+const SWAP_BONUS_MULT: float = 1.5
+const COMBO_WINDOW: float = 2.0
+const COMBO_BONUS_MULT: float = 2.0
 ## Buff riêng từng vũ khí
 const PERFECT_DRAW_WINDOW: float = 0.2     # giây sau khi căng đầy mà nhả vẫn tính "Perfect"
 const PERFECT_DRAW_DMG_MULT: float = 1.5
@@ -97,6 +103,11 @@ const STAFF_LEGEND_RADIUS_MULT: float = 1.3
 ## Trạng thái căng dây (chỉ vũ khí có charge_time): giây đã căng, đang căng hay không.
 var charge: float = 0.0
 var charging: bool = false
+var swap_bonus_timer: float = 0.0   # còn bao lâu thì thưởng đổi vũ khí hết hiệu lực
+var swap_bonus_mult: float = 1.0
+var swap_bonus_combo: bool = false
+var _last_hit_class: String = ""    # "melee" / "ranged" của đòn trúng gần nhất
+var _last_hit_msec: int = -100000
 var full_hold: float = 0.0        # giây đã giữ sau khi căng đầy (cho Perfect Draw)
 var railgun_shots: int = 0        # đếm phát Railgun (Overcharge)
 var impaled_target: Node = null   # quái đang bị Giáo ghim (Impale)
@@ -189,6 +200,7 @@ func _ready() -> void:
 	Global.room_cleared.connect(_on_room_cleared)
 	Global.player_hit_landed.connect(_on_hit_landed_fortify)
 	Global.player_hit_landed.connect(_on_hit_landed_weapon_buffs)
+	Global.player_hit_landed.connect(_on_hit_landed_combo)
 
 	set_weapon_with_rarity(cls["default_weapon"], "common")
 	_attach_class_skill()
@@ -292,6 +304,12 @@ func _physics_process(delta: float) -> void:
 		slow_timer = maxf(0.0, slow_timer - delta)
 	if slide_timer > 0.0:
 		slide_timer = maxf(0.0, slide_timer - delta)
+	if swap_bonus_timer > 0.0:
+		swap_bonus_timer = maxf(0.0, swap_bonus_timer - delta)
+		if swap_bonus_timer <= 0.0:
+			swap_bonus_mult = 1.0
+			swap_bonus_combo = false
+		queue_redraw()
 	if impale_timer > 0.0:
 		impale_timer = maxf(0.0, impale_timer - delta)
 		if impale_timer <= 0.0:
@@ -484,6 +502,7 @@ func _shoot(charge_ratio_arg: float = -1.0, perfect: bool = false) -> void:
 	if Global.buff_stack("buff_focus") > 0 and still_time >= 0.6:
 		mult += 0.2 * float(Global.buff_stack("buff_focus"))
 	var dmg = int(base_dmg * mult)
+	var swap_mult: float = _consume_swap_bonus() # thưởng đổi vũ khí, áp SAU các nhánh độ hiếm (chúng có thể gán lại dmg)
 
 	var pellets: int = w["pellets"]
 	var spread: float = w["spread"]
@@ -571,6 +590,7 @@ func _shoot(charge_ratio_arg: float = -1.0, perfect: bool = false) -> void:
 			bullet_radius *= OVERCHARGE_RADIUS_MULT
 			p_color = Color(1.0, 1.0, 1.0)
 			Global.float_text(global_position + Vector2(0, -30), "OVERCHARGE", Color(0.5, 0.95, 1.0), 18)
+	dmg = int(float(dmg) * swap_mult)
 	if is_super:
 		dmg *= 3
 		pierce_n = maxi(pierce_n + 1, PIERCE_SUPER) # Laser (đã xuyên sẵn) được cộng thêm 1
@@ -679,6 +699,7 @@ func _swing() -> void:
 	if Global.buff_stack("buff_berserk") > 0 and max_hp > 0:
 		mult += 0.4 * (1.0 - float(hp) / float(max_hp))
 	var dmg = int(base_dmg * mult)
+	var swap_mult: float = _consume_swap_bonus() # thưởng đổi vũ khí, áp SAU các nhánh độ hiếm (chúng có thể gán lại dmg)
 
 	var cd = float(w["cooldown"])
 	var aoe_range = float(w["range"])
@@ -744,6 +765,7 @@ func _swing() -> void:
 		aoe_angle += 40.0
 
 	if is_crit: dmg *= 2
+	dmg = int(float(dmg) * swap_mult)
 
 	# Phản Công: sau khi bị đánh, đòn chém kế tiếp x2 sát thương
 	if Global.buff_stack("buff_counter") > 0 and counter_timer > 0.0:
@@ -910,14 +932,44 @@ func has_free_weapon_slot() -> bool:
 func swap_weapon() -> bool:
 	if not alive or rolling or swinging or _other_slot_empty():
 		return false
+	var prev_class: String = Global.player_weapon_class()
 	active_slot = 1 - active_slot
 	_apply_active_weapon()
+	_start_swap_bonus(prev_class)
 	display_swing_range = 0.0
 	fire_timer.start(maxf(fire_timer.time_left, SWAP_COOLDOWN))
 	weapons_changed.emit()
 	Global.sfx("pickup")
 	Global.message.emit("%s (%s)" % [weapon["name"], rarity_data["name"]], rarity_data["color"])
 	return true
+
+## Ghi nhận loại vũ khí của đòn trúng gần nhất (để tính Combo khi đổi sang loại khác).
+func _on_hit_landed_combo(_target: Node, _dmg: int, _is_crit: bool) -> void:
+	_last_hit_class = Global.player_weapon_class()
+	_last_hit_msec = Time.get_ticks_msec()
+
+## Bật thưởng đòn đầu tiên sau khi đổi vũ khí; Combo nếu vừa trúng đòn bằng loại vũ khí kia trong COMBO_WINDOW giây.
+func _start_swap_bonus(prev_class: String) -> void:
+	var new_class: String = Global.player_weapon_class()
+	var recent: bool = float(Time.get_ticks_msec() - _last_hit_msec) / 1000.0 <= COMBO_WINDOW
+	swap_bonus_combo = recent and _last_hit_class == prev_class and new_class != prev_class
+	swap_bonus_mult = COMBO_BONUS_MULT if swap_bonus_combo else SWAP_BONUS_MULT
+	swap_bonus_timer = SWAP_BONUS_WINDOW
+	if swap_bonus_combo:
+		Global.float_text(global_position + Vector2(0, -34), "COMBO x%s" % ("%.1f" % swap_bonus_mult), Color(1.0, 0.75, 0.2), 20)
+		Global.burst(global_position, Color(1.0, 0.75, 0.2), 10, 140.0, 1.4)
+	queue_redraw()
+
+## Dùng thưởng (nếu còn): trả về hệ số sát thương cho đòn đánh này và tắt thưởng.
+func _consume_swap_bonus() -> float:
+	if swap_bonus_timer <= 0.0:
+		return 1.0
+	var m: float = swap_bonus_mult
+	swap_bonus_timer = 0.0
+	swap_bonus_mult = 1.0
+	swap_bonus_combo = false
+	queue_redraw()
+	return m
 
 ## Khôi phục 2 ô vũ khí từ save. Id/độ hiếm không còn tồn tại bị bỏ; không còn gì thì dùng vũ khí khởi đầu của class.
 func restore_weapons(slots: Array, active: int) -> void:
@@ -1181,6 +1233,10 @@ func _update_weapon_visual() -> void:
 	weapon_sprite.position = Vector2.from_angle(ang) * offset
 
 func _draw() -> void:
+	if swap_bonus_timer > 0.0:
+		var pulse: float = 0.5 + 0.5 * sin(float(Time.get_ticks_msec()) * 0.012)
+		var col: Color = Color(1.0, 0.75, 0.2) if swap_bonus_combo else Color(0.6, 0.85, 1.0)
+		draw_arc(Vector2.ZERO, 20.0 + 2.0 * pulse, 0.0, TAU, 32, Color(col, 0.55 + 0.35 * pulse), 2.0)
 	if charging and charge > 0.0:
 		_draw_charge()
 	if weapon.get("is_melee", false) and (swinging or _slash_fade > 0.0):

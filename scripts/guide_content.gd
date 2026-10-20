@@ -70,6 +70,7 @@ static func basics() -> String:
 	t += "After the boss on floors 5 and 10 you also pick 1 of 2 upgrades for your class skill (this run only).\n"
 	t += "Interact: %s (altars, chests, shrines, picking up weapons)\n" % _key("interact")
 	t += "Swap weapon: %s or [b]Right mouse[/b] (you can carry 2 weapons; any class can use any weapon)\n" % _key("swap_weapon")
+	t += "Swap bonus: your first attack within 1.5 s of swapping deals x1.5 damage. If you landed a hit with one kind of weapon (melee or ranged) in the last 2 s and swap to the other kind, it is a COMBO: x2 damage.\n"
 	t += "Movement keys and dodge can be changed in Settings.\n"
 	t += _sub("A run")
 	t += "Each floor is a set of rooms. Clear a room to open its doors and pick 1 of 3 buffs. "
