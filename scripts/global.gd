@@ -178,7 +178,11 @@ func weapon_summary(w_id: String, rarity: String) -> String:
 
 var classes: Dictionary = {
 	"ranger": {"name": "Ranger", "max_hp": 100, "default_weapon": "pistol", "skill": "overdrive"},
-	"brawler": {"name": "Brawler", "max_hp": 200, "default_weapon": "broadsword", "skill": "slam"}
+	"brawler": {"name": "Brawler", "max_hp": 200, "default_weapon": "broadsword", "skill": "slam"},
+	# Cây kiếng: máu thấp, sát thương lớn, né + định vị bằng kỹ năng lướt
+	"mage": {"name": "Mage", "max_hp": 80, "default_weapon": "staff", "skill": "phase_step"},
+	# Sát thủ: lướt xuyên quái gây sát thương, dao găm nhanh
+	"rogue": {"name": "Rogue", "max_hp": 90, "default_weapon": "daggers", "skill": "shadow_dash"}
 }
 var current_class: String = "brawler"
 
@@ -330,6 +334,21 @@ func _ready() -> void:
 			{"freq": 0.0, "vol": 0.34, "dur": 0.16, "wave": "noise", "lp": 0.55, "decay": 2.2},
 			{"freq": 1100.0, "slide": -800.0, "vol": 0.16, "dur": 0.14, "wave": "saw"},
 			{"freq": 150.0, "slide": -70.0, "vol": 0.22, "dur": 0.12, "wave": "square"}]),
+		# Mage / Rogue: lướt, thiên thạch báo hiệu + rơi
+		"phase_step": _mix(0.35, [
+			{"freq": 1500.0, "slide": -1100.0, "vol": 0.22, "dur": 0.18, "wave": "sine", "decay": 1.6},
+			{"freq": 0.0, "vol": 0.16, "dur": 0.14, "wave": "noise", "lp": 0.6, "decay": 2.0},
+			{"freq": 520.0, "slide": 700.0, "vol": 0.18, "dur": 0.22, "wave": "sine", "delay": 0.08, "decay": 1.8}]),
+		"shadow_dash": _mix(0.28, [
+			{"freq": 0.0, "vol": 0.34, "dur": 0.22, "wave": "noise", "lp": 0.8, "decay": 2.4},
+			{"freq": 900.0, "slide": -600.0, "vol": 0.14, "dur": 0.16, "wave": "saw", "decay": 2.0}]),
+		"meteor_warn": _mix(0.7, [
+			{"freq": 220.0, "slide": 380.0, "vol": 0.40, "dur": 0.60, "wave": "sine", "swell": 1.0},
+			{"freq": 0.0, "vol": 0.22, "dur": 0.55, "wave": "noise", "lp": 0.15, "swell": 1.0}]),
+		"meteor_impact": _mix(0.7, [
+			{"freq": 120.0, "slide": -80.0, "vol": 0.40, "dur": 0.50, "wave": "sine", "decay": 1.5},
+			{"freq": 0.0, "vol": 0.38, "dur": 0.40, "wave": "noise", "lp": 0.18, "decay": 2.0},
+			{"freq": 700.0, "slide": -600.0, "vol": 0.14, "dur": 0.20, "wave": "saw", "decay": 2.2}]),
 		"shockwave": _mix(0.75, [
 			{"freq": 95.0, "slide": -55.0, "vol": 0.42, "dur": 0.55, "wave": "sine", "decay": 1.4},
 			{"freq": 0.0, "vol": 0.40, "dur": 0.40, "wave": "noise", "lp": 0.12, "decay": 1.8},
