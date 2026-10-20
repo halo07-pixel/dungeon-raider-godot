@@ -9,6 +9,10 @@ extends CharacterBody2D
 
 signal died
 signal summon_requested(kind: String, pos: Vector2)
+## Hội Đồng Bốn Boss (boss_council.gd): boss xin "thẻ tấn công" trước mỗi đòn và trả lại sau đòn.
+## Boss đơn lẻ (council == null) không dùng các signal này nên hành vi cũ không đổi.
+signal token_requested(boss)
+signal token_released(boss)
 
 const BULLET = preload("res://scenes/bullet.tscn")
 const RLControllerScript = preload("res://scripts/rl_controller.gd")
@@ -165,6 +169,32 @@ var _rl_move: Vector2 = Vector2.ZERO
 var _rl_prev_player_total: float = -1.0
 var _rl_prev_hp: float = -1.0
 var arena_rect: Rect2 = Rect2()
+
+## --- Chế độ Hội Đồng (xem boss_council.gd) ---
+const TOKEN_RETRY: float = 0.4   # chưa có thẻ thì hỏi lại sau chừng này giây (lúc chờ vẫn đi áp sát)
+var council: Node = null
+var has_token: bool = true        # boss đơn lẻ luôn "có thẻ"
+var rebirth_left: float = 0.0     # >0: đang hồi sinh, bất tử
+
+## Vào chế độ Hội Đồng: từ giờ phải xin thẻ mới được ra đòn; không phát tín hiệu thanh máu/hạ boss đơn.
+func set_council(c: Node) -> void:
+	council = c
+	has_token = false
+
+## Được hồi sinh với `hp_fraction` máu tối đa, bất tử `secs` giây (Necromancer cứu đồng đội).
+func begin_rebirth(hp_fraction: float, secs: float) -> void:
+	hp = max_hp * clampf(hp_fraction, 0.05, 1.0)
+	phase = _phase_for_ratio(hp / max_hp, int(BOSS_DATA[kind]["phases"]))
+	rebirth_left = secs
+	Global.burst(global_position, Color(0.7, 0.3, 0.9), 40, 300.0, 2.5)
+	Global.shake(0.6, 0.4)
+
+## Đồng đội vừa gục: nổi giận, lên một pha (có trần) và gầm.
+func council_rage() -> void:
+	var max_phase: int = int(BOSS_DATA[kind]["phases"])
+	phase = mini(phase + 1, max_phase)
+	pending_roar = true
+	Global.burst(global_position, Color(1.0, 0.25, 0.2), 24, 260.0, 2.0)
 
 func set_arena_bounds(rect: Rect2) -> void:
 	arena_rect = rect
@@ -397,6 +427,11 @@ func _on_attack_timer_timeout() -> void:
 	if not is_instance_valid(p) or not p.alive:
 		attack_timer.start(0.7)
 		return
+	if council != null and not has_token:
+		token_requested.emit(self) # council cấp thẻ ngay trong signal nếu còn
+		if not has_token:
+			attack_timer.start(TOKEN_RETRY)
+			return
 	busy = true
 	if pending_roar:
 		pending_roar = false
@@ -429,6 +464,9 @@ func _on_attack_timer_timeout() -> void:
 	if not alive:
 		return
 	busy = false
+	if council != null:
+		has_token = false
+		token_released.emit(self)
 	attack_timer.start(_cooldown())
 
 
@@ -1049,6 +1087,9 @@ func _physics_process(delta: float) -> void:
 	_t += delta
 	if not alive:
 		return
+	if rebirth_left > 0.0:
+		rebirth_left = maxf(0.0, rebirth_left - delta)
+		modulate.a = 1.0 if rebirth_left <= 0.0 else 0.45 + 0.3 * sin(_t * 30.0)
 	if sunder_stacks > 0:
 		sunder_timer -= delta
 		if sunder_timer <= 0.0:
@@ -1103,7 +1144,7 @@ func _physics_process(delta: float) -> void:
 
 # ------------------------------------------------------------------ Sát thương / chết
 func take_damage(amount: int, _from_pos: Vector2 = Vector2.ZERO, _knock: float = 0.0) -> void:
-	if not alive or not active:
+	if not alive or not active or rebirth_left > 0.0:
 		return
 
 	var cfg: Dictionary = BOSS_DATA[kind]
@@ -1125,6 +1166,8 @@ func take_damage(amount: int, _from_pos: Vector2 = Vector2.ZERO, _knock: float =
 	create_tween().tween_property(self, "modulate", Color.WHITE, 0.1)
 
 	if hp <= 0.0:
+		if council != null and council.try_revive(self):
+			return # được Necromancer hồi sinh thay vì chết
 		_die()
 		return
 
@@ -1137,7 +1180,8 @@ func take_damage(amount: int, _from_pos: Vector2 = Vector2.ZERO, _knock: float =
 		frost_enraged = true
 		Global.message.emit("%s enrages" % BOSS_NAME, Color(0.4, 0.9, 1.0))
 		Global.shake(0.6, 0.4)
-	Global.boss_hp_changed.emit(hp, max_hp, phase, BOSS_NAME)
+	if council == null:
+		Global.boss_hp_changed.emit(hp, max_hp, phase, BOSS_NAME)
 
 
 ## Chia đều ngưỡng % máu theo số pha của từng loại boss (3 pha: 66/33, 4 pha: 75/50/25).
@@ -1154,7 +1198,8 @@ func _die() -> void:
 	if Global.get("run_stats") != null and Global.run_stats.has("kills"):
 		Global.run_stats["kills"] += 1
 	Global.record_kill()
-	Global.record_boss_kill(kind)
+	if council == null:
+		Global.record_boss_kill(kind) # thành viên Hội Đồng không tính vào điều kiện tiến hoá class
 	charging = false
 	tele_mode = ""
 	hitbox.set_deferred("monitoring", false)
@@ -1165,7 +1210,8 @@ func _die() -> void:
 	Global.burst(global_position, Color(1.0, 0.8, 0.3), 60, 380.0, 3.0)
 	Global.hitstop(0.2)
 	Global.message.emit("%s defeated!" % BOSS_NAME, Color(1.0, 0.9, 0.3))
-	Global.boss_defeated.emit()
+	if council == null:
+		Global.boss_defeated.emit() # Hội Đồng tự phát đúng một lần khi cả bốn gục
 	died.emit()
 	create_tween().tween_property(self, "modulate:a", 0.0, 1.2)
 	await get_tree().create_timer(2.0).timeout

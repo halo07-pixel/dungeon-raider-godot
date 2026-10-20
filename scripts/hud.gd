@@ -36,6 +36,7 @@ func _ready() -> void:
 	Global.boss_spawned.connect(_on_boss_spawned)
 	Global.boss_hp_changed.connect(_on_boss_hp)
 	Global.boss_defeated.connect(_on_boss_defeated)
+	Global.council_started.connect(_on_council_started)
 	Global.message.connect(_show_message)
 	Global.player_damaged.connect(_on_player_damaged)
 
@@ -48,6 +49,7 @@ func _ready() -> void:
 		_dungeon_ref = d_node
 
 func _process(_delta: float) -> void:
+	_update_council_bars()
 	var p = Global.player
 	if not is_instance_valid(p):
 		return
@@ -186,6 +188,54 @@ func _draw_boss_ticks() -> void:
 
 func _on_boss_defeated() -> void:
 	boss_box.visible = false
+	_clear_council_bars()
+
+## --- Hội Đồng Bốn Boss: 4 thanh máu nhỏ thay cho thanh đơn. Boss đang giữ thẻ tấn công có chữ vàng. ---
+const COUNCIL_COLORS: Dictionary = {
+	"warden": Color(0.95, 0.6, 0.2), "necromancer": Color(0.7, 0.35, 0.9),
+	"frost": Color(0.4, 0.85, 1.0), "lord": Color(0.95, 0.25, 0.25)}
+const COUNCIL_BAR_W: float = 140.0
+const COUNCIL_BAR_GAP: float = 13.0
+var _council_bosses: Array = []
+var _council_rows: Array = []
+
+func _on_council_started(bosses: Array) -> void:
+	_clear_council_bars()
+	boss_label.visible = false
+	boss_bar.visible = false
+	boss_ticks.visible = false
+	boss_box.visible = true
+	_council_bosses = bosses.duplicate()
+	for i in _council_bosses.size():
+		var b = _council_bosses[i]
+		var x: float = float(i) * (COUNCIL_BAR_W + COUNCIL_BAR_GAP)
+		var lbl: Label = _label(boss_box, String(b.BOSS_NAME), 12, Vector2(x, 4.0), Vector2(COUNCIL_BAR_W, 18.0), HORIZONTAL_ALIGNMENT_CENTER)
+		var bar: ProgressBar = _bar(boss_box, Vector2(x, 24.0), Vector2(COUNCIL_BAR_W, 12.0), COUNCIL_COLORS.get(String(b.kind), Color(0.7, 0.2, 0.8)))
+		bar.max_value = b.max_hp
+		bar.value = b.hp
+		_council_rows.append({"label": lbl, "bar": bar})
+
+func _update_council_bars() -> void:
+	for i in _council_rows.size():
+		var b = _council_bosses[i]
+		var row: Dictionary = _council_rows[i]
+		if not is_instance_valid(b):
+			row["bar"].value = 0.0
+			continue
+		row["bar"].max_value = b.max_hp
+		row["bar"].value = b.hp if b.alive else 0.0
+		var c: Color = Color(1.0, 0.9, 0.3) if (b.alive and b.has_token) else (Color(0.6, 0.6, 0.6) if not b.alive else Color.WHITE)
+		row["label"].add_theme_color_override("font_color", c)
+
+func _clear_council_bars() -> void:
+	for row in _council_rows:
+		if is_instance_valid(row["label"]): row["label"].queue_free()
+		if is_instance_valid(row["bar"]): row["bar"].queue_free()
+	_council_rows.clear()
+	_council_bosses.clear()
+	boss_label.visible = true
+	boss_bar.visible = true
+	boss_ticks.visible = true
 
 func _show_message(text: String, color: Color) -> void:
 	msg_label.text = text

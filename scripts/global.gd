@@ -8,6 +8,9 @@ signal portal_entered
 signal boss_spawned(boss)
 signal boss_hp_changed(hp: float, max_hp: float, phase: int, boss_name: String)
 signal boss_defeated
+## Hội Đồng Bốn Boss: HUD dựng 4 thanh máu; cổng mở sau tầng 15 dẫn vào đấu trường.
+signal council_started(bosses: Array)
+signal council_portal_entered
 ## Dungeon phát ngay khi bắt đầu dựng một tầng (mọi tầng, kể cả tầng Lord). MusicManager chọn nhạc theo biome.
 signal floor_started(floor_num: int)
 ## Một đòn của Player vừa trúng quái/boss (cận chiến, đạn, nguồn phụ). Buff phản ứng khi trúng (Fortify...) nghe signal này.
@@ -224,6 +227,8 @@ var enemies: Dictionary = {
 # ==============================================================================
 
 var floor_num: int = 1
+## true khi đang ở đấu trường Hội Đồng Bốn Boss (tầng 15 giữ nguyên, thoát qua cổng xuống tầng 16).
+var in_council: bool = false
 var coins: int = 0
 var player = null
 var camera = null
@@ -444,6 +449,14 @@ func _ready() -> void:
 			{"freq": 0.0, "vol": 0.30, "dur": 0.20, "wave": "noise", "lp": 0.95, "decay": 2.4},
 			{"freq": 1800.0, "slide": -1400.0, "vol": 0.18, "dur": 0.30, "wave": "sine", "decay": 1.3},
 			{"freq": 70.0, "slide": -20.0, "vol": 0.34, "dur": 0.40, "wave": "sine", "decay": 1.3}]),
+		"council_rage": _mix(0.85, [
+			{"freq": 70.0, "slide": -25.0, "vol": 0.34, "dur": 0.80, "wave": "saw", "swell": 0.2, "decay": 0.9},
+			{"freq": 105.0, "slide": -35.0, "vol": 0.22, "dur": 0.70, "wave": "saw", "swell": 0.2, "decay": 0.9},
+			{"freq": 0.0, "vol": 0.20, "dur": 0.40, "wave": "noise", "lp": 0.4, "decay": 1.6}]),
+		"council_revive": _mix(0.80, [
+			{"freq": 220.0, "slide": 380.0, "vol": 0.22, "dur": 0.70, "wave": "sine", "swell": 0.8, "decay": 0.6},
+			{"freq": 330.0, "slide": 420.0, "vol": 0.14, "dur": 0.65, "wave": "sine", "swell": 0.8, "delay": 0.05, "decay": 0.6},
+			{"freq": 0.0, "vol": 0.14, "dur": 0.70, "wave": "noise", "lp": 0.12, "swell": 0.8, "decay": 0.5}]),
 		"imp_fire": _mix(0.30, [
 			{"freq": 0.0, "vol": 0.24, "dur": 0.20, "wave": "noise", "lp": 0.5, "swell": 0.2, "decay": 1.5},
 			{"freq": 430.0, "slide": -220.0, "vol": 0.18, "dur": 0.22, "wave": "saw", "decay": 1.4}]),
@@ -504,6 +517,7 @@ var stolen_gold_held: int = 0
 
 func reset_run() -> void:
 	floor_num = 1
+	in_council = false
 	coins = 0
 	stolen_gold_held = 0
 	buff_picks_left = 0
@@ -1073,6 +1087,10 @@ func _migrate_q_table(t: Dictionary) -> Dictionary:
 # --- Ghi nhận hồ sơ (gọi từ main/enemy/boss; lưu file ở các mốc hiếm, không lưu mỗi lần hạ quái) ---
 func record_run_start() -> void:
 	MetaProgress.record_run_start(profile, current_class)
+	save_game()
+
+func record_council_clear() -> void:
+	MetaProgress.record_council_clear(profile)
 	save_game()
 
 func record_run_end(entry: Dictionary) -> void:

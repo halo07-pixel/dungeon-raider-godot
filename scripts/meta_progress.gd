@@ -34,14 +34,14 @@ static func new_class_entry() -> Dictionary:
 	return {"runs": 0, "best_floor": 0, "kills": 0, "bosses": {}, "tier": 0}
 
 static func new_profile() -> Dictionary:
-	return {"runs": 0, "wins": 0, "best_floor": 0, "kills": 0, "secrets": 0, "bosses": {}, "classes": {}, "history": []}
+	return {"runs": 0, "wins": 0, "best_floor": 0, "kills": 0, "secrets": 0, "bosses": {}, "classes": {}, "history": [], "council": 0}
 
 ## Gộp dữ liệu đã lưu vào cấu trúc mặc định (save cũ thiếu khóa vẫn đọc được).
 static func merge_loaded(loaded) -> Dictionary:
 	var p: Dictionary = new_profile()
 	if not (loaded is Dictionary):
 		return p
-	for k in ["runs", "wins", "best_floor", "kills", "secrets"]:
+	for k in ["runs", "wins", "best_floor", "kills", "secrets", "council"]:
 		p[k] = int(loaded.get(k, 0))
 	var b = loaded.get("bosses", {})
 	if b is Dictionary:
@@ -87,6 +87,10 @@ static func record_run_end(p: Dictionary, entry: Dictionary) -> void:
 	if h.size() > HISTORY_MAX:
 		h = h.slice(h.size() - HISTORY_MAX)
 	p["history"] = h
+
+## Số lần hạ Hội Đồng Bốn Boss.
+static func record_council_clear(p: Dictionary) -> void:
+	p["council"] = int(p.get("council", 0)) + 1
 
 static func record_kill(p: Dictionary, cid: String) -> void:
 	p["kills"] += 1
