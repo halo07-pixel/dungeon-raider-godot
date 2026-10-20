@@ -128,6 +128,12 @@ static func weapons() -> String:
 			line += ". HOLD the mouse to draw the bow (%s s to full), release to fire: stronger, faster and more piercing the longer you draw" % _num(float(w["charge_time"]))
 		if bool(w.get("beam", false)):
 			line += ". Fires a beam that pierces every enemy in a line"
+		if bool(w.get("pin", false)):
+			line += ". Pins enemies that have a wall right behind them: bonus damage and a stun"
+		if bool(w.get("flame", false)):
+			line += ". Sprays short-range fire through every enemy in front of you and sets them ablaze"
+		if bool(w.get("boomerang", false)):
+			line += ". Thrown disc that flies out and returns, hitting on both trips; you cannot throw another until it is back"
 		if w.has("blast_radius"):
 			line += ". The orb explodes in a %d px radius, hurting everything inside" % int(w["blast_radius"])
 		t += line + "\n"

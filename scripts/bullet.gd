@@ -51,6 +51,22 @@ var blast_radius: float = 0.0
 var blast_status: String = ""
 var blast_echo: bool = false
 var _exploded: bool = false
+## Crossbow (effect "pin"): quái trúng đạn mà phía sau trong pin_reach px có tường => bị GHIM: sát thương x pin_mult + choáng pin_stun giây.
+signal pinned(target: Node)
+var pin_mult: float = 1.8
+var pin_stun: float = 1.0
+var pin_reach: float = 70.0
+## Flamethrower (effect "fire"): trúng thì gây cháy với công suất burn_power.
+var burn_power: int = 2
+## Chakram: bay ra out_time giây (hoặc tới khi chạm tường) rồi quay về Player; lượt về nhân sát thương return_dmg_mult.
+var boomerang: bool = false
+var out_time: float = 0.55
+var return_dmg_mult: float = 1.0
+var _returning: bool = false
+var _alive_t: float = 0.0
+var _spin: float = 0.0
+const CHAKRAM_CATCH_DIST: float = 20.0
+const CHAKRAM_RETURN_SPEED_MULT: float = 1.25
 const BLAST_ECHO_DELAY: float = 0.4
 const BLAST_ECHO_DMG_MULT: float = 0.6
 const BLAST_ECHO_RADIUS_MULT: float = 0.8
@@ -184,6 +200,9 @@ func _steer_player_homing(delta: float) -> void:
 	rotation = dir.angle()
 
 func _physics_process(delta: float) -> void:
+	if boomerang and from_player:
+		_boomerang_step(delta)
+		return
 	if homing and from_player:
 		_steer_player_homing(delta)
 	elif homing and is_instance_valid(homing_target):
@@ -192,6 +211,34 @@ func _physics_process(delta: float) -> void:
 		dir = dir.slerp(want_dir, minf(1.0, HOMING_TURN_RATE * delta))
 		rotation = dir.angle()
 	position += dir * speed * delta
+
+## Chakram: bay thẳng, tới hạn (hoặc chạm tường) thì quay về Player; tới sát Player thì được "bắt" lại (đĩa biến mất).
+func _boomerang_step(delta: float) -> void:
+	_alive_t += delta
+	_spin += delta * 18.0
+	queue_redraw()
+	if not _returning and _alive_t >= out_time:
+		_start_return()
+	if _returning:
+		var pl: Node2D = Global.player
+		if not is_instance_valid(pl) or not bool(pl.get("alive")):
+			queue_free()
+			return
+		var to: Vector2 = (pl.hurt_center() if pl.has_method("hurt_center") else pl.global_position) - global_position
+		if to.length() <= CHAKRAM_CATCH_DIST:
+			Global.burst(global_position, color, 4, 80.0, 1.0)
+			queue_free()
+			return
+		dir = to.normalized()
+	position += dir * speed * delta
+
+func _start_return() -> void:
+	if _returning:
+		return
+	_returning = true
+	_hit.clear() # lượt về được đánh lại các quái đã trúng lượt đi
+	damage = maxi(1, int(float(damage) * return_dmg_mult))
+	speed *= CHAKRAM_RETURN_SPEED_MULT
 
 func _on_body_entered(body: Node) -> void:
 	if body.has_method("take_damage"):
@@ -205,7 +252,16 @@ func _on_body_entered(body: Node) -> void:
 				return # đã xuyên qua quái này rồi, không đánh lần 2
 			_hit.append(body)
 
-		body.take_damage(damage, global_position - dir * 8.0, knock)
+		var hit_dmg: int = damage
+		var pinned_now: bool = false
+		if effect == "pin" and from_player and _wall_behind(body):
+			hit_dmg = int(float(damage) * pin_mult)
+			pinned_now = true
+		body.take_damage(hit_dmg, global_position - dir * 8.0, knock)
+		if pinned_now:
+			_apply_pin(body)
+		elif effect == "fire" and from_player and body.has_method("apply_element"):
+			body.apply_element("burn", burn_power, 0)
 
 		if not from_player and source_q_agent and not _q_reward_sent:
 			_q_reward_sent = true
@@ -214,7 +270,7 @@ func _on_body_entered(body: Node) -> void:
 		if from_player:
 			# ÁP DỤNG BUFF (tầm xa — sát thương tầm xa "đổ bộ" ở đây, không phải trong player.gd._shoot()):
 			# Phá Giáp / Hút Máu
-			Global.on_player_hit(body, damage, is_crit)
+			Global.on_player_hit(body, hit_dmg, is_crit)
 			if Global.buff_stack("buff_sunder") > 0 and body.has_method("apply_sunder"):
 				body.apply_sunder()
 
@@ -249,12 +305,28 @@ func _on_body_entered(body: Node) -> void:
 				_impact()
 	elif from_player and bounces_left > 0 and _try_bounce():
 		return
+	elif boomerang and from_player:
+		_start_return() # Chakram chạm tường: quay về luôn (lượt về xuyên tường, không bị chặn)
 	else:
 		# Đập tường/vật cản (không có take_damage) = trượt -> phạt QAgent nếu là đạn Tinh Anh
 		if source_q_agent and not _q_reward_sent:
 			_q_reward_sent = true
 			source_q_agent.learn(-5.0)
 		_impact()
+
+## Crossbow: có tường ngay phía sau mục tiêu (theo hướng bay, trong pin_reach px) không?
+func _wall_behind(target: Node2D) -> bool:
+	var from: Vector2 = target.global_position
+	var q := PhysicsRayQueryParameters2D.create(from, from + dir * pin_reach, Global.L_WORLD)
+	return not get_world_2d().direct_space_state.intersect_ray(q).is_empty()
+
+func _apply_pin(target: Node) -> void:
+	if target.has_method("apply_status"):
+		target.apply_status("stun", pin_stun)
+	Global.float_text(target.global_position + Vector2(0, -28), "PINNED", Color(1.0, 0.85, 0.5), 18)
+	Global.burst(target.global_position, Color(1.0, 0.85, 0.5), 8, 120.0, 1.3)
+	Global.shake(0.15, 0.1)
+	pinned.emit(target)
 
 ## Đạn Nảy: dò pháp tuyến tường bằng raycast ngắn rồi phản xạ hướng bay.
 func _try_bounce() -> bool:
@@ -384,6 +456,13 @@ func _spawn_aftershock(pos: Vector2) -> void:
 	z.global_position = pos
 
 func _draw() -> void:
+	if boomerang:
+		for k in 4:
+			var a: float = _spin + float(k) * TAU * 0.25
+			draw_line(Vector2.ZERO, Vector2.from_angle(a) * radius * 1.25, Color(color, 0.9), 2.5)
+		draw_arc(Vector2.ZERO, radius * 0.8, 0.0, TAU, 20, Color.WHITE, 2.0)
+		draw_arc(Vector2.ZERO, radius * 1.05, 0.0, TAU, 20, Color(color, 0.7), 1.5)
+		return
 	if beam_len > 0.0:
 		draw_line(Vector2(-beam_len, 0.0), Vector2.ZERO, Color(color, 0.30), radius * 3.0)
 		draw_line(Vector2(-beam_len, 0.0), Vector2.ZERO, Color(color, 0.85), radius * 1.4)

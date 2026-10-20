@@ -114,6 +114,13 @@ var weapons: Dictionary = {
 	"railgun": {"name": "Railgun", "damage": 45, "cooldown": 1.6, "speed": 1500.0, "pellets": 1, "spread": 0.0, "pierce": false, "life": 0.6, "recoil": 220.0, "radius": 6.0, "color": Color(0.4, 0.9, 1.0), "sfx": "laser", "is_melee": false, "beam": true},
 	# Arcane Staff: quả cầu nổ diện rộng (blast_radius px) khi chạm quái/tường/hết tầm; sát thương nổ áp cho mọi quái trong vùng.
 	"staff": {"name": "Arcane Staff", "damage": 18, "cooldown": 0.75, "speed": 430.0, "pellets": 1, "spread": 2.0, "pierce": false, "life": 1.1, "recoil": 40.0, "radius": 7.0, "color": Color(0.7, 0.45, 1.0), "sfx": "laser", "is_melee": false, "blast_radius": 64.0},
+	# --- Đợt 2: cơ chế riêng (xem Player._shoot và Bullet) ---
+	# Crossbow: nỏ nặng. Quái bị bắn ngay SÁT TƯỜNG (trong tầm ghim) bị ghim: choáng + sát thương cộng thêm.
+	"crossbow": {"name": "Crossbow", "damage": 34, "cooldown": 0.85, "speed": 900.0, "pellets": 1, "spread": 0.0, "pierce": false, "life": 0.9, "recoil": 60.0, "radius": 5.0, "color": Color(0.85, 0.8, 0.65), "sfx": "shoot", "is_melee": false, "pin": true},
+	# Flamethrower: phun lửa tầm ngắn liên tục, xuyên mọi quái, gây cháy.
+	"flamethrower": {"name": "Flamethrower", "damage": 4, "cooldown": 0.07, "speed": 380.0, "pellets": 1, "spread": 12.0, "pierce": false, "life": 0.26, "recoil": 8.0, "radius": 6.0, "color": Color(1.0, 0.55, 0.15), "sfx": "", "is_melee": false, "flame": true},
+	# Chakram: ném đĩa bay ra rồi quay về tay (chạm quái cả lượt đi lẫn lượt về). Chưa về thì chưa ném được đĩa mới.
+	"chakram": {"name": "Chakram", "damage": 20, "cooldown": 0.6, "speed": 560.0, "pellets": 1, "spread": 0.0, "pierce": false, "life": 2.4, "recoil": 0.0, "radius": 9.0, "color": Color(0.8, 0.9, 1.0), "sfx": "dodge", "is_melee": false, "boomerang": true, "out_time": 0.55},
 	"laser": {"name": "Laser Gun", "damage": 14, "cooldown": 0.50, "speed": 1100.0, "pellets": 1, "spread": 0.0, "pierce": false, "pierce_count": 2, "life": 0.9, "recoil": 60.0, "radius": 4.0, "color": Color(0.4, 1.0, 1.0), "sfx": "laser", "is_melee": false},
 
 	"broadsword": {"name": "Longsword", "damage": 25, "cooldown": 0.45, "is_melee": true, "range": 55.0, "cleave_angle": 180.0, "knock": 280.0, "color": Color(0.9, 0.9, 0.9), "sfx": "dodge"},
@@ -535,6 +542,7 @@ const BUFF_MAX_STACK: Dictionary = {
 	# Tầm xa
 	"buff_bounce": 2, "buff_split": 1, "buff_focus": 3, "buff_homing": 1, "buff_ring": 1, "buff_super": 1,
 	# Buff riêng từng vũ khí (chỉ xuất hiện khi đang cầm đúng vũ khí đó)
+	"buff_heavy_bolt": 3, "buff_nailgun": 1, "buff_fuel_tank": 3, "buff_inferno": 1, "buff_sharpened": 3, "buff_twin_disc": 1,
 	"buff_perfect_draw": 1, "buff_quickdraw": 3, "buff_overcharge": 1, "buff_capacitor": 3,
 	"buff_aftershock": 1, "buff_volatile": 2, "buff_impale": 1, "buff_reach_master": 3,
 	"buff_reap": 1, "buff_blood_pact": 2,
@@ -581,6 +589,12 @@ var buff_pool: Dictionary = {
 	"buff_ring": {"name": "Bullet Ring", "desc": "Every 5th shot: ring of 8 (50%)", "tier": "epic", "class": "ranged"},
 	"buff_super": {"name": "Mega Shot", "desc": "Every 6th shot: x3 damage, pierces 2 enemies", "tier": "epic", "class": "ranged"},
 	# ---- Riêng từng vũ khí: "weapon" = id vũ khí bắt buộc đang cầm (xem roll_buff_choices)
+	"buff_heavy_bolt": {"name": "Heavy Bolt", "desc": "Crossbow: +20% damage and +40 px pin reach", "tier": "rare", "class": "ranged", "weapon": "crossbow"},
+	"buff_nailgun": {"name": "Nailgun", "desc": "Crossbow: pinning an enemy halves the next reload", "tier": "epic", "class": "ranged", "weapon": "crossbow"},
+	"buff_fuel_tank": {"name": "Fuel Tank", "desc": "Flamethrower: +15% range and +10% burn damage", "tier": "rare", "class": "ranged", "weapon": "flamethrower"},
+	"buff_inferno": {"name": "Inferno", "desc": "Flamethrower: enemies you kill burst into flames", "tier": "epic", "class": "ranged", "weapon": "flamethrower"},
+	"buff_sharpened": {"name": "Sharpened Edge", "desc": "Chakram: +15% damage", "tier": "rare", "class": "ranged", "weapon": "chakram"},
+	"buff_twin_disc": {"name": "Twin Discs", "desc": "Chakram: throw 2 discs at once", "tier": "epic", "class": "ranged", "weapon": "chakram"},
 	"buff_perfect_draw": {"name": "Perfect Draw", "desc": "Release right as the draw fills: x1.5 damage", "tier": "epic", "class": "ranged", "weapon": "bow"},
 	"buff_quickdraw": {"name": "Quickdraw", "desc": "Draw the bow 15% faster", "tier": "rare", "class": "ranged", "weapon": "bow"},
 	"buff_overcharge": {"name": "Overcharge", "desc": "Every 3rd Railgun shot: x2 damage, wider beam", "tier": "epic", "class": "ranged", "weapon": "railgun"},

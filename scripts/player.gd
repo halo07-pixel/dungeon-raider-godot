@@ -96,6 +96,30 @@ const RANK_PERKS: Dictionary = {
 	"spear": {"range_mult": 1.1},
 	"scythe": {"cd_mult": 0.9},
 }
+## Vũ khí đợt 2: Crossbow / Flamethrower / Chakram
+const CROSSBOW_RARE_CD_MULT: float = 0.85
+const CROSSBOW_EPIC_PIN_STUN: float = 1.6
+const CROSSBOW_LEGEND_DMG_MULT: float = 1.25
+const CROSSBOW_LEGEND_PIN_MULT: float = 2.5
+const CROSSBOW_PIN_REACH: float = 70.0
+const HEAVY_BOLT_DMG_PER_STACK: float = 0.20
+const HEAVY_BOLT_REACH_PER_STACK: float = 40.0
+const NAILGUN_CD_MULT: float = 0.5
+const FLAME_RARE_LIFE_MULT: float = 1.25
+const FLAME_EPIC_BURN_MULT: float = 1.5
+const FLAME_LEGEND_DMG_MULT: float = 1.5
+const FLAME_LEGEND_SPREAD_MULT: float = 1.5
+const FLAME_BURN_PER_DMG: float = 0.5      # công suất cháy = sát thương mỗi hạt x hệ số này
+const FLAME_SFX_EVERY: int = 7             # 14 hạt/giây: chỉ phát tiếng mỗi N hạt để khỏi chói tai
+const FUEL_TANK_RANGE_PER_STACK: float = 0.15
+const FUEL_TANK_BURN_PER_STACK: float = 0.10
+const INFERNO_RADIUS: float = 55.0
+const INFERNO_DMG_BASE: float = 10.0
+const INFERNO_DMG_PER_FLOOR: float = 1.5
+const CHAKRAM_RARE_SPEED_MULT: float = 1.25
+const CHAKRAM_LEGEND_RETURN_MULT: float = 1.5
+const SHARPENED_DMG_PER_STACK: float = 0.15
+const TWIN_DISC_SPREAD: float = 30.0
 ## Buff riêng từng vũ khí
 const PERFECT_DRAW_WINDOW: float = 0.2     # giây sau khi căng đầy mà nhả vẫn tính "Perfect"
 const PERFECT_DRAW_DMG_MULT: float = 1.5
@@ -122,6 +146,9 @@ const STAFF_LEGEND_RADIUS_MULT: float = 1.3
 ## Trạng thái căng dây (chỉ vũ khí có charge_time): giây đã căng, đang căng hay không.
 var charge: float = 0.0
 var charging: bool = false
+var chakram_discs: Array = []       # đĩa Chakram đang bay (chưa về thì chưa ném được đĩa mới)
+var nailgun_ready: bool = false     # Nailgun: lần nạp kế tiếp nhanh gấp đôi
+var _flame_shots: int = 0
 var weapon_kills: Dictionary = {}   # id vũ khí -> số quái đã hạ gục trong ván này (Weapon Rank)
 var swap_bonus_timer: float = 0.0   # còn bao lâu thì thưởng đổi vũ khí hết hiệu lực
 var swap_bonus_mult: float = 1.0
@@ -507,6 +534,10 @@ func _tick_charge(delta: float) -> void:
 		_shoot(ratio, perfect)
 
 func _shoot(charge_ratio_arg: float = -1.0, perfect: bool = false) -> void:
+	if weapon_id == "chakram":
+		chakram_discs = chakram_discs.filter(func(d): return is_instance_valid(d) and not d.is_queued_for_deletion())
+		if not chakram_discs.is_empty():
+			return # đĩa chưa về tay
 	var w: Dictionary = weapon
 	var base_dmg = int(w["damage"])
 	var mult = rarity_data["mult"]
@@ -539,8 +570,19 @@ func _shoot(charge_ratio_arg: float = -1.0, perfect: bool = false) -> void:
 	var blast_r: float = float(w.get("blast_radius", 0.0))
 	var blast_status: String = ""
 	var blast_echo: bool = false
+	var flame: bool = bool(w.get("flame", false))
+	var boomerang: bool = bool(w.get("boomerang", false))
+	var pin_mult: float = 1.8
+	var pin_stun: float = 1.0
+	var pin_reach: float = CROSSBOW_PIN_REACH
+	var burn_power: int = 2
+	var return_mult: float = 1.0
 	if blast_r > 0.0:
 		eff = "orb"
+	if bool(w.get("pin", false)):
+		eff = "pin"
+	if flame:
+		eff = "fire"
 
 	# LOGIC ĐỘ HIẾM TẦM XA CHUYÊN SÂU
 	if weapon_id == "pistol":
@@ -560,6 +602,31 @@ func _shoot(charge_ratio_arg: float = -1.0, perfect: bool = false) -> void:
 		if weapon_rarity == "rare": cd *= RAILGUN_RARE_CD_MULT
 		elif weapon_rarity == "epic": eff = "slow"
 		elif weapon_rarity == "legendary": eff = "chain"; p_color = Color(1.0, 0.4, 0.9); dmg = int(float(dmg) * RAILGUN_LEGEND_DMG_MULT)
+	elif weapon_id == "crossbow":
+		if weapon_rarity == "rare": cd *= CROSSBOW_RARE_CD_MULT
+		elif weapon_rarity == "epic": pin_stun = CROSSBOW_EPIC_PIN_STUN
+		elif weapon_rarity == "legendary": pin_stun = CROSSBOW_EPIC_PIN_STUN; pin_mult = CROSSBOW_LEGEND_PIN_MULT; dmg = int(float(dmg) * CROSSBOW_LEGEND_DMG_MULT); p_color = Color(1.0, 0.7, 0.3)
+		var hb: int = Global.buff_stack("buff_heavy_bolt")
+		dmg = int(float(dmg) * (1.0 + HEAVY_BOLT_DMG_PER_STACK * float(hb)))
+		pin_reach += HEAVY_BOLT_REACH_PER_STACK * float(hb)
+		if nailgun_ready:
+			cd *= NAILGUN_CD_MULT
+			nailgun_ready = false
+	elif weapon_id == "flamethrower":
+		var burn_mult: float = 1.0 + FUEL_TANK_BURN_PER_STACK * float(Global.buff_stack("buff_fuel_tank"))
+		life *= 1.0 + FUEL_TANK_RANGE_PER_STACK * float(Global.buff_stack("buff_fuel_tank"))
+		if weapon_rarity == "rare": life *= FLAME_RARE_LIFE_MULT
+		elif weapon_rarity == "epic": burn_mult *= FLAME_EPIC_BURN_MULT
+		elif weapon_rarity == "legendary": burn_mult *= FLAME_EPIC_BURN_MULT; dmg = int(float(dmg) * FLAME_LEGEND_DMG_MULT); spread *= FLAME_LEGEND_SPREAD_MULT; p_color = Color(1.0, 0.35, 0.9)
+		burn_power = maxi(2, int(float(dmg) * FLAME_BURN_PER_DMG * burn_mult))
+	elif weapon_id == "chakram":
+		dmg = int(float(dmg) * (1.0 + SHARPENED_DMG_PER_STACK * float(Global.buff_stack("buff_sharpened"))))
+		if weapon_rarity == "rare": speed *= CHAKRAM_RARE_SPEED_MULT
+		elif weapon_rarity == "epic": eff = "slow"
+		elif weapon_rarity == "legendary": eff = "slow"; return_mult = CHAKRAM_LEGEND_RETURN_MULT; p_color = Color(1.0, 0.85, 0.4)
+		if Global.buff_stack("buff_twin_disc") > 0:
+			pellets = 2
+			spread = TWIN_DISC_SPREAD
 	elif weapon_id == "staff":
 		if weapon_rarity == "rare": blast_r *= STAFF_RARE_RADIUS_MULT
 		elif weapon_rarity == "epic": blast_status = "slow"
@@ -631,10 +698,24 @@ func _shoot(charge_ratio_arg: float = -1.0, perfect: bool = false) -> void:
 		if pellets > 1:
 			off = lerpf(-spread * 0.5, spread * 0.5, float(i) / float(pellets - 1))
 			off += randf_range(-spread, spread) * 0.08
+		elif flame:
+			off = randf_range(-spread * 0.5, spread * 0.5) # lửa phun toé ngẫu nhiên trong hình quạt
 		var dir: Vector2 = Vector2.from_angle(base_ang + off)
 		var b = BULLET.instantiate()
-		b.setup(true, dir, dmg, speed, life, p_color, bullet_radius, beam, eff)
+		b.setup(true, dir, dmg, speed, life, p_color, bullet_radius, beam or flame or boomerang, eff)
 		b.pierce_left = pierce_n
+		if eff == "pin":
+			b.pin_mult = pin_mult
+			b.pin_stun = pin_stun
+			b.pin_reach = pin_reach
+			b.pinned.connect(_on_bolt_pinned)
+		if flame:
+			b.burn_power = burn_power
+		if boomerang:
+			b.boomerang = true
+			b.out_time = float(w.get("out_time", 0.55))
+			b.return_dmg_mult = return_mult
+			chakram_discs.append(b)
 		if beam:
 			b.beam_len = BEAM_TRAIL_LEN
 		if blast_r > 0.0:
@@ -660,6 +741,10 @@ func _shoot(charge_ratio_arg: float = -1.0, perfect: bool = false) -> void:
 		
 	knockback -= aim_dir * w_knock
 	Global.sfx(w["sfx"])
+	if flame:
+		_flame_shots += 1
+		if _flame_shots % FLAME_SFX_EVERY == 1:
+			Global.sfx("flame_trail")
 	Global.burst(global_position + aim_dir * 28.0, p_color, 4, 90.0, 1.0)
 	Global.shake(0.10 if pellets > 1 else 0.04, 0.1)
 	if Global.buff_stack("buff_momentum") > 0:
@@ -1127,6 +1212,23 @@ func _add_weapon_kill() -> void:
 
 ## Buff riêng vũ khí phản ứng khi hạ gục: Capacitor (Railgun) cắt hồi đòn, Reap (Lưỡi Liềm) cộng stack tốc độ.
 ## player_hit_landed phát SAU take_damage nên target.alive == false nghĩa là đòn này vừa hạ gục.
+## Nailgun: bolt ghim được quái => lần nạp kế tiếp nhanh gấp đôi.
+func _on_bolt_pinned(_target: Node) -> void:
+	if Global.buff_stack("buff_nailgun") > 0:
+		nailgun_ready = true
+
+## Inferno: quái chết vì Flamethrower nổ lửa nhỏ, đốt và làm đau quái xung quanh (gây sát thương trực tiếp, không kích hoạt dây chuyền buff).
+func _inferno_pop(pos: Vector2, dead: Node) -> void:
+	var dmg: int = maxi(1, int(INFERNO_DMG_BASE + INFERNO_DMG_PER_FLOOR * float(Global.floor_num)))
+	Global.burst(pos, Color(1.0, 0.5, 0.1), 12, 170.0, 1.6)
+	for e in get_tree().get_nodes_in_group("enemies"):
+		if e == dead or not is_instance_valid(e) or not bool(e.get("alive")) or e.get("active") == false:
+			continue
+		if e.global_position.distance_to(pos) <= INFERNO_RADIUS:
+			e.take_damage(dmg, pos, 0.0, true)
+			if e.has_method("apply_element"):
+				e.apply_element("burn", maxi(2, dmg / 3), 0)
+
 func _on_hit_landed_weapon_buffs(target: Node, _dmg: int, _is_crit: bool) -> void:
 	if not is_instance_valid(target) or bool(target.get("alive")):
 		return
@@ -1135,6 +1237,8 @@ func _on_hit_landed_weapon_buffs(target: Node, _dmg: int, _is_crit: bool) -> voi
 		var cap: int = Global.buff_stack("buff_capacitor")
 		if cap > 0 and not fire_timer.is_stopped():
 			fire_timer.start(maxf(0.05, fire_timer.time_left - CAPACITOR_CD_CUT * float(cap)))
+	elif weapon_id == "flamethrower" and Global.buff_stack("buff_inferno") > 0:
+		_inferno_pop(target.global_position, target)
 	elif weapon_id == "scythe" and Global.buff_stack("buff_reap") > 0:
 		reap_stacks = mini(reap_stacks + 1, REAP_MAX_STACKS)
 		reap_timer = REAP_WINDOW
