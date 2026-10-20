@@ -166,7 +166,10 @@ static func buffs() -> String:
 		for id in ids:
 			var b: Dictionary = Global.buff_pool[id]
 			var mx: int = int(Global.BUFF_MAX_STACK.get(id, 1))
-			t += "[b]%s[/b]%s: %s" % [b["name"], CLASS_TAG.get(String(b["class"]), ""), b["desc"]]
+			var tag: String = CLASS_TAG.get(String(b["class"]), "")
+			if b.has("weapon"):
+				tag = " (%s only)" % String(Global.weapons[String(b["weapon"])]["name"])
+			t += "[b]%s[/b]%s: %s" % [b["name"], tag, b["desc"]]
 			if mx > 1:
 				t += " (max %d)" % mx
 			t += "\n"

@@ -485,6 +485,10 @@ const BUFF_MAX_STACK: Dictionary = {
 	"buff_wave": 3, "buff_rollslash": 3, "buff_counter": 1, "buff_whirl": 1,
 	# Tầm xa
 	"buff_bounce": 2, "buff_split": 1, "buff_focus": 3, "buff_homing": 1, "buff_ring": 1, "buff_super": 1,
+	# Buff riêng từng vũ khí (chỉ xuất hiện khi đang cầm đúng vũ khí đó)
+	"buff_perfect_draw": 1, "buff_quickdraw": 3, "buff_overcharge": 1, "buff_capacitor": 3,
+	"buff_aftershock": 1, "buff_volatile": 2, "buff_impale": 1, "buff_reach_master": 3,
+	"buff_reap": 1, "buff_blood_pact": 2,
 }
 ## "class": "any" (mọi vũ khí) | "melee" (chỉ khi đang cầm vũ khí cận chiến) | "ranged" (chỉ tầm xa).
 ## Buff bị lọc khỏi lượt chọn nếu không hợp loại vũ khí đang cầm (xem roll_buff_choices).
@@ -527,6 +531,17 @@ var buff_pool: Dictionary = {
 	"buff_homing": {"name": "Homing", "desc": "Bullets track targets", "tier": "epic", "class": "ranged"},
 	"buff_ring": {"name": "Bullet Ring", "desc": "Every 5th shot: ring of 8 (50%)", "tier": "epic", "class": "ranged"},
 	"buff_super": {"name": "Mega Shot", "desc": "Every 6th shot: x3 damage, pierces 2 enemies", "tier": "epic", "class": "ranged"},
+	# ---- Riêng từng vũ khí: "weapon" = id vũ khí bắt buộc đang cầm (xem roll_buff_choices)
+	"buff_perfect_draw": {"name": "Perfect Draw", "desc": "Release right as the draw fills: x1.5 damage", "tier": "epic", "class": "ranged", "weapon": "bow"},
+	"buff_quickdraw": {"name": "Quickdraw", "desc": "Draw the bow 15% faster", "tier": "rare", "class": "ranged", "weapon": "bow"},
+	"buff_overcharge": {"name": "Overcharge", "desc": "Every 3rd Railgun shot: x2 damage, wider beam", "tier": "epic", "class": "ranged", "weapon": "railgun"},
+	"buff_capacitor": {"name": "Capacitor", "desc": "Railgun kills cut 0.4s off the next shot's cooldown", "tier": "rare", "class": "ranged", "weapon": "railgun"},
+	"buff_aftershock": {"name": "Aftershock", "desc": "Staff blasts leave a fire patch for 2s", "tier": "epic", "class": "ranged", "weapon": "staff"},
+	"buff_volatile": {"name": "Volatile Orb", "desc": "Enemies killed by a Staff blast explode (50%)", "tier": "rare", "class": "ranged", "weapon": "staff"},
+	"buff_impale": {"name": "Impale", "desc": "Spear tip stuns the front enemy; hitting it again within 2s: x1.5 damage", "tier": "epic", "class": "melee", "weapon": "spear"},
+	"buff_reach_master": {"name": "Reach Master", "desc": "Spear: +10% reach and +10% damage to enemies behind the tip", "tier": "rare", "class": "melee", "weapon": "spear"},
+	"buff_reap": {"name": "Reap", "desc": "Scythe kills make you swing 6% faster (stacks to 5, 3s)", "tier": "epic", "class": "melee", "weapon": "scythe"},
+	"buff_blood_pact": {"name": "Blood Pact", "desc": "Scythe: 25% less HP cost per swing, heals 5% of damage dealt", "tier": "rare", "class": "melee", "weapon": "scythe"},
 }
 ## Bảng buff có tương tác chéo (đối xứng): id -> các buff đối tác. buff_picker hiện nhãn ★ khi đã có đối tác.
 const SYNERGY_MAP: Dictionary = {
@@ -587,6 +602,9 @@ func roll_buff_choices(n: int = 3, only_tier: String = "") -> Array:
 	for id in buff_pool:
 		var bclass: String = String(buff_pool[id].get("class", "any"))
 		if bclass != "any" and bclass != wclass:
+			continue
+		var req_weapon: String = String(buff_pool[id].get("weapon", ""))
+		if req_weapon != "" and (not is_instance_valid(player) or String(player.get("weapon_id")) != req_weapon):
 			continue
 		if only_tier != "" and String(buff_pool[id]["tier"]) != only_tier:
 			continue

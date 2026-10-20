@@ -2,6 +2,7 @@ extends Area2D
 ## Đạn (Area2D) nâng cấp: Tích hợp hiệu ứng Sử thi/Huyền thoại (Xuyên, Nổ, Chậm, Xích sét).
 
 const RingFx = preload("res://scripts/skill_ring_fx.gd")
+const AftershockZone = preload("res://scripts/aftershock_zone.gd")
 
 var dir: Vector2 = Vector2.RIGHT
 var damage: int = 10
@@ -56,6 +57,9 @@ const BLAST_ECHO_RADIUS_MULT: float = 0.8
 const BLAST_KNOCK_MULT: float = 1.2
 const BLAST_REACH: float = 12.0        # cộng thêm bán kính thân quái để quái to cũng bị tính
 const BLAST_SLOW_TIME: float = 1.8
+const AFTERSHOCK_DMG_MULT: float = 0.25   # mỗi nhịp lửa = 25% sát thương quả cầu
+const VOLATILE_RADIUS_MULT: float = 0.6
+const VOLATILE_DMG_MULT: float = 0.5
 const HOMING_TURN_RATE: float = 2.2 # rad/s - bẻ hướng từ từ, không phải dính chắc chắn
 
 @onready var life_timer: Timer = $Life
@@ -317,6 +321,8 @@ func _explode_orb() -> void:
 	$Shape.set_deferred("disabled", true)
 	var pos: Vector2 = global_position
 	_orb_blast(pos, blast_radius, damage)
+	if Global.buff_stack("buff_aftershock") > 0:
+		_spawn_aftershock(pos)
 	if blast_echo:
 		await get_tree().create_timer(BLAST_ECHO_DELAY).timeout
 		if is_inside_tree():
@@ -343,6 +349,36 @@ func _orb_blast(pos: Vector2, rad: float, dmg: int) -> void:
 		Global.on_player_hit(e, dmg, is_crit)
 		if blast_status == "slow" and e.has_method("apply_status"):
 			e.apply_status("slow", BLAST_SLOW_TIME)
+		if not bool(e.get("alive")) and Global.buff_stack("buff_volatile") > 0:
+			_volatile_pop(e.global_position, rad, dmg, e)
+
+## Volatile Orb: quái chết trong vụ nổ nổ nhỏ lên quái kề bên (không dây chuyền tiếp).
+func _volatile_pop(pos: Vector2, rad: float, dmg: int, dead: Node) -> void:
+	var r: float = rad * VOLATILE_RADIUS_MULT
+	var pop_dmg: int = maxi(1, int(float(dmg) * VOLATILE_DMG_MULT))
+	Global.burst(pos, color, 8, 120.0, 1.4)
+	var fx := Node2D.new()
+	fx.set_script(RingFx)
+	fx.max_radius = r
+	fx.color = color
+	fx.duration = 0.25
+	Global.world.add_child(fx)
+	fx.global_position = pos
+	for o in get_tree().get_nodes_in_group("enemies") + get_tree().get_nodes_in_group("boss"):
+		if o == dead or not is_instance_valid(o) or not bool(o.get("alive")) or o.get("active") == false:
+			continue
+		if o.global_position.distance_to(pos) <= r + BLAST_REACH:
+			o.take_damage(pop_dmg, pos, 0.0, true)
+
+## Aftershock: vùng lửa còn lại sau vụ nổ.
+func _spawn_aftershock(pos: Vector2) -> void:
+	var z := Node2D.new()
+	z.set_script(AftershockZone)
+	z.radius = blast_radius * 0.8
+	z.tick_damage = maxi(1, int(float(damage) * AFTERSHOCK_DMG_MULT))
+	z.color = color
+	Global.world.add_child(z)
+	z.global_position = pos
 
 func _draw() -> void:
 	if beam_len > 0.0:
