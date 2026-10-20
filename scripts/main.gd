@@ -92,11 +92,12 @@ func _ready() -> void:
 	pause_layer.hide()
 
 
-## Tầng > 10 là phần Vô Hạn (sau khi đã hạ Dungeon Lord) - gắn nhãn "Endless" cho rõ,
-## giữ "Floor %d" như cũ cho các tầng 1-10 của hành trình chính.
+## Tầng 11-15 là Chương Địa Ngục ("Hell"), sau đó là Vô Hạn ("Endless"); tầng 1-10 giữ "Floor %d" như cũ.
 func _floor_label(f: int) -> String:
-	if f > 10:
+	if f > Global.ENDLESS_START_FLOOR:
 		return "Endless - Floor %d" % f
+	if f > 10:
+		return "Hell - Floor %d" % f
 	return "Floor %d" % f
 
 

@@ -17,23 +17,25 @@ const BOSS_HAZARD = preload("res://scripts/boss_hazard.gd")
 ## min_floor: tầng thấp nhất xuất hiện · kinds: loại quái hợp lệ · color: nhận diện (tint, viền thanh HP)
 const AFFIXES: Dictionary = {
 	"volatile": {"label": "Volatile", "color": Color(1.0, 0.55, 0.15), "min_floor": 2,
-		"kinds": ["slime", "brute", "chort", "masked_orc", "frost_zombie", "frost_big_zombie"]},
+		"kinds": ["slime", "brute", "chort", "masked_orc", "frost_zombie", "frost_big_zombie", "hell_ogre"]},
 	"warden": {"label": "Warden", "color": Color(0.35, 0.7, 1.0), "min_floor": 3,
-		"kinds": ["archer", "shaman", "brute", "masked_orc", "frost_big_zombie"]},
+		"kinds": ["archer", "shaman", "brute", "masked_orc", "frost_big_zombie", "hell_ogre", "hell_imp"]},
 	"summoner": {"label": "Summoner", "color": Color(0.75, 0.4, 1.0), "min_floor": 4,
-		"kinds": ["archer", "shaman", "brute", "masked_orc", "frost_big_zombie"]},
+		"kinds": ["archer", "shaman", "brute", "masked_orc", "frost_big_zombie", "hell_ogre", "hell_imp"]},
 	"splitter": {"label": "Splitter", "color": Color(0.5, 0.95, 0.45), "min_floor": 3,
 		"kinds": ["slime", "chort", "frost_zombie", "brute", "masked_orc"]},
 	"frenzy": {"label": "Frenzy", "color": Color(1.0, 0.25, 0.25), "min_floor": 4,
-		"kinds": ["slime", "brute", "chort", "masked_orc", "frost_zombie", "frost_big_zombie"]},
+		"kinds": ["slime", "brute", "chort", "masked_orc", "frost_zombie", "frost_big_zombie", "hell_ogre", "cinder_tiny"]},
 	"leech": {"label": "Leech", "color": Color(0.85, 0.2, 0.55), "min_floor": 5,
-		"kinds": ["slime", "brute", "chort", "masked_orc", "frost_zombie", "frost_big_zombie"]},
+		"kinds": ["slime", "brute", "chort", "masked_orc", "frost_zombie", "frost_big_zombie", "hell_ogre"]},
 	"blink": {"label": "Blink", "color": Color(0.4, 0.9, 0.95), "min_floor": 6,
 		"kinds": ["slime", "brute", "chort", "masked_orc", "frost_zombie", "frost_big_zombie"]},
 }
 const CHANCE_BASE: float = 0.05   # tỉ lệ ở tầng 2
 const CHANCE_PER_FLOOR: float = 0.02
 const CHANCE_MAX: float = 0.22
+const HELL_MIN_FLOOR: int = 11    # Chương Địa Ngục: quái có affix nhiều hơn
+const HELL_CHANCE: float = 0.32
 const MAX_PER_ROOM: int = 2
 
 const VOLATILE_RADIUS: float = 58.0
@@ -71,6 +73,8 @@ var _blink_left: float = 0.0
 static func chance_for_floor(floor_num: int) -> float:
 	if floor_num < 2:
 		return 0.0
+	if floor_num >= HELL_MIN_FLOOR:
+		return HELL_CHANCE
 	return clampf(CHANCE_BASE + CHANCE_PER_FLOOR * float(floor_num - 2), 0.0, CHANCE_MAX)
 
 ## Chọn affix cho 1 quái: "" nếu không trúng / không có affix hợp lệ.

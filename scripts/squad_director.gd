@@ -10,8 +10,8 @@ extends Node
 const ENABLED: bool = true
 const UPDATE_INTERVAL: float = 0.5
 const MIN_SQUAD: int = 3              # ít hơn số quái này thì không phối hợp (đánh thẳng như cũ)
-const TANKS: Array = ["brute", "masked_orc", "frost_big_zombie"]
-const RANGED: Array = ["archer", "shaman"]
+const TANKS: Array = ["brute", "masked_orc", "frost_big_zombie", "hell_ogre"]
+const RANGED: Array = ["archer", "shaman", "hell_imp"]
 const FLANK_ENGAGE_DIST: float = 150.0 # xa hơn mức này mới đi vòng; gần hơn thì lao thẳng vào
 const FLANK_RADIUS: float = 110.0      # bán kính vòng quanh người chơi chứa các điểm gọng kìm
 const FLANK_WEIGHT: float = 0.8        # độ mạnh của độ lệch so với hướng thẳng

@@ -15,3 +15,7 @@
 
 ## Class sprites (Mage, Rogue)
 - `wizard_m_*` (Mage) and `lizard_m_*` (Rogue) animation frames are cut from the **0x72 DungeonTilesetII v1.3** atlas (CC0 1.0, same source/copy as above, atlas names `wizzard_m` and `lizard_m`) by `tools/gen_class_sprites.py`, padded to 16x28 like the other class sprites.
+
+## Quái Địa Ngục (hell_imp, hell_ogre, hell_acolyte, cinder_tiny)
+Dẫn xuất từ sprite imp / ogre / orc_shaman / frost_tiny của bộ 0x72 DungeonTilesetII (đã nằm trong repo) bằng đổi bảng màu:
+`python3 tools/gen_hell_enemies.py`. Giữ nguyên giấy phép của bộ gốc.

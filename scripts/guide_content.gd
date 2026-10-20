@@ -11,6 +11,7 @@ const EnemyAffix = preload("res://scripts/enemy_affix.gd")
 const EventRooms = preload("res://scripts/event_rooms.gd")
 const BossScript = preload("res://scripts/boss.gd")
 const EnemyScript = preload("res://scripts/enemy.gd")
+const DungeonScript = preload("res://scripts/dungeon.gd")
 
 const TAB_ORDER: Array = ["basics", "classes", "weapons", "buffs", "defense", "enemies", "events", "tips"]
 const TAB_TITLES: Dictionary = {
@@ -61,7 +62,7 @@ static func tab_text(tab_id: String) -> String:
 static func basics() -> String:
 	var t: String = _h("BASICS")
 	t += "[b]Goal[/b]: clear rooms, grow stronger, and beat the boss on floor 10 (the Dungeon Lord). "
-	t += "Beyond it, Endless mode starts and enemies scale up much faster.\n"
+	t += "After it comes the Hell chapter (floors 11-15) with its own monsters, then Endless mode, where enemies scale up much faster.\n"
 	t += _sub("Controls")
 	t += "Move: %s %s %s %s\n" % [_key("move_up"), _key("move_left"), _key("move_down"), _key("move_right")]
 	t += "Aim and attack: [b]Mouse[/b] (hold to keep attacking)\n"
@@ -213,7 +214,7 @@ static func defense() -> String:
 	t += "Tougher enemies and bosses have armor that reduces your damage by a percentage: armor 10 reduces %s, armor 19 reduces %s. " % [_pct(Global.armor_reduction(10.0)), _pct(Global.armor_reduction(19.0))]
 	t += "Sunder stacks extra damage taken on whatever you hit, which helps against armor.\n"
 	t += _sub("Floor scaling")
-	t += "Enemy HP at floor 10 is about x%s of floor 1. Enemy damage also rises with the floor. After floor %d, Endless mode adds %s more difficulty per floor.\n" % [_num(Global.hp_scale_for_floor(10)), Global.ENDLESS_START_FLOOR, _pct(Global.ENDLESS_RATE)]
+	t += "Enemy HP at floor 10 is about x%s of floor 1. Enemy damage also rises with the floor. Floors 11-15 (Hell) get no extra scaling; after floor %d, Endless mode adds %s more difficulty per floor.\n" % [_num(Global.hp_scale_for_floor(10)), Global.ENDLESS_START_FLOOR, _pct(Global.ENDLESS_RATE)]
 	return t
 
 # ---------------------------------------------------------------- ENEMIES
@@ -227,6 +228,10 @@ const ENEMY_NOTES: Dictionary = {
 	"frost_zombie": "Basic frost melee.",
 	"frost_big_zombie": "Slams the ground and slows you.",
 	"frost_tiny": "Fast, explodes on contact.",
+	"hell_imp": "Hell. Throws fireballs that set you on fire, then backs away.",
+	"hell_ogre": "Hell. Telegraphs a straight charge, hits hard and leaves a trail of fire. Roll sideways.",
+	"hell_acolyte": "Hell. Shields nearby allies and keeps its distance. Kill it first; its shields drop when it dies.",
+	"cinder_tiny": "Hell. Fast, explodes on contact and leaves a fire puddle when it dies.",
 	"mimic": "Only comes from trapped chests. Tough and rewards a Purple Gem.",
 }
 
@@ -236,6 +241,10 @@ static func enemies() -> String:
 		var e: Dictionary = Global.enemies[kind]
 		t += "[b]%s[/b]: %d HP, %d contact dmg. %s\n" % [_display(kind), int(e["hp"]), int(e["touch"]), ENEMY_NOTES.get(kind, "")]
 	t += "(Stats are for floor 1. They grow every floor.)\n"
+	t += _sub("Hell chapter (floors 11-15)")
+	t += "Hell has its own monsters, introduced floor by floor: Imps and Cinders on floor 11, Ogres on floor 12, Acolytes on floor 13, then all of them mixed. "
+	t += "Affixes are far more common here (%s). Instead of a boss, the last room of each floor is a [b]Hell Trial[/b]: %d waves of monsters (%d on floor %d). " % [_pct(EnemyAffix.HELL_CHANCE), DungeonScript.TRIAL_WAVES_DEFAULT, DungeonScript.TRIAL_WAVES_FINAL, DungeonScript.HELL_LAST_FLOOR]
+	t += "Difficulty here comes from the monster mix, not from extra stats, so watch for telegraphs and kill Acolytes first.\n"
 	t += _sub("Elites")
 	t += "%s of Archers and Shamans spawn as purple Elites with x%s HP. They learn from your habits and aim less predictably.\n" % [_pct(EnemyScript.ELITE_CHANCE), _num(EnemyScript.ELITE_HP_MULT)]
 	t += _sub("Affixes")
@@ -244,12 +253,16 @@ static func enemies() -> String:
 		"volatile": "explodes shortly after dying (%d dmg, move away when it warns)" % EnemyAffix.VOLATILE_DAMAGE,
 		"warden": "shields nearby allies every %s s. Kill it to drop the shields" % _num(EnemyAffix.WARD_INTERVAL),
 		"summoner": "calls up to %d minions every %s s. Kill it first" % [EnemyAffix.MAX_MINIONS, _num(EnemyAffix.SUMMON_INTERVAL)],
+		"splitter": "splits into %d smaller copies when killed" % EnemyAffix.SPLIT_COUNT,
+		"frenzy": "gets faster every time another enemy dies, up to +%s" % _pct(EnemyAffix.FRENZY_MAX),
+		"blink": "teleports behind you after a short warning (move when the ring appears)",
+		"leech": "heals for %s of the damage it deals to you" % _pct(EnemyAffix.LEECH_FRACTION),
 	}
 	for id in EnemyAffix.AFFIXES:
 		var a: Dictionary = EnemyAffix.AFFIXES[id]
 		t += "[b]%s[/b] (from floor %d): %s.\n" % [a["label"], int(a["min_floor"]), af_notes.get(id, "")]
 	t += _sub("Bosses")
-	var order: Array = [["warden", "floors 1-3"], ["necromancer", "floors 4-6"], ["frost", "floors 7-9"], ["lord", "floor 10 and beyond"]]
+	var order: Array = [["warden", "floors 1-3"], ["necromancer", "floors 4-6"], ["frost", "floors 7-9"], ["lord", "floor 10, and again in Endless"]]
 	for row in order:
 		var d: Dictionary = BossScript.BOSS_DATA.get(row[0], {})
 		t += "[b]%s[/b] (%s): %d phases.\n" % [String(d.get("name", row[0])), row[1], int(d.get("phases", 3))]

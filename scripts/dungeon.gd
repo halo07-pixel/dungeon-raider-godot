@@ -435,7 +435,10 @@ func _enter_room(cell: Vector2i) -> void:
 			_spawn_wave(cell)
 		"boss":
 			_lock_doors(room)
-			_spawn_boss(cell)
+			if is_hell_trial_floor(Global.floor_num):
+				_start_hell_trial(cell)
+			else:
+				_spawn_boss(cell)
 		"treasure":
 			room["cleared"] = true
 			
@@ -655,9 +658,29 @@ func _pick_kind_swamp() -> String:
 
 ## Biome 3 (Băng Giá): Frost Big Zombie (tank) · Frost Tinyling (nhanh, tự nổ) ·
 ## Frost Zombie (phần còn lại, vai cơ bản).
-## Địa ngục: trộn bộ quái băng và đá (không có roster riêng; art quái địa ngục để sau).
+## Địa Ngục (tầng 11+): bộ quái riêng, giới thiệu dần theo tầng (xem hell_weights).
 func _pick_kind_hell() -> String:
-	return _pick_kind_ice() if randf() < 0.5 else _pick_kind_stone()
+	var w: Dictionary = hell_weights(Global.floor_num)
+	var total: float = 0.0
+	for k in w:
+		total += float(w[k])
+	var r: float = randf() * total
+	for k in w:
+		r -= float(w[k])
+		if r <= 0.0:
+			return String(k)
+	return "chort"
+
+
+## Tỉ lệ xuất hiện từng loại quái Địa Ngục theo tầng: 11 Imp + Cinder · 12 thêm Ogre · 13 thêm Acolyte ·
+## 14+ dày Ogre/Acolyte hơn. Chort là quái cận chiến nền.
+static func hell_weights(floor_num: int) -> Dictionary:
+	var w: Dictionary = {"hell_imp": 0.45, "cinder_tiny": 0.35, "chort": 0.20}
+	if floor_num >= 12:
+		w["hell_ogre"] = 0.22 if floor_num >= 14 else 0.18
+	if floor_num >= 13:
+		w["hell_acolyte"] = 0.16 if floor_num >= 14 else 0.12
+	return w
 
 
 func _pick_kind_ice() -> String:
@@ -720,7 +743,8 @@ func _on_affix_summon(owner_enemy: Node, cell: Vector2i) -> void:
 	var minion_kind: String = "slime"
 	match current_biome:
 		"swamp": minion_kind = "chort"
-		"ice", "hell": minion_kind = "frost_tiny"
+		"ice": minion_kind = "frost_tiny"
+		"hell": minion_kind = "cinder_tiny"
 	var r: Rect2 = _room_rect(cell, 3)
 	var off := Vector2.from_angle(randf() * TAU) * 44.0
 	var p: Vector2 = owner_enemy.global_position + off
@@ -789,6 +813,8 @@ func _on_enemy_died(_enemy, cell: Vector2i) -> void:
 	if alive_enemies <= 0 and not boss_alive:
 		if rooms.has(cell) and rooms[cell].get("gamble_wave", false):
 			_challenge_gamble_cleared.call_deferred(cell)
+		elif rooms.has(cell) and int(rooms[cell].get("trial_waves_left", 0)) > 0:
+			_trial_next_wave.call_deferred(cell)
 		elif rooms.has(cell) and rooms[cell]["type"] == "challenge" and int(rooms[cell].get("waves_left", 0)) > 0:
 			_challenge_next_wave.call_deferred(cell)
 		else:
@@ -854,6 +880,48 @@ func _challenge_next_wave(cell: Vector2i) -> void:
 	room["waves_left"] = left - 1
 	Global.message.emit("Wave %d/%d" % [EventRooms.CHALLENGE_WAVES - left + 1, EventRooms.CHALLENGE_WAVES], Color(1.0, 0.55, 0.2))
 	_spawn_wave(cell, _challenge_wave_size())
+
+
+## --- Thử Thách Địa Ngục (tầng 11-15): phòng cuối tầng thay Boss bằng nhiều đợt quái đội hình ---
+const HELL_FIRST_FLOOR: int = 11
+const HELL_LAST_FLOOR: int = 15
+const TRIAL_WAVES_DEFAULT: int = 2
+const TRIAL_WAVES_FINAL: int = 3          # tầng 15: cửa ải
+const TRIAL_WAVE_BASE: int = 6            # số quái mỗi đợt = BASE + (tầng - 10), tối đa TRIAL_WAVE_MAX
+const TRIAL_WAVE_MAX: int = 10
+
+static func is_hell_trial_floor(floor_num: int) -> bool:
+	return floor_num >= HELL_FIRST_FLOOR and floor_num <= HELL_LAST_FLOOR
+
+static func trial_wave_count(floor_num: int) -> int:
+	return TRIAL_WAVES_FINAL if floor_num >= HELL_LAST_FLOOR else TRIAL_WAVES_DEFAULT
+
+static func trial_wave_size(floor_num: int) -> int:
+	return mini(TRIAL_WAVE_BASE + maxi(0, floor_num - 10), TRIAL_WAVE_MAX)
+
+
+func _start_hell_trial(cell: Vector2i) -> void:
+	var total: int = trial_wave_count(Global.floor_num)
+	var room: Dictionary = rooms[cell]
+	room["trial_total"] = total
+	room["trial_waves_left"] = total - 1
+	Global.sfx("trial_horn")
+	Global.message.emit("HELL TRIAL! Wave 1/%d" % total, Color(1.0, 0.35, 0.15))
+	_spawn_wave(cell, trial_wave_size(Global.floor_num))
+
+
+func _trial_next_wave(cell: Vector2i) -> void:
+	if not rooms.has(cell) or alive_enemies > 0:
+		return
+	var room: Dictionary = rooms[cell]
+	var left: int = int(room.get("trial_waves_left", 0))
+	if left <= 0:
+		return
+	room["trial_waves_left"] = left - 1
+	var total: int = int(room.get("trial_total", 2))
+	Global.sfx("trial_horn")
+	Global.message.emit("Wave %d/%d" % [total - left + 1, total], Color(1.0, 0.35, 0.15))
+	_spawn_wave(cell, trial_wave_size(Global.floor_num))
 
 
 func _on_boss_died(cell: Vector2i) -> void:
