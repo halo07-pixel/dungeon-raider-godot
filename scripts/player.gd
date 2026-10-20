@@ -71,6 +71,24 @@ const SCYTHE_LEGEND_COST_PCT: float = 0.07
 const SCYTHE_LEGEND_HEAL_PCT: float = 0.30
 const SCYTHE_LEGEND_DMG_MULT: float = 1.5
 const SCYTHE_LEGEND_KILL_HEAL_PCT: float = 0.03
+## Buff riêng từng vũ khí
+const PERFECT_DRAW_WINDOW: float = 0.2     # giây sau khi căng đầy mà nhả vẫn tính "Perfect"
+const PERFECT_DRAW_DMG_MULT: float = 1.5
+const QUICKDRAW_PER_STACK: float = 0.85    # thời gian căng dây nhân hệ số này mỗi stack
+const OVERCHARGE_EVERY: int = 3
+const OVERCHARGE_DMG_MULT: float = 2.0
+const OVERCHARGE_RADIUS_MULT: float = 1.8
+const CAPACITOR_CD_CUT: float = 0.4        # giây cắt khỏi hồi đòn mỗi stack, mỗi lần hạ gục bằng Railgun
+const IMPALE_STUN: float = 0.35
+const IMPALE_WINDOW: float = 2.0
+const IMPALE_DMG_MULT: float = 1.5
+const REACH_MASTER_RANGE_PER_STACK: float = 0.10
+const REACH_MASTER_BEHIND_PER_STACK: float = 0.10
+const REAP_MAX_STACKS: int = 5
+const REAP_WINDOW: float = 3.0
+const REAP_CD_PER_STACK: float = 0.06
+const BLOOD_PACT_COST_CUT: float = 0.25
+const BLOOD_PACT_HEAL_PCT: float = 0.05
 const BEAM_TRAIL_LEN: float = 260.0
 const RAILGUN_RARE_CD_MULT: float = 0.8
 const RAILGUN_LEGEND_DMG_MULT: float = 1.5
@@ -79,6 +97,12 @@ const STAFF_LEGEND_RADIUS_MULT: float = 1.3
 ## Trạng thái căng dây (chỉ vũ khí có charge_time): giây đã căng, đang căng hay không.
 var charge: float = 0.0
 var charging: bool = false
+var full_hold: float = 0.0        # giây đã giữ sau khi căng đầy (cho Perfect Draw)
+var railgun_shots: int = 0        # đếm phát Railgun (Overcharge)
+var impaled_target: Node = null   # quái đang bị Giáo ghim (Impale)
+var impale_timer: float = 0.0
+var reap_stacks: int = 0
+var reap_timer: float = 0.0
 ## Kỹ năng class (vd Overdrive) nhân thời gian hồi đòn đánh; 1.0 = bình thường. Chỉ ClassSkill được ghi vào đây.
 var skill_attack_cd_mult: float = 1.0
 ## 2 ô vũ khí: mỗi ô {"id": String, "rarity": String} hoặc {} nếu trống. weapon_id/weapon_rarity/weapon/
@@ -162,6 +186,7 @@ func _ready() -> void:
 	shield = float(max_shield)
 	Global.room_cleared.connect(_on_room_cleared)
 	Global.player_hit_landed.connect(_on_hit_landed_fortify)
+	Global.player_hit_landed.connect(_on_hit_landed_weapon_buffs)
 
 	set_weapon_with_rarity(cls["default_weapon"], "common")
 	_attach_class_skill()
@@ -265,6 +290,14 @@ func _physics_process(delta: float) -> void:
 		slow_timer = maxf(0.0, slow_timer - delta)
 	if slide_timer > 0.0:
 		slide_timer = maxf(0.0, slide_timer - delta)
+	if impale_timer > 0.0:
+		impale_timer = maxf(0.0, impale_timer - delta)
+		if impale_timer <= 0.0:
+			impaled_target = null
+	if reap_timer > 0.0:
+		reap_timer = maxf(0.0, reap_timer - delta)
+		if reap_timer <= 0.0:
+			reap_stacks = 0
 	if momentum_timer > 0.0:
 		momentum_timer = maxf(0.0, momentum_timer - delta)
 		if momentum_timer <= 0.0:
@@ -401,6 +434,8 @@ func _charge_time_needed() -> float:
 	if weapon_id == "bow" and weapon_rarity == "rare":
 		t *= BOW_RARE_DRAW_MULT
 	t *= pow(0.9, float(Global.buff_stack("buff_haste")))
+	if weapon_id == "bow":
+		t *= pow(QUICKDRAW_PER_STACK, float(Global.buff_stack("buff_quickdraw")))
 	t *= skill_attack_cd_mult
 	return maxf(0.05, t)
 
@@ -411,6 +446,7 @@ func charge_ratio() -> float:
 func _cancel_charge() -> void:
 	charge = 0.0
 	charging = false
+	full_hold = 0.0
 
 ## Giữ chuột = căng dây (chỉ khi hết hồi đòn); nhả chuột = bắn với mức căng hiện có; lăn = huỷ.
 func _tick_charge(delta: float) -> void:
@@ -422,12 +458,15 @@ func _tick_charge(delta: float) -> void:
 		if fire_timer.is_stopped():
 			charging = true
 			charge = minf(_charge_time_needed(), charge + delta)
+			if charge >= _charge_time_needed():
+				full_hold += delta
 	elif charging:
 		var ratio: float = charge_ratio()
+		var perfect: bool = ratio >= 1.0 and full_hold <= PERFECT_DRAW_WINDOW and Global.buff_stack("buff_perfect_draw") > 0
 		_cancel_charge()
-		_shoot(ratio)
+		_shoot(ratio, perfect)
 
-func _shoot(charge_ratio_arg: float = -1.0) -> void:
+func _shoot(charge_ratio_arg: float = -1.0, perfect: bool = false) -> void:
 	var w: Dictionary = weapon
 	var base_dmg = int(w["damage"])
 	var mult = rarity_data["mult"]
@@ -513,12 +552,23 @@ func _shoot(charge_ratio_arg: float = -1.0) -> void:
 		if r >= 1.0:
 			pierce_n += BOW_PIERCE_FULL
 			p_color = Color(1.0, 0.95, 0.6)
+			if perfect:
+				dmg = int(float(dmg) * PERFECT_DRAW_DMG_MULT)
+				p_color = Color(1.0, 1.0, 1.0)
+				Global.float_text(global_position + Vector2(0, -30), "PERFECT", Color(1.0, 0.95, 0.4), 18)
 			if weapon_rarity == "epic":
 				pierce_n += BOW_EPIC_EXTRA_PIERCE
 			elif weapon_rarity == "legendary":
 				pellets = BOW_LEGEND_ARROWS
 				spread = BOW_LEGEND_SPREAD
 				dmg = int(float(dmg) * BOW_LEGEND_DMG_MULT)
+	if weapon_id == "railgun" and Global.buff_stack("buff_overcharge") > 0:
+		railgun_shots += 1
+		if railgun_shots % OVERCHARGE_EVERY == 0:
+			dmg = int(float(dmg) * OVERCHARGE_DMG_MULT)
+			bullet_radius *= OVERCHARGE_RADIUS_MULT
+			p_color = Color(1.0, 1.0, 1.0)
+			Global.float_text(global_position + Vector2(0, -30), "OVERCHARGE", Color(0.5, 0.95, 1.0), 18)
 	if is_super:
 		dmg *= 3
 		pierce_n = maxi(pierce_n + 1, PIERCE_SUPER) # Laser (đã xuyên sẵn) được cộng thêm 1
@@ -573,6 +623,21 @@ func _shoot(charge_ratio_arg: float = -1.0) -> void:
 # ==============================================================================
 # HỆ THỐNG HIỆU ỨNG CẬN CHIẾN & CHÉM ĐẠN
 # ==============================================================================
+## Impale: mũi giáo ghim quái đầu tiên (choáng ngắn); đâm lại đúng quái đó trong IMPALE_WINDOW giây => x1.5 sát thương.
+func _impale_adjust(target: Node, dmg_in: int) -> int:
+	if Global.buff_stack("buff_impale") <= 0:
+		return dmg_in
+	if impaled_target == target and impale_timer > 0.0:
+		impaled_target = null
+		impale_timer = 0.0
+		Global.float_text(global_position + Vector2(0, -30), "IMPALE", Color(1.0, 0.8, 0.5), 18)
+		return int(float(dmg_in) * IMPALE_DMG_MULT)
+	impaled_target = target
+	impale_timer = IMPALE_WINDOW
+	if target.has_method("apply_status"):
+		target.apply_status("stun", IMPALE_STUN)
+	return dmg_in
+
 ## Mục tiêu GẦN NHẤT trong vùng đâm của Giáo (quái hoặc boss) — ăn đủ sát thương.
 func _spear_front_target(aoe_range: float, rad_angle: float) -> Node:
 	var best: Node = null
@@ -640,19 +705,30 @@ func _swing() -> void:
 		elif weapon_rarity == "legendary":
 			cd *= 0.4; if randf() < 0.5: is_crit = true
 	elif weapon_id == "spear":
+		var rm: int = Global.buff_stack("buff_reach_master")
+		aoe_range *= 1.0 + REACH_MASTER_RANGE_PER_STACK * float(rm)
+		behind_mult = minf(1.0, behind_mult + REACH_MASTER_BEHIND_PER_STACK * float(rm))
 		if weapon_rarity == "rare": aoe_range *= SPEAR_RARE_RANGE_MULT
 		elif weapon_rarity == "epic": behind_mult = SPEAR_EPIC_BEHIND_MULT
 		elif weapon_rarity == "legendary": behind_mult = SPEAR_EPIC_BEHIND_MULT; aoe_range *= SPEAR_LEGEND_RANGE_MULT; dmg = int(float(dmg) * SPEAR_LEGEND_DMG_MULT)
 	elif weapon_id == "scythe":
+		var bp: int = Global.buff_stack("buff_blood_pact")
+		scythe_heal_pct = BLOOD_PACT_HEAL_PCT * float(bp)
 		if weapon_rarity == "rare": aoe_range *= SCYTHE_RARE_RANGE_MULT
-		elif weapon_rarity == "epic": scythe_cost_pct = SCYTHE_EPIC_COST_PCT; scythe_heal_pct = SCYTHE_EPIC_HEAL_PCT
+		elif weapon_rarity == "epic": scythe_cost_pct = SCYTHE_EPIC_COST_PCT; scythe_heal_pct += SCYTHE_EPIC_HEAL_PCT
 		elif weapon_rarity == "legendary":
-			scythe_cost_pct = SCYTHE_LEGEND_COST_PCT; scythe_heal_pct = SCYTHE_LEGEND_HEAL_PCT
+			scythe_cost_pct = SCYTHE_LEGEND_COST_PCT; scythe_heal_pct += SCYTHE_LEGEND_HEAL_PCT
 			dmg = int(float(dmg) * SCYTHE_LEGEND_DMG_MULT)
 	elif weapon_id == "hammer":
 		if weapon_rarity == "rare": aoe_range *= 1.25; knock *= 1.5
 		elif weapon_rarity == "epic": apply_stun = true; stun_duration = 1.0
 		elif weapon_rarity == "legendary": apply_stun = true; stun_duration = 1.5; aoe_range *= 1.5
+
+	# Lưỡi Liềm: Blood Pact giảm mức đổi máu; Reap tăng tốc vung theo số kill gần đây
+	if weapon_id == "scythe":
+		scythe_cost_pct *= maxf(0.0, 1.0 - BLOOD_PACT_COST_CUT * float(Global.buff_stack("buff_blood_pact")))
+		if Global.buff_stack("buff_reap") > 0:
+			cd *= 1.0 - REAP_CD_PER_STACK * float(reap_stacks)
 
 	# ÁP DỤNG BUFF: Nhanh Nhẹn / Chí Mạng / Tầm Đánh / Vung Kiếm Càn Quét
 	cd *= pow(0.9, float(Global.buff_stack("buff_haste")))
@@ -728,6 +804,8 @@ func _swing() -> void:
 					var hit_dmg: int = dmg
 					if spear_front != null and e != spear_front:
 						hit_dmg = maxi(1, int(float(dmg) * behind_mult))
+					elif spear_front != null:
+						hit_dmg = _impale_adjust(e, hit_dmg)
 					e.take_damage(hit_dmg, global_position, knock)
 					Global.on_player_hit(e, hit_dmg, is_crit)
 					hit_something = true
@@ -756,6 +834,8 @@ func _swing() -> void:
 					var boss_dmg: int = dmg
 					if spear_front != null and b != spear_front:
 						boss_dmg = maxi(1, int(float(dmg) * behind_mult))
+					elif spear_front != null:
+						boss_dmg = _impale_adjust(b, boss_dmg)
 					b.take_damage(boss_dmg, global_position, knock)
 					Global.on_player_hit(b, boss_dmg, is_crit)
 					hit_something = true
@@ -931,6 +1011,19 @@ func _tick_shield(delta: float) -> void:
 		shield_delay_timer = maxf(0.0, shield_delay_timer - delta)
 	elif shield < float(max_shield):
 		shield = minf(float(max_shield), shield + SHIELD_REGEN_RATE * (1.0 + 0.25 * float(Global.buff_stack("buff_shield_regen"))) * delta)
+
+## Buff riêng vũ khí phản ứng khi hạ gục: Capacitor (Railgun) cắt hồi đòn, Reap (Lưỡi Liềm) cộng stack tốc độ.
+## player_hit_landed phát SAU take_damage nên target.alive == false nghĩa là đòn này vừa hạ gục.
+func _on_hit_landed_weapon_buffs(target: Node, _dmg: int, _is_crit: bool) -> void:
+	if not is_instance_valid(target) or bool(target.get("alive")):
+		return
+	if weapon_id == "railgun":
+		var cap: int = Global.buff_stack("buff_capacitor")
+		if cap > 0 and not fire_timer.is_stopped():
+			fire_timer.start(maxf(0.05, fire_timer.time_left - CAPACITOR_CD_CUT * float(cap)))
+	elif weapon_id == "scythe" and Global.buff_stack("buff_reap") > 0:
+		reap_stacks = mini(reap_stacks + 1, REAP_MAX_STACKS)
+		reap_timer = REAP_WINDOW
 
 ## Buff Fortify: mỗi đòn của Player trúng quái/boss cộng FORTIFY_SHIELD_PER_HIT giáp ảo (không vượt max_shield).
 ## Nghe signal Global.player_hit_landed; hồi chiêu đo bằng đồng hồ hệ thống nên không cần tick mỗi frame.
