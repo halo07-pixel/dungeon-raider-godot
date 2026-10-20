@@ -17,11 +17,14 @@ const EVOLUTIONS: Dictionary = {
 	],
 }
 
+## Số ván gần nhất giữ trong hồ sơ (thống kê cuối run).
+const HISTORY_MAX: int = 20
+
 static func new_class_entry() -> Dictionary:
 	return {"runs": 0, "best_floor": 0, "kills": 0, "bosses": {}, "tier": 0}
 
 static func new_profile() -> Dictionary:
-	return {"runs": 0, "wins": 0, "best_floor": 0, "kills": 0, "secrets": 0, "bosses": {}, "classes": {}}
+	return {"runs": 0, "wins": 0, "best_floor": 0, "kills": 0, "secrets": 0, "bosses": {}, "classes": {}, "history": []}
 
 ## Gộp dữ liệu đã lưu vào cấu trúc mặc định (save cũ thiếu khóa vẫn đọc được).
 static func merge_loaded(loaded) -> Dictionary:
@@ -45,6 +48,12 @@ static func merge_loaded(loaded) -> Dictionary:
 				if sb is Dictionary:
 					for kind in sb: e["bosses"][String(kind)] = int(sb[kind])
 			p["classes"][String(cid)] = e
+	var h = loaded.get("history", [])
+	if h is Array:
+		for entry in h:
+			if entry is Dictionary:
+				p["history"].append(entry)
+		p["history"] = p["history"].slice(maxi(0, p["history"].size() - HISTORY_MAX))
 	return p
 
 static func cls(p: Dictionary, cid: String) -> Dictionary:
@@ -60,6 +69,14 @@ static func record_floor(p: Dictionary, cid: String, floor_num: int) -> void:
 	p["best_floor"] = maxi(p["best_floor"], floor_num)
 	var c: Dictionary = cls(p, cid)
 	c["best_floor"] = maxi(c["best_floor"], floor_num)
+
+## Ghi 1 ván vừa kết thúc vào lịch sử (giữ HISTORY_MAX ván gần nhất).
+static func record_run_end(p: Dictionary, entry: Dictionary) -> void:
+	var h: Array = p.get("history", [])
+	h.append(entry)
+	if h.size() > HISTORY_MAX:
+		h = h.slice(h.size() - HISTORY_MAX)
+	p["history"] = h
 
 static func record_kill(p: Dictionary, cid: String) -> void:
 	p["kills"] += 1

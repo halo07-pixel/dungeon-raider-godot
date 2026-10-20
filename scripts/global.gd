@@ -994,6 +994,10 @@ func record_run_start() -> void:
 	MetaProgress.record_run_start(profile, current_class)
 	save_game()
 
+func record_run_end(entry: Dictionary) -> void:
+	MetaProgress.record_run_end(profile, entry)
+	save_game()
+
 func record_floor_reached(f: int) -> void:
 	MetaProgress.record_floor(profile, current_class, f)
 
