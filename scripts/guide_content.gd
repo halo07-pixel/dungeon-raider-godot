@@ -133,7 +133,12 @@ static func weapons() -> String:
 		var w: Dictionary = Global.weapons[wid]
 		if not bool(w.get("is_melee", false)):
 			continue
-		t += "[b]%s[/b]: %s dmg, %.1f swings/s, range %d, arc %d degrees\n" % [w["name"], _num(float(w["damage"])), 1.0 / float(w["cooldown"]), int(w["range"]), int(w["cleave_angle"])]
+		var mline: String = "[b]%s[/b]: %s dmg, %.1f swings/s, range %d, arc %d degrees" % [w["name"], _num(float(w["damage"])), 1.0 / float(w["cooldown"]), int(w["range"]), int(w["cleave_angle"])]
+		if bool(w.get("thrust", false)):
+			mline += ". Thrusts down a narrow line: the FIRST enemy takes full damage, enemies behind take less"
+		if bool(w.get("reap", false)):
+			mline += ". Sweeps all around. Epic and Legendary cost HP with every swing (never lethal) but heal you for a share of the damage dealt; Legendary also heals on kills"
+		t += mline + "\n"
 	t += _sub("Rarity")
 	var tag_hex: Dictionary = {"common": "#dddddd", "rare": "#44ff44", "epic": "#b644ff", "legendary": "#ffd700"}
 	for rid in Global.rarities:

@@ -118,6 +118,10 @@ var weapons: Dictionary = {
 
 	"broadsword": {"name": "Longsword", "damage": 25, "cooldown": 0.45, "is_melee": true, "range": 55.0, "cleave_angle": 180.0, "knock": 280.0, "color": Color(0.9, 0.9, 0.9), "sfx": "dodge"},
 	"daggers": {"name": "Daggers", "damage": 17, "cooldown": 0.22, "is_melee": true, "range": 40.0, "cleave_angle": 80.0, "knock": 120.0, "color": Color(0.6, 0.9, 0.6), "sfx": "dodge"},
+	# Spear: đâm hẹp, tầm xa. Quái đứng TRƯỚC NHẤT trong đường đâm ăn đủ sát thương, quái phía sau ăn một phần.
+	"spear": {"name": "Spear", "damage": 30, "cooldown": 0.55, "is_melee": true, "range": 95.0, "cleave_angle": 28.0, "knock": 200.0, "color": Color(0.8, 0.9, 1.0), "sfx": "dodge", "thrust": true},
+	# Scythe: quét 360 độ, chậm. Bậc Epic/Legendary phải ĐỔI MÁU mỗi nhát vung, bù lại hút máu mạnh khi trúng quái.
+	"scythe": {"name": "Scythe", "damage": 26, "cooldown": 0.8, "is_melee": true, "range": 68.0, "cleave_angle": 360.0, "knock": 160.0, "color": Color(0.75, 0.4, 0.9), "sfx": "slam", "reap": true},
 	"hammer": {"name": "War Hammer", "damage": 40, "cooldown": 0.90, "is_melee": true, "range": 65.0, "cleave_angle": 160.0, "knock": 550.0, "color": Color(1.0, 0.5, 0.2), "sfx": "slam"}
 }
 
