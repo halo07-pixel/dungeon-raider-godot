@@ -15,6 +15,16 @@ const EVOLUTIONS: Dictionary = {
 		 "desc": "[Q] Blast enemies away and clear bullets.",
 		 "req": {"type": "boss", "kind": "lord", "count": 2}},
 	],
+	"mage": [
+		{"name": "Mage+", "skill": "meteor_storm", "skill_name": "Meteor Storm",
+		 "desc": "[Q] Mark the ground at your cursor; meteors crash down there shortly after.",
+		 "req": {"type": "boss", "kind": "lord", "count": 2}},
+	],
+	"rogue": [
+		{"name": "Rogue+", "skill": "shadow_rush", "skill_name": "Shadow Rush",
+		 "desc": "[Q] Dash far through enemies, making them bleed, then attack faster for a few seconds.",
+		 "req": {"type": "boss", "kind": "lord", "count": 2}},
+	],
 }
 
 static func new_class_entry() -> Dictionary:

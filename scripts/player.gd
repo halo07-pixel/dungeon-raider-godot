@@ -143,6 +143,8 @@ const MOMENTUM_PER_STACK: float = 0.05
 const SPRITE_SET: Dictionary = {
 	"ranger": "elf_m",
 	"brawler": "knight_m",
+	"mage": "wizard_m",
+	"rogue": "lizard_m",
 }
 const SPRITE_SCALE: float = 2.0
 const SPRITE_OFFSET_Y: float = -11.0
