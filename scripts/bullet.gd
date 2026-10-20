@@ -32,6 +32,7 @@ var homing_delay: float = 0.0          # giây bay thẳng trước khi bắt đ
 var lock_target: Node = null           # mục tiêu đã khóa (giữ đến khi chết)
 var homing_exclude: Node = null        # quái KHÔNG được khóa (mảnh tách ra không quay lại quái vừa trúng)
 const HOMING_RANGE: float = 360.0
+const HOMING_PIERCE_STRAIGHT: float = 0.03 # giây bay thẳng sau khi xuyên qua 1 quái, rồi mới khóa quái kế tiếp
 const HOMING_CONE_COS: float = 0.5     # cos(60°): nón ưu tiên phía trước
 const HOMING_BASE_TURN: float = 5.0    # rad/s khi ở xa
 const HOMING_LEAD: float = 0.12        # đón đầu: cộng velocity * 0.12s
@@ -128,7 +129,7 @@ func _acquire_lock() -> Node:
 	var best_any: Node = null
 	var best_any_d: float = INF
 	for e in get_tree().get_nodes_in_group("enemies") + get_tree().get_nodes_in_group("boss"):
-		if not _target_alive(e) or e == homing_exclude or e.get("active") == false:
+		if not _target_alive(e) or e == homing_exclude or _hit.has(e) or e.get("active") == false:
 			continue
 		var to: Vector2 = _aim_point(e) - global_position
 		var d: float = to.length()
@@ -150,12 +151,18 @@ func _turn_mult(d: float) -> float:
 		return lerpf(1.0, 2.5, (HOMING_FAR - d) / (HOMING_FAR - HOMING_NEAR))
 	return lerpf(2.5, 3.0, 1.0 - d / HOMING_NEAR)
 
+## Vừa xuyên qua 1 quái: bỏ khóa, bay thẳng một đoạn ngắn để thoát khỏi quái đó rồi mới tìm quái khác.
+func _after_pierce() -> void:
+	if homing and from_player:
+		lock_target = null
+		homing_delay = HOMING_PIERCE_STRAIGHT
+
 func _steer_player_homing(delta: float) -> void:
 	if homing_delay > 0.0:
 		homing_delay -= delta # bay thẳng trước (đạn vòng bung ra rồi mới chụm vào)
 		return
-	if not _target_alive(lock_target):
-		lock_target = _acquire_lock() # chỉ chọn lại khi mục tiêu cũ đã chết
+	if not _target_alive(lock_target) or _hit.has(lock_target):
+		lock_target = _acquire_lock() # chọn lại khi mục tiêu cũ đã chết HOẶC đã bị xuyên qua (không thể trúng lần 2)
 	if lock_target == null:
 		return
 	var center_d: float = (_aim_point(lock_target, 0.0) - global_position).length()
@@ -225,9 +232,12 @@ func _on_body_entered(body: Node) -> void:
 				
 		if from_player and split_on_hit and not is_fragment:
 			_spawn_fragments(body)
+		if pierce and homing and from_player:
+			_after_pierce()
 		if not pierce:
 			if pierce_left > 0:
 				pierce_left -= 1 # xuyên qua quái này, còn bay tiếp
+				_after_pierce()
 			else:
 				_impact()
 	elif from_player and bounces_left > 0 and _try_bounce():
