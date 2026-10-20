@@ -96,6 +96,57 @@ SCYTHE = [
     "................",
 ]
 
+
+CROSSBOW = [
+    "................",
+    "................",
+    "..........wW....",
+    ".........wW.....",
+    ".........w......",
+    ".........w......",
+    "....GggggggggGGg",   # mũi tên (bolt) nằm trên báng, đầu mũi tên bên phải
+    ".wwWWwwwwwwwww..",
+    ".wwWDwwwwwwwww..",
+    ".........w......",
+    ".........w......",
+    ".........wW.....",
+    "..........wW....",
+    "................",
+    "................",
+    "................",
+]
+FLAMETHROWER = [
+    "................",
+    "................",
+    "...........o....",
+    "..rrr.....oor.o.",
+    ".rooor...ooGoor.",
+    ".roorr.dd.oGGoo.",
+    ".rrrrrddddooGoor",
+    ".roorrddddoGGoo.",
+    ".rooor.dd.ooGoo.",
+    "..rrr......oor..",
+    "...........o....",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+]
+
+def chakram_rows():
+    """Vòng chakram 12px có lỗ giữa + 4 gai chéo (đối xứng nên hướng không quan trọng)."""
+    cx = cy = 7.5
+    grid = [["."] * 16 for _ in range(16)]
+    for y in range(16):
+        for x in range(16):
+            d = ((x - cx) ** 2 + (y - cy) ** 2) ** 0.5
+            if 2.6 <= d <= 5.6:
+                grid[y][x] = "G" if (x + y) < 15 else "g"
+    for (x, y) in [(2, 2), (13, 2), (2, 13), (13, 13), (3, 3), (12, 3), (3, 12), (12, 12)]:
+        grid[y][x] = "C"
+    return ["".join(r) for r in grid]
+
 def crop_rotate(atlas, box, keep_rows):
     x, y, w, h = box
     c = atlas.crop((x, y, x + w, y + h))
@@ -113,6 +164,9 @@ def main():
     from_rows(BOW).save(OUT / "weapon_bow.png")
     from_rows(RAILGUN).save(OUT / "weapon_railgun.png")
     from_rows(SCYTHE).save(OUT / "weapon_scythe.png")
+    from_rows(CROSSBOW).save(OUT / "weapon_crossbow.png")
+    from_rows(FLAMETHROWER).save(OUT / "weapon_flamethrower.png")
+    from_rows(chakram_rows()).save(OUT / "weapon_chakram.png")
     if len(sys.argv) > 1:
         atlas = Image.open(sys.argv[1]).convert("RGBA")
         # spear 6x30: giữ hàng 0-13 (đầu giáo) + 28-29 (mũi cán) = 16; staff 8x30: giữ 0-8 + 23-29 = 16
