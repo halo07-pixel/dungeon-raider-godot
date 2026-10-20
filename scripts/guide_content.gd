@@ -12,6 +12,7 @@ const EventRooms = preload("res://scripts/event_rooms.gd")
 const BossScript = preload("res://scripts/boss.gd")
 const EnemyScript = preload("res://scripts/enemy.gd")
 const DungeonScript = preload("res://scripts/dungeon.gd")
+const BossCouncil = preload("res://scripts/boss_council.gd")
 
 const TAB_ORDER: Array = ["basics", "classes", "weapons", "buffs", "defense", "enemies", "events", "tips"]
 const TAB_TITLES: Dictionary = {
@@ -273,6 +274,11 @@ static func enemies() -> String:
 		var d: Dictionary = BossScript.BOSS_DATA.get(row[0], {})
 		t += "[b]%s[/b] (%s): %d phases.\n" % [String(d.get("name", row[0])), row[1], int(d.get("phases", 3))]
 	t += "Bosses change their behavior between phases. The Dungeon Lord also watches how you fight and adapts its attack choices.\n"
+	t += _sub("Council Trial")
+	t += "Clear the Hell Trial on floor %d and a crimson gate opens next to the stairs. It leads to the [b]Council Trial[/b]: the Warden, Necromancer, Frozen Horror and Dungeon Lord all at once, each with %s of its normal HP. " % [DungeonScript.HELL_LAST_FLOOR, _pct(BossCouncil.HP_MULT)]
+	t += "Only %d bosses may use their big attacks at the same time; the others just chase you. Every boss that falls lets one more attack at once and enrages the rest (they jump a phase) and leaves a burning puddle. " % BossCouncil.TOKENS_START
+	t += "While the Necromancer lives, the first boss to fall is revived once with %s HP, so take the Necromancer down first. " % _pct(BossCouncil.REVIVE_HP_FRACTION)
+	t += "Reward: a Legendary weapon and %d Purple Gems. You can skip it and take the stairs down to Endless instead.\n" % DungeonScript.COUNCIL_GEMS
 	return t
 
 # ---------------------------------------------------------------- EVENTS

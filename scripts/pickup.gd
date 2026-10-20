@@ -35,14 +35,14 @@ func _ready() -> void:
 	collision_layer = Global.L_PICKUP
 	collision_mask = Global.L_PLAYER
 	var s := CircleShape2D.new()
-	s.radius = 28.0 if kind == "portal" else 14.0
+	s.radius = 28.0 if (kind == "portal" or kind == "council_portal") else 14.0
 	$Shape.shape = s
 	body_entered.connect(_on_body_entered)
 	if kind == "weapon":
 		add_to_group("weapon_pickup")
 		_lock = WEAPON_PICKUP_LOCK
 		body_exited.connect(_on_body_exited)
-	if kind == "portal":
+	if kind == "portal" or kind == "council_portal":
 		set_deferred("monitoring", false)
 		get_tree().create_timer(1.0).timeout.connect(_arm)
 	_setup_sprite()
@@ -137,6 +137,8 @@ func _on_body_entered(body: Node) -> void:
 			body.heal(20)
 		"portal":
 			Global.portal_entered.emit()
+		"council_portal":
+			Global.council_portal_entered.emit()
 	Global.sfx("pickup")
 	queue_free()
 
@@ -209,3 +211,9 @@ func _draw() -> void:
 			draw_circle(Vector2.ZERO, 18.0 * pulse, Color(0.5, 0.4, 1.0, 0.6))
 			draw_circle(Vector2.ZERO, 8.0, Color.WHITE)
 			draw_string(ThemeDB.fallback_font, Vector2(-60.0, -38.0), "GO DOWN", HORIZONTAL_ALIGNMENT_CENTER, 120.0, 14, Color.WHITE)
+		"council_portal":
+			var pulse2: float = 1.0 + 0.12 * sin(_t * 5.0)
+			draw_circle(Vector2.ZERO, 30.0 * pulse2, Color(0.9, 0.1, 0.15, 0.35))
+			draw_circle(Vector2.ZERO, 19.0 * pulse2, Color(1.0, 0.3, 0.2, 0.6))
+			draw_circle(Vector2.ZERO, 8.0, Color(1.0, 0.9, 0.7))
+			draw_string(ThemeDB.fallback_font, Vector2(-70.0, -40.0), "THE COUNCIL", HORIZONTAL_ALIGNMENT_CENTER, 140.0, 14, Color(1.0, 0.5, 0.4))

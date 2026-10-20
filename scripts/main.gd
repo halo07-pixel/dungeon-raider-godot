@@ -49,6 +49,7 @@ func _ready() -> void:
 	player.shield = float(player.max_shield)
 
 	Global.portal_entered.connect(_on_portal_entered)
+	Global.council_portal_entered.connect(_on_council_portal_entered)
 	Global.player_died.connect(_on_player_died)
 	telemetry = RunTelemetryScript.new() # trước dungeon.generate để bắt floor_started của tầng đầu
 	add_child(telemetry)
@@ -149,7 +150,27 @@ func _on_portal_entered() -> void:
 	_changing = true
 	_next_floor.call_deferred()
 
+## Cổng đỏ sau tầng 15: vào đấu trường Hội Đồng Bốn Boss (tầng vẫn là 15), xong đi tiếp xuống tầng 16.
+func _on_council_portal_entered() -> void:
+	if _changing: return
+	_changing = true
+	_enter_council.call_deferred()
+
+func _enter_council() -> void:
+	Global.in_council = true
+	player.global_position = Vector2(-9999, -9999)
+	dungeon.generate_council_floor()
+	await get_tree().process_frame
+	player.global_position = dungeon.room_center(dungeon.start_cell)
+	player.refresh_max_shield()
+	player.shield = float(player.max_shield)
+	player.knockback = Vector2.ZERO
+	player.heal(int(float(player.max_hp) * 0.3))
+	Global.message.emit("The Council Trial", Color(1.0, 0.4, 0.3))
+	_changing = false
+
 func _next_floor() -> void:
+	Global.in_council = false
 	# === BỔ SUNG LOGIC THƯỞNG NGỌC TÍM (ĐIỀU KIỆN 3) ===
 	if Global.floor_num > 0 and Global.floor_num % 5 == 0:
 		var gems_earned = int(Global.floor_num / 5)

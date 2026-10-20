@@ -195,6 +195,13 @@ func _generate_lord_floor() -> void:
 	rooms_updated.emit()
 
 
+## Đấu trường Hội Đồng Bốn Boss: bố cục cố định như tầng Lord (Start an toàn nối thẳng phòng Boss).
+## Gọi sau khi Global.in_council = true; tầng vẫn là 15 (không tăng).
+func generate_council_floor() -> void:
+	Global.floor_started.emit(Global.floor_num)
+	_generate_lord_floor()
+
+
 # ------------------------------------------------------------------ Sinh tầng
 func generate(floor_number: int) -> void:
 	Global.floor_started.emit(floor_number) # đặt trước nhánh tầng 10 (return sớm) để mọi tầng đều phát
@@ -435,7 +442,9 @@ func _enter_room(cell: Vector2i) -> void:
 			_spawn_wave(cell)
 		"boss":
 			_lock_doors(room)
-			if is_hell_trial_floor(Global.floor_num):
+			if Global.in_council:
+				_spawn_council(cell)
+			elif is_hell_trial_floor(Global.floor_num):
 				_start_hell_trial(cell)
 			else:
 				_spawn_boss(cell)
@@ -924,6 +933,50 @@ func _trial_next_wave(cell: Vector2i) -> void:
 	_spawn_wave(cell, trial_wave_size(Global.floor_num))
 
 
+## --- Hội Đồng Bốn Boss (boss_council.gd) ---
+const BossCouncilScript = preload("res://scripts/boss_council.gd")
+const COUNCIL_CORNER_INSET: float = 0.30   # vị trí 4 boss: 30% / 70% chiều rộng, cao của phòng
+const COUNCIL_GEMS: int = 10
+
+static func council_spawn_points(rect: Rect2) -> Array:
+	var xs: Array = [rect.position.x + rect.size.x * COUNCIL_CORNER_INSET, rect.position.x + rect.size.x * (1.0 - COUNCIL_CORNER_INSET)]
+	var ys: Array = [rect.position.y + rect.size.y * COUNCIL_CORNER_INSET, rect.position.y + rect.size.y * (1.0 - COUNCIL_CORNER_INSET)]
+	return [Vector2(xs[0], ys[0]), Vector2(xs[1], ys[0]), Vector2(xs[0], ys[1]), Vector2(xs[1], ys[1])]
+
+
+func _spawn_council(cell: Vector2i) -> void:
+	var arena: Rect2 = _room_rect(cell, 3)
+	var points: Array = council_spawn_points(arena)
+	var spawned: Array = []
+	for i in BossCouncilScript.KINDS.size():
+		var b = BOSS.instantiate()
+		b.setup(BossCouncilScript.HP_MULT, String(BossCouncilScript.KINDS[i]))
+		b.summon_requested.connect(_on_summon.bind(cell))
+		entities.add_child(b)
+		b.global_position = points[i]
+		b.set_arena_bounds(arena)
+		spawned.append(b)
+	var council := Node.new()
+	council.set_script(BossCouncilScript)
+	council.name = "BossCouncil"
+	entities.add_child(council)
+	council.setup(spawned)
+	council.all_defeated.connect(_on_council_defeated.bind(cell))
+	for b in spawned:
+		b.activate_boss()
+	boss_alive = true
+	var lord = spawned[spawned.size() - 1]
+	Global.boss_spawned.emit(lord) # nhạc Lord + hiện thanh máu; HUD đổi sang 4 thanh ngay sau đó
+	Global.council_started.emit(spawned)
+	Global.message.emit("THE COUNCIL AWAKENS!", Color(1.0, 0.3, 0.3))
+
+
+func _on_council_defeated(cell: Vector2i) -> void:
+	Global.record_council_clear()
+	Global.boss_defeated.emit() # đúng một lần: HUD ẩn thanh, nhạc chiến thắng
+	_on_boss_died(cell)
+
+
 func _on_boss_died(cell: Vector2i) -> void:
 	boss_alive = false
 	for e in get_tree().get_nodes_in_group("enemies"):
@@ -946,9 +999,18 @@ func _room_cleared(cell: Vector2i) -> void:
 		_spawn_pickup("portal", "", room_center(cell))
 		Global.message.emit("The stairs down have opened!", Color(0.6, 0.6, 1.0))
 		Global.queue_skill_upgrade_for_floor(Global.floor_num) # nâng cấp kỹ năng được mời SAU lượt chọn buff bên dưới
-		if Global.floor_num % BOSS_WEAPON_REWARD_EVERY == 0:
+		if Global.in_council:
+			# Phần thưởng Hội Đồng: vũ khí Huyền thoại + ngọc tím
+			_spawn_pickup("weapon", _roll_weapon_drop("legendary"), room_center(cell) + Vector2(-72.0, 0.0))
+			Global.purple_gems += COUNCIL_GEMS
+			Global.save_game()
+			Global.message.emit("The Council has fallen! Legendary weapon and +%d Purple Gems" % COUNCIL_GEMS, Color(1.0, 0.85, 0.3))
+		elif Global.floor_num % BOSS_WEAPON_REWARD_EVERY == 0:
 			_spawn_pickup("weapon", _roll_weapon_drop(Global.roll_weapon_rarity(Global.floor_num, "rare")), room_center(cell) + Vector2(-72.0, 0.0))
 			Global.message.emit("The boss dropped a weapon!", Color(1.0, 0.85, 0.3))
+		if Global.floor_num == HELL_LAST_FLOOR and not Global.in_council:
+			_spawn_pickup("council_portal", "", room_center(cell) + Vector2(0.0, 70.0))
+			Global.message.emit("A crimson gate opens: the Council awaits", Color(1.0, 0.4, 0.3))
 		# Cân bằng lại: trước đây mời chọn buff sau MỌI phòng dọn sạch (quá dễ cày),
 		# giờ chỉ 1 lần chọn buff duy nhất mỗi tầng, ngay sau khi hạ Boss.
 		Global.request_buff_choice()
