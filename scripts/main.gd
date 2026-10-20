@@ -5,6 +5,7 @@ extends Node2D
 @onready var player: CharacterBody2D = $Player
 const NPC_SCENE = preload("res://scenes/npc.tscn")
 const SETTINGS_MENU_SCENE = preload("res://scenes/settings_menu.tscn")
+const RunTelemetryScript = preload("res://scripts/run_telemetry.gd")
 const BUFF_PICKER_SCENE = preload("res://scenes/buff_picker.tscn")
 var current_npc: Node2D = null
 
@@ -13,6 +14,7 @@ var pause_layer: CanvasLayer
 var pause_ui: VBoxContainer
 var is_game_over: bool = false
 var is_victory_screen: bool = false
+var telemetry: Node = null
 ## Thưởng Ngọc Tím một lần duy nhất khi lần đầu hạ Dungeon Lord (tầng 10) trong ván này.
 const VICTORY_GEM_BONUS: int = 20
 ## Phiên bản định dạng saved_run. 1 = 1 vũ khí (weapon_id/weapon_rarity); 2 = thêm weapon_slots + active_slot.
@@ -48,6 +50,8 @@ func _ready() -> void:
 
 	Global.portal_entered.connect(_on_portal_entered)
 	Global.player_died.connect(_on_player_died)
+	telemetry = RunTelemetryScript.new() # trước dungeon.generate để bắt floor_started của tầng đầu
+	add_child(telemetry)
 	
 	# 2. XÂY DỰNG HẦM NGỤC & ĐẶT PLAYER
 	player.global_position = Vector2(-9999, -9999)
@@ -250,6 +254,7 @@ func _save_and_quit() -> void:
 
 func _on_player_died() -> void:
 	is_game_over = true
+	telemetry.finish_run(false)
 	Global.saved_run.clear() # Xóa file save vì đã chết
 	Global.save_game()
 	
@@ -273,6 +278,9 @@ func _build_game_over_menu() -> void:
 	
 	var info = Label.new()
 	info.text = "Floors cleared: %d\nEnemies defeated: %d\nGold collected: %d" % [f, k, c_coin]
+	var tele_text: String = RunTelemetryScript.summary_text(Global.run_stats)
+	if tele_text != "":
+		info.text += "\n" + tele_text
 	info.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	pause_ui.add_child(info)
 
@@ -286,6 +294,7 @@ func _build_game_over_menu() -> void:
 # ==========================================
 func _show_victory() -> void:
 	is_victory_screen = true
+	telemetry.mark_won()
 	Global.record_win()
 	Global.purple_gems += VICTORY_GEM_BONUS
 	Global.save_game()
@@ -324,6 +333,7 @@ func _build_victory_menu() -> void:
 		_next_floor.call_deferred()
 	)
 	_add_btn("Return to Main Menu", func():
+		telemetry.finish_run(true)
 		get_tree().paused = false
 		get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
 	)
