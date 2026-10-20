@@ -18,6 +18,7 @@ const QAgentScript = preload("res://scripts/q_agent.gd")
 const HpBarScript = preload("res://scripts/enemy_hp_bar.gd")
 const AffixScript = preload("res://scripts/enemy_affix.gd")
 const MimicSkillsScript = preload("res://scripts/mimic_skills.gd")
+const HellSkillsScript = preload("res://scripts/hell_skills.gd")
 
 ## AI Tầng 2 (Q-Learning): % quái tầm xa (archer/shaman) trở thành "Tinh Anh" mỗi lần spawn —
 ## HP cao hơn, tint tím nhận diện, và dùng QAgent (scripts/q_agent.gd) để quyết định hành vi
@@ -44,7 +45,7 @@ const WAYPOINT_REACHED: float = 12.0 ## tới gần điểm này (px) thì chuy�
 const STUCK_TIME: float = 0.5   ## đứng yên chừng này giây khi đang bị chặn thì ép tính lại đường
 var speed_mult: float = 1.0 ## Hệ số tốc độ do affix (Frenzy) đặt; 1.0 = bình thường
 signal split_requested(owner_enemy: Node)
-var skills: Node = null ## Kỹ năng riêng (hiện chỉ Mimic); null = quái thường
+var skills: Node = null ## Kỹ năng riêng (Mimic, quái Địa Ngục); null = quái thường
 
 var kind: String = "slime"
 var data: Dictionary = {}
@@ -104,7 +105,19 @@ const ENEMY_SPRITES: Dictionary = {
 	"frost_zombie": {"prefix": "frost_zombie", "single_anim": true, "offset_y": -6.0},
 	"frost_big_zombie": {"prefix": "frost_big_zombie", "single_anim": true, "offset_y": 0.0},
 	"frost_tiny": {"prefix": "frost_tiny", "single_anim": true, "offset_y": -6.0},
+	# Biome 4 (Địa Ngục) — bản nhuộm than/lửa (tools/gen_hell_enemies.py), prefix "hell_*"/"cinder_*".
+	"hell_imp": {"prefix": "hell_imp", "single_anim": false, "offset_y": -10.0},
+	"hell_ogre": {"prefix": "hell_ogre", "single_anim": false, "offset_y": 2.0},
+	"hell_acolyte": {"prefix": "hell_acolyte", "single_anim": true, "offset_y": -10.0},
+	"cinder_tiny": {"prefix": "cinder_tiny", "single_anim": true, "offset_y": -6.0},
 }
+
+## Quái bắn tầm xa (data["shooter"]) và quái giữ khoảng cách / lùi khi bị áp sát (data["kiter"]).
+func _is_shooter() -> bool:
+	return bool(data.get("shooter", false))
+
+func _kites() -> bool:
+	return bool(data.get("kiter", false))
 
 ## Tâm hitbox thật — enemy không lệch offset nên bằng global_position, nhưng vẫn
 ## expose hàm này để player/enemy khác gọi đồng nhất (không ngoại lệ con quái nào).
@@ -118,7 +131,7 @@ func hurt_center() -> Vector2:
 func setup(p_kind: String, hp_mult: float = 1.0, allow_affix: bool = false) -> void:
 	kind = p_kind
 	data = Global.enemies[p_kind]
-	if (kind == "archer" or kind == "shaman") and randf() < ELITE_CHANCE:
+	if _is_shooter() and randf() < ELITE_CHANCE:
 		is_elite = true
 		hp_mult *= ELITE_HP_MULT
 	elif allow_affix:
@@ -137,6 +150,12 @@ func setup(p_kind: String, hp_mult: float = 1.0, allow_affix: bool = false) -> v
 	if kind == "mimic":
 		skills = Node.new()
 		skills.set_script(MimicSkillsScript)
+		skills.name = "Skills"
+		add_child(skills)
+		skills.attach(self)
+	elif HellSkillsScript.KINDS.has(kind):
+		skills = Node.new()
+		skills.set_script(HellSkillsScript)
 		skills.name = "Skills"
 		add_child(skills)
 		skills.attach(self)
@@ -167,7 +186,7 @@ func _ready() -> void:
 	near_zone.body_exited.connect(_on_near_exited)
 	far_zone.body_entered.connect(_on_far_entered)
 	far_zone.body_exited.connect(_on_far_exited)
-	action_timer.one_shot = not (kind == "archer" or kind == "shaman" or kind == "frost_big_zombie")
+	action_timer.one_shot = not (_is_shooter() or kind == "frost_big_zombie")
 	action_timer.timeout.connect(_on_action_timer_timeout)
 	spawn_timer.timeout.connect(_on_spawn_done)
 	modulate.a = 0.35
@@ -275,7 +294,7 @@ func _on_spawn_done() -> void:
 	active = true
 	squad_register.emit(self)
 	create_tween().tween_property(self, "modulate:a", 1.0, 0.15)
-	if kind == "archer" or kind == "shaman":
+	if _is_shooter():
 		action_timer.start(float(data["shoot_cd"]))
 	elif kind == "frost_big_zombie":
 		action_timer.start(float(data.get("slam_cd", 2.2)))
@@ -285,7 +304,7 @@ func _on_spawn_done() -> void:
 func _on_action_timer_timeout() -> void:
 	if not active or not alive or hurtbox.is_stunned():
 		return
-	if kind == "archer" or kind == "shaman":
+	if _is_shooter():
 		if player_in_range and has_los and passive_timer <= 0.0:
 			_shoot() # đang trong cửa sổ hold/retreat thì không mở quyết định mới
 	elif kind == "frost_big_zombie":
@@ -332,7 +351,7 @@ func _shoot() -> void:
 		b.source_q_agent = q_agent # bullet.gd báo kết quả trúng/trượt ngược lại qua field này
 	Global.world.add_child(b)
 	b.global_position = global_position + dir * 18.0
-	Global.sfx("enemy_shoot")
+	Global.sfx(String(data.get("shoot_sfx", "enemy_shoot")))
 
 ## Bắt đầu cửa sổ "nhịn" của QAgent. retreat -> còn chủ động lùi + lách ngang trong cửa sổ.
 func _begin_passive(action: String) -> void:
@@ -465,7 +484,7 @@ func _physics_process(delta: float) -> void:
 		var dir: Vector2 = to_p.normalized()
 		facing = dir
 		match kind:
-			"archer", "shaman":
+			_ when _kites():
 				if player_too_close: move = -dir
 				elif player_in_range and has_los: move = dir.orthogonal() * strafe_sign * 0.5
 				elif squad_anchor != Vector2.ZERO and not player_in_range and global_position.distance_to(squad_anchor) > 24.0:
@@ -474,7 +493,7 @@ func _physics_process(delta: float) -> void:
 			"slime": move = _chase_dir(dir, delta) * (0.55 + 0.45 * absf(sin(_t * 4.0)))
 			_: move = _chase_dir(dir, delta)
 		# Phối hợp nhóm: chỉ cộng độ lệch khi đang đi thẳng (thấy người chơi); bị tường chặn thì để A* lo.
-		if squad_offset != Vector2.ZERO and has_los and not player_too_close and (kind != "archer" and kind != "shaman"):
+		if squad_offset != Vector2.ZERO and has_los and not player_too_close and not _kites():
 			var mlen: float = move.length()
 			move = (move + squad_offset).normalized() * mlen
 		# QAgent chọn "retreat": chủ động lùi ra xa Player và lách ngang (ghi đè hướng thường)

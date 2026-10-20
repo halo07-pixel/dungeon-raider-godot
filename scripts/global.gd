@@ -188,12 +188,12 @@ var current_class: String = "brawler"
 
 var enemies: Dictionary = {
 	"slime": {"hp": 30, "speed": 95.0, "touch": 10, "touch_cd": 0.8, "touch_knock": 260.0, "radius": 13.0, "coins": 1, "weight": 1.0, "color": Color(0.35, 0.85, 0.35)},
-	"archer": {"hp": 22, "speed": 85.0, "touch": 0, "touch_cd": 1.0, "touch_knock": 200.0, "radius": 12.0, "coins": 2, "weight": 1.0, "color": Color(0.4, 0.6, 1.0), "shoot_cd": 1.5, "bullet_damage": 8, "bullet_speed": 280.0, "keep_away": 170.0, "range": 380.0},
+	"archer": {"hp": 22, "speed": 85.0, "touch": 0, "touch_cd": 1.0, "touch_knock": 200.0, "radius": 12.0, "coins": 2, "weight": 1.0, "color": Color(0.4, 0.6, 1.0), "shoot_cd": 1.5, "bullet_damage": 8, "bullet_speed": 280.0, "keep_away": 170.0, "range": 380.0, "shooter": true, "kiter": true},
 	"brute": {"hp": 120, "speed": 62.0, "touch": 20, "touch_cd": 1.0, "touch_knock": 430.0, "radius": 20.0, "coins": 3, "weight": 2.5, "color": Color(0.8, 0.35, 0.25)},
 
 	# --- BIOME 2 (Đầm Lầy) — bộ quái RIÊNG, không lặp với biome khác. Chủ đề Độc & Tiêu Hao:
 	# phối hợp giữ chân (Masked Orc) + dồn độc (Shaman tầm xa + Chort cận chiến) ---
-	"shaman": {"hp": 20, "speed": 80.0, "touch": 0, "touch_cd": 1.0, "touch_knock": 180.0, "radius": 12.0, "coins": 2, "weight": 1.0, "color": Color(0.55, 0.85, 0.35), "shoot_cd": 1.8, "bullet_damage": 4, "bullet_speed": 260.0, "keep_away": 170.0, "range": 380.0, "bullet_effect": "poison"},
+	"shaman": {"hp": 20, "speed": 80.0, "touch": 0, "touch_cd": 1.0, "touch_knock": 180.0, "radius": 12.0, "coins": 2, "weight": 1.0, "color": Color(0.55, 0.85, 0.35), "shoot_cd": 1.8, "bullet_damage": 4, "bullet_speed": 260.0, "keep_away": 170.0, "range": 380.0, "bullet_effect": "poison", "shooter": true, "kiter": true},
 	"chort": {"hp": 18, "speed": 128.0, "touch": 6, "touch_cd": 0.5, "touch_knock": 150.0, "radius": 11.0, "coins": 2, "weight": 0.9, "color": Color(0.85, 0.25, 0.2)},
 	"masked_orc": {"hp": 140, "speed": 58.0, "touch": 16, "touch_cd": 1.1, "touch_knock": 350.0, "radius": 20.0, "coins": 3, "weight": 2.6, "color": Color(0.5, 0.65, 0.4)},
 
@@ -201,7 +201,15 @@ var enemies: Dictionary = {
 	# (hết quái CC0 phù hợp) nhưng bù lại dày CC — slide + slow — khớp với Ô Băng ---
 	"frost_zombie": {"hp": 35, "speed": 90.0, "touch": 8, "touch_cd": 0.9, "touch_knock": 220.0, "radius": 13.0, "coins": 2, "weight": 1.0, "color": Color(0.55, 0.8, 0.95)},
 	"frost_big_zombie": {"hp": 150, "speed": 50.0, "touch": 22, "touch_cd": 1.2, "touch_knock": 400.0, "radius": 21.0, "coins": 3, "weight": 2.8, "color": Color(0.6, 0.85, 1.0), "slam_cd": 2.2, "slam_radius": 70.0},
-	"frost_tiny": {"hp": 12, "speed": 150.0, "touch": 14, "touch_cd": 999.0, "touch_knock": 260.0, "radius": 9.0, "coins": 1, "weight": 0.6, "color": Color(0.75, 0.92, 1.0)},
+	"frost_tiny": {"hp": 12, "speed": 150.0, "touch": 14, "touch_cd": 999.0, "touch_knock": 260.0, "radius": 9.0, "coins": 1, "weight": 0.6, "color": Color(0.75, 0.92, 1.0), "suicide": true},
+
+	# --- BIOME 4 (Địa Ngục, tầng 11+) — bộ quái RIÊNG, mỗi loại một vai và tương tác với nhau:
+	# Imp bắn cầu lửa rồi lùi · Ogre lao thẳng để lại vệt lửa · Acolyte cấp khiên cho đồng đội
+	# (phải hạ trước) · Cinder tự nổ, chết để lại vũng lửa. Kỹ năng ở scripts/hell_skills.gd.
+	"hell_imp": {"hp": 26, "speed": 100.0, "touch": 0, "touch_cd": 1.0, "touch_knock": 200.0, "radius": 12.0, "coins": 3, "weight": 1.0, "color": Color(1.0, 0.5, 0.15), "shoot_cd": 1.6, "bullet_damage": 9, "bullet_speed": 300.0, "keep_away": 190.0, "range": 360.0, "bullet_effect": "burn", "shoot_sfx": "imp_fire", "shooter": true, "kiter": true},
+	"hell_ogre": {"hp": 170, "speed": 55.0, "touch": 24, "touch_cd": 1.1, "touch_knock": 450.0, "radius": 22.0, "coins": 4, "weight": 3.0, "color": Color(0.8, 0.3, 0.75)},
+	"hell_acolyte": {"hp": 40, "speed": 70.0, "touch": 0, "touch_cd": 1.0, "touch_knock": 150.0, "radius": 13.0, "coins": 4, "weight": 1.2, "color": Color(0.85, 0.4, 0.9), "keep_away": 170.0, "range": 260.0, "kiter": true},
+	"cinder_tiny": {"hp": 14, "speed": 140.0, "touch": 12, "touch_cd": 999.0, "touch_knock": 240.0, "radius": 9.0, "coins": 1, "weight": 0.6, "color": Color(1.0, 0.7, 0.2), "suicide": true},
 
 	# --- Mimic (phòng sự kiện Rương Bẫy): không nằm trong bảng spawn thường, chỉ sinh từ rương bẫy.
 	"mimic": {"hp": 90, "speed": 115.0, "touch": 22, "touch_cd": 0.7, "touch_knock": 380.0, "radius": 15.0, "coins": 8, "weight": 1.6, "color": Color(0.85, 0.6, 0.2)},
@@ -217,7 +225,8 @@ var world: Node2D = null
 ## Hệ số khó THÊM áp dụng cho tầng > 10 (Chế Độ Vô Hạn, sau khi hạ Dungeon Lord tầng 10):
 ## nhân thêm vào công thức scale máu/giáp vốn có của boss.gd/enemy.gd, khiến độ khó tăng
 ## NHANH HƠN hẳn so với tốc độ tăng đều 1-10 — đúng như phần thưởng/thử thách của Vô Hạn.
-const ENDLESS_START_FLOOR: int = 10
+## Tầng 11-15 là Chương Địa Ngục (độ khó do bộ quái + tầng thử thách quyết định, không nhân thêm); Vô Hạn bắt đầu tăng sau tầng này.
+const ENDLESS_START_FLOOR: int = 15
 const ENDLESS_RATE: float = 0.12
 
 func endless_difficulty_mult(for_floor_num: int) -> float:
@@ -428,6 +437,27 @@ func _ready() -> void:
 			{"freq": 0.0, "vol": 0.30, "dur": 0.20, "wave": "noise", "lp": 0.95, "decay": 2.4},
 			{"freq": 1800.0, "slide": -1400.0, "vol": 0.18, "dur": 0.30, "wave": "sine", "decay": 1.3},
 			{"freq": 70.0, "slide": -20.0, "vol": 0.34, "dur": 0.40, "wave": "sine", "decay": 1.3}]),
+		"imp_fire": _mix(0.30, [
+			{"freq": 0.0, "vol": 0.24, "dur": 0.20, "wave": "noise", "lp": 0.5, "swell": 0.2, "decay": 1.5},
+			{"freq": 430.0, "slide": -220.0, "vol": 0.18, "dur": 0.22, "wave": "saw", "decay": 1.4}]),
+		"ogre_windup": _mix(0.70, [
+			{"freq": 62.0, "slide": 70.0, "vol": 0.30, "dur": 0.65, "wave": "saw", "swell": 0.85, "decay": 0.4},
+			{"freq": 0.0, "vol": 0.16, "dur": 0.65, "wave": "noise", "lp": 0.12, "swell": 0.85, "decay": 0.4}]),
+		"ogre_charge": _mix(0.50, [
+			{"freq": 0.0, "vol": 0.30, "dur": 0.45, "wave": "noise", "lp": 0.35, "swell": 0.15, "decay": 1.0},
+			{"freq": 95.0, "slide": -45.0, "vol": 0.32, "dur": 0.40, "wave": "sine", "decay": 1.0}]),
+		"ward_cast": _mix(0.45, [
+			{"freq": 520.0, "slide": 300.0, "vol": 0.20, "dur": 0.35, "wave": "sine", "decay": 1.3},
+			{"freq": 780.0, "slide": 200.0, "vol": 0.13, "dur": 0.30, "wave": "sine", "delay": 0.05, "decay": 1.4}]),
+		"cinder_burst": _mix(0.40, [
+			{"freq": 0.0, "vol": 0.30, "dur": 0.30, "wave": "noise", "lp": 0.6, "decay": 1.7},
+			{"freq": 150.0, "slide": -90.0, "vol": 0.26, "dur": 0.25, "wave": "sine", "decay": 1.4},
+			{"freq": 0.0, "vol": 0.16, "dur": 0.05, "wave": "noise", "lp": 0.95, "delay": 0.12},
+			{"freq": 0.0, "vol": 0.14, "dur": 0.05, "wave": "noise", "lp": 0.95, "delay": 0.20}]),
+		"trial_horn": _mix(0.90, [
+			{"freq": 110.0, "slide": 6.0, "vol": 0.24, "dur": 0.80, "wave": "saw", "swell": 0.3, "decay": 0.7},
+			{"freq": 165.0, "slide": 9.0, "vol": 0.16, "dur": 0.80, "wave": "saw", "swell": 0.3, "decay": 0.7},
+			{"freq": 0.0, "vol": 0.08, "dur": 0.80, "wave": "noise", "lp": 0.08, "swell": 0.3, "decay": 0.7}]),
 		"mimic_windup": _mix(0.65, [
 			{"freq": 90.0, "slide": 120.0, "vol": 0.26, "dur": 0.60, "wave": "saw", "swell": 0.85, "decay": 0.4},
 			{"freq": 0.0, "vol": 0.18, "dur": 0.60, "wave": "noise", "lp": 0.3, "swell": 0.85, "decay": 0.4}]),

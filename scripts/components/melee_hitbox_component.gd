@@ -61,8 +61,9 @@ func try_attack() -> void:
 		var af = _owner2d.get("affix_node")
 		if af != null and af.has_method("on_hit_player"):
 			af.on_hit_player(int(_data["touch"])) # Leech hồi máu
-	if _owner2d.kind == "frost_tiny":
-		_owner2d.kill() # Vỡ Băng: lao tới, chạm 1 phát rồi tự huỷ, không trụ lại đánh dai dẳng
+	if bool(_data.get("suicide", false)):
+		_owner2d.set_meta("self_destruct", true) # để Cinder biết đây là tự nổ (khác bị dọn phòng ép chết)
+		_owner2d.kill() # Vỡ Băng / Cinder: lao tới, chạm 1 phát rồi tự huỷ, không trụ lại đánh dai dẳng
 		return
 	cooldown.start(float(_data["touch_cd"]))
 

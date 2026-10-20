@@ -233,6 +233,9 @@ func _on_body_entered(body: Node) -> void:
 			elif effect == "poison":
 				# Độc Trượng (Orc Shaman, biome Đầm Lầy): 3 nhịp x 4 dmg lên Player
 				body.apply_status("poison", 3, 4)
+			elif effect == "burn":
+				# Cầu lửa (Imp, biome Địa Ngục): thiêu 2 nhịp
+				body.apply_status("burn", 2)
 				
 		if from_player and split_on_hit and not is_fragment:
 			_spawn_fragments(body)
