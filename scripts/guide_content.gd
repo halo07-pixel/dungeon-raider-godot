@@ -96,6 +96,9 @@ static func classes() -> String:
 		var c: Dictionary = Global.classes[cid]
 		var w: Dictionary = Global.weapons.get(String(c["default_weapon"]), {})
 		t += "[b][color=#ffd700]%s[/color][/b]: %d HP, starts with %s.\n" % [c["name"], int(c["max_hp"]), String(w.get("name", "?"))]
+		var passive: Dictionary = c.get("passive", {})
+		if not passive.is_empty():
+			t += "  Passive [b]%s[/b]: %s\n" % [passive["name"], passive["desc"]]
 		var base_sk: Dictionary = ClassSkillScript.SKILLS.get(String(c.get("skill", "")), {})
 		if not base_sk.is_empty():
 			t += "  Starting skill [b]%s[/b], cooldown %s s: %s\n" % [base_sk["name"], _num(float(base_sk["cooldown"])), String(base_sk["desc"]).replace("[Q]", Global.key_name_for_action("skill") + ":")]
@@ -111,7 +114,9 @@ static func classes() -> String:
 			t += "  Evolves into [b]%s[/b] (%s).\n" % [evo["name"], need]
 			t += "  Skill [b]%s[/b], cooldown %s s: %s\n" % [evo["skill_name"], _num(float(sk.get("cooldown", 0.0))), String(evo["desc"]).replace("[Q]", Global.key_name_for_action("skill") + ":")]
 		t += "\n"
-	t += "A class sets your HP, starting weapon and skill. Any class can use any weapon, and you carry two. "
+	t += "[b]Skill Power[/b] raises your skill's damage and effects; [b]Skill Haste[/b] shortens its cooldown. Both come from the Skill buffs "
+	t += "(Arcana, Quick Cast, Surge, Overflow, Echo, Spellburst, Overload) and from some passives, so you can build around your skill instead of your weapon.\n"
+	t += "A class sets your HP, starting weapon, passive and skill. Any class can use any weapon, and you carry two. "
 	t += "The weapon in your hand decides the buffs you are offered: ranged-only buffs such as Ricochet and Homing appear while holding a gun, "
 	t += "melee-only buffs such as Sword Wave while holding a blade.\n"
 	return t

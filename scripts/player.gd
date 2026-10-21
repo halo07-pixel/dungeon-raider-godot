@@ -60,6 +60,23 @@ const BOW_LEGEND_DMG_MULT: float = 0.5 # ...mỗi mũi 75% sát thương
 ## Spear: quái phía sau mũi giáo (không phải quái đầu tiên) ăn bấy nhiêu phần sát thương.
 const SPEAR_BEHIND_MULT: float = 0.6
 const SPEAR_RARE_RANGE_MULT: float = 1.2
+## ---- Chỉ số kỹ năng + nội tại class (Skill Build) ----
+const PASSIVE_RANGER_RANGED_DMG: float = 0.12   # Ranger: vũ khí tầm xa +12% sát thương
+const PASSIVE_BRAWLER_MELEE_DMG: float = 0.12   # Brawler: vũ khí cận chiến +12% sát thương
+const PASSIVE_BRAWLER_DAMAGE_TAKEN: float = 0.92 # Brawler: nhận sát thương x0.92
+const PASSIVE_MAGE_HASTE: float = 0.25          # Mage: hồi chiêu kỹ năng nhanh hơn 25%
+const PASSIVE_ROGUE_CRIT: float = 0.15          # Rogue: +15% tỉ lệ chí mạng
+const SKILL_POWER_PER_ARCANA: float = 0.12
+const SKILL_HASTE_PER_QUICK_CAST: float = 0.10
+const OVERLOAD_POWER: float = 0.4
+const OVERLOAD_HASTE: float = -0.2
+const ECHO_MULT: float = 2.0
+const ECHO_WINDOW: float = 5.0
+const SURGE_SHIELD_PER_STACK: float = 20.0
+const OVERFLOW_REFUND_PER_STACK: float = 1.0
+const OVERFLOW_WINDOW_MSEC: int = 2000
+const SPELLBURST_CHANCE_PER_STACK: float = 0.25
+const SKILL_CRIT_WINDOW: float = 6.0
 ## Mythic Pistol (Hail of Lead): cứ mỗi MYTHIC_PISTOL_EVERY phát bắn thì bắn loạt quạt 5 viên xuyên.
 const MYTHIC_PISTOL_EVERY: int = 5
 const SPEAR_EPIC_BEHIND_MULT: float = 1.0
@@ -173,6 +190,12 @@ var rarity_data: Dictionary = {}
 ## Cây vũ khí đang cầm (WeaponInstance) + dữ liệu suy ra: Mythic dùng các nhánh hiệu ứng của Legendary (fx_rarity)
 ## cộng đặc tính Mythic riêng; weapon_level = cấp nâng; aff = chỉ số gộp từ dòng phụ (WeaponInstance.affix_mods).
 var weapon_inst: Dictionary = {}
+## Trạng thái do kỹ năng/buff kỹ năng đặt lên Player (ClassSkill ghi, _shoot/_swing đọc).
+var skill_pierce_add: int = 0        # Overdrive: đạn xuyên thêm
+var skill_crit_charges: int = 0      # Rogue: số đòn kế tiếp chắc chắn chí mạng
+var skill_crit_timer: float = 0.0
+var skill_echo_timer: float = 0.0    # buff Echo: > 0 = đòn kế tiếp nhân ECHO_MULT
+var _last_skill_msec: int = -100000
 var _steal_acc: float = 0.0
 var fx_rarity: String = "common"
 var weapon_level: int = 0
@@ -276,6 +299,7 @@ func _attach_class_skill() -> void:
 	class_skill.name = "ClassSkill"
 	add_child(class_skill)
 	class_skill.setup(self, sid)
+	class_skill.skill_used.connect(_on_skill_used)
 
 func _build_sprite_frames() -> SpriteFrames:
 	var prefix: String = SPRITE_SET.get(Global.current_class, "knight_m")
@@ -561,7 +585,7 @@ func _shoot(charge_ratio_arg: float = -1.0, perfect: bool = false) -> void:
 	if Global.buff_stack("buff_focus") > 0 and still_time >= 0.6:
 		mult += 0.2 * float(Global.buff_stack("buff_focus"))
 	var dmg = int(base_dmg * mult)
-	var swap_mult: float = _consume_swap_bonus() * WeaponInstance.level_mult(weapon_level) * float(aff["dmg"]) # swap + cấp nâng + dòng phụ, áp SAU các nhánh độ hiếm (chúng có thể gán lại dmg)
+	var swap_mult: float = _consume_swap_bonus() * WeaponInstance.level_mult(weapon_level) * float(aff["dmg"]) * _passive_dmg_mult() * _consume_echo() # swap + cấp nâng + dòng phụ, áp SAU các nhánh độ hiếm (chúng có thể gán lại dmg)
 
 	var pellets: int = w["pellets"]
 	var spread: float = w["spread"]
@@ -661,14 +685,16 @@ func _shoot(charge_ratio_arg: float = -1.0, perfect: bool = false) -> void:
 	# ÁP DỤNG BUFF: Nhanh Nhẹn / Chí Mạng / Tầm Đánh (tầm xa = bay xa+nhanh hơn) / Vung Kiếm Càn Quét (tầm xa = xuyên)
 	cd *= pow(0.9, float(Global.buff_stack("buff_haste")))
 	cd *= skill_attack_cd_mult * _rank_perk("cd_mult", 1.0) * float(aff["cd"])
-	if randf() < 0.08 * float(Global.buff_stack("buff_crit")) + _rank_perk("crit_add", 0.0) + float(aff["crit"]):
+	if randf() < 0.08 * float(Global.buff_stack("buff_crit")) + _rank_perk("crit_add", 0.0) + float(aff["crit"]) + _passive_crit():
+		is_crit = true
+	if _take_skill_crit():
 		is_crit = true
 	if Global.buff_stack("buff_reach") > 0:
 		life *= 1.0 + 0.15 * float(Global.buff_stack("buff_reach"))
 		speed *= 1.0 + 0.08 * float(Global.buff_stack("buff_reach"))
 	if Global.buff_stack("buff_sweep") > 0:
 		pierce_n += PIERCE_SWEEP
-	pierce_n += int(_rank_perk("pierce_add", 0.0)) + int(aff["pierce"])
+	pierce_n += int(_rank_perk("pierce_add", 0.0)) + int(aff["pierce"]) + skill_pierce_add
 	if blast_r > 0.0:
 		blast_r *= _rank_perk("blast_mult", 1.0)
 	if is_crit: dmg *= 2
@@ -837,7 +863,7 @@ func _swing() -> void:
 	if Global.buff_stack("buff_berserk") > 0 and max_hp > 0:
 		mult += 0.4 * (1.0 - float(hp) / float(max_hp))
 	var dmg = int(base_dmg * mult)
-	var swap_mult: float = _consume_swap_bonus() * WeaponInstance.level_mult(weapon_level) * float(aff["dmg"]) # swap + cấp nâng + dòng phụ, áp SAU các nhánh độ hiếm (chúng có thể gán lại dmg)
+	var swap_mult: float = _consume_swap_bonus() * WeaponInstance.level_mult(weapon_level) * float(aff["dmg"]) * _passive_dmg_mult() * _consume_echo() # swap + cấp nâng + dòng phụ, áp SAU các nhánh độ hiếm (chúng có thể gán lại dmg)
 
 	var cd = float(w["cooldown"])
 	var aoe_range = float(w["range"])
@@ -909,7 +935,9 @@ func _swing() -> void:
 	# ÁP DỤNG BUFF: Nhanh Nhẹn / Chí Mạng / Tầm Đánh / Vung Kiếm Càn Quét
 	cd *= pow(0.9, float(Global.buff_stack("buff_haste")))
 	cd *= skill_attack_cd_mult * _rank_perk("cd_mult", 1.0) * float(aff["cd"])
-	if randf() < 0.08 * float(Global.buff_stack("buff_crit")) + _rank_perk("crit_add", 0.0) + float(aff["crit"]):
+	if randf() < 0.08 * float(Global.buff_stack("buff_crit")) + _rank_perk("crit_add", 0.0) + float(aff["crit"]) + _passive_crit():
+		is_crit = true
+	if _take_skill_crit():
 		is_crit = true
 	if Global.buff_stack("buff_reach") > 0:
 		aoe_range *= 1.0 + 0.15 * float(Global.buff_stack("buff_reach"))
@@ -1159,6 +1187,72 @@ func _start_swap_bonus(prev_class: String) -> void:
 	queue_redraw()
 
 ## Dùng thưởng (nếu còn): trả về hệ số sát thương cho đòn đánh này và tắt thưởng.
+## ---- Chỉ số kỹ năng ----
+## Skill Power: cộng vào sát thương/hiệu ứng kỹ năng (ClassSkill._dmg_mult). Skill Haste: hồi chiêu chia (1 + haste).
+func skill_power() -> float:
+	var p: float = SKILL_POWER_PER_ARCANA * float(Global.buff_stack("buff_skill_power"))
+	if Global.buff_stack("buff_skill_overload") > 0:
+		p += OVERLOAD_POWER
+	return p
+
+func skill_haste() -> float:
+	var h: float = SKILL_HASTE_PER_QUICK_CAST * float(Global.buff_stack("buff_skill_haste"))
+	if Global.current_class == "mage":
+		h += PASSIVE_MAGE_HASTE
+	if Global.buff_stack("buff_skill_overload") > 0:
+		h += OVERLOAD_HASTE
+	return maxf(-0.5, h)
+
+## Xác suất tung kỹ năng mà không tốn hồi chiêu (buff Spellburst).
+func spellburst_chance() -> float:
+	return minf(0.75, SPELLBURST_CHANCE_PER_STACK * float(Global.buff_stack("buff_skill_burst")))
+
+## ---- Nội tại class ----
+## Hệ số sát thương vũ khí theo nội tại (Ranger tầm xa, Brawler cận chiến).
+func _passive_dmg_mult() -> float:
+	var melee: bool = bool(weapon.get("is_melee", false))
+	match Global.current_class:
+		"ranger":
+			return 1.0 + PASSIVE_RANGER_RANGED_DMG if not melee else 1.0
+		"brawler":
+			return 1.0 + PASSIVE_BRAWLER_MELEE_DMG if melee else 1.0
+	return 1.0
+
+func _passive_crit() -> float:
+	return PASSIVE_ROGUE_CRIT if Global.current_class == "rogue" else 0.0
+
+func _passive_damage_taken_mult() -> float:
+	return PASSIVE_BRAWLER_DAMAGE_TAKEN if Global.current_class == "brawler" else 1.0
+
+## ---- Kỹ năng <-> đòn đánh ----
+## Rogue: cấp n đòn kế tiếp chắc chắn chí mạng (hết hạn sau SKILL_CRIT_WINDOW giây).
+func grant_skill_crits(n: int) -> void:
+	skill_crit_charges = maxi(skill_crit_charges, n)
+	skill_crit_timer = SKILL_CRIT_WINDOW
+
+func _take_skill_crit() -> bool:
+	if skill_crit_charges <= 0:
+		return false
+	skill_crit_charges -= 1
+	return true
+
+## Buff Echo: đòn đánh kế tiếp sau khi tung kỹ năng nhân ECHO_MULT. Trả 1.0 nếu không có.
+func _consume_echo() -> float:
+	if skill_echo_timer <= 0.0:
+		return 1.0
+	skill_echo_timer = 0.0
+	Global.float_text(global_position + Vector2(0, -34), "ECHO", Color(0.6, 0.85, 1.0), 18)
+	return ECHO_MULT
+
+## Nghe ClassSkill.skill_used: Surge (giáp), Echo (đòn kế tiếp), ghi mốc cho Overflow.
+func _on_skill_used(_sid: String) -> void:
+	_last_skill_msec = Time.get_ticks_msec()
+	var surge: int = Global.buff_stack("buff_skill_surge")
+	if surge > 0:
+		shield = minf(float(max_shield), shield + SURGE_SHIELD_PER_STACK * float(surge))
+	if Global.buff_stack("buff_skill_echo") > 0:
+		skill_echo_timer = ECHO_WINDOW
+
 func _consume_swap_bonus() -> float:
 	if swap_bonus_timer <= 0.0:
 		return 1.0
@@ -1212,6 +1306,11 @@ func _tick_buff_timers(delta: float) -> void:
 	_tick_arc(delta)
 	shield_nova_cd = maxf(0.0, shield_nova_cd - delta)
 	counter_timer = maxf(0.0, counter_timer - delta)
+	skill_echo_timer = maxf(0.0, skill_echo_timer - delta)
+	if skill_crit_charges > 0:
+		skill_crit_timer -= delta
+		if skill_crit_timer <= 0.0:
+			skill_crit_charges = 0
 	if velocity.length() < 5.0 and not rolling:
 		still_time += delta
 	else:
@@ -1313,6 +1412,10 @@ func _inferno_pop(pos: Vector2, dead: Node) -> void:
 func _on_hit_landed_weapon_buffs(target: Node, _dmg: int, _is_crit: bool) -> void:
 	if not is_instance_valid(target) or bool(target.get("alive")):
 		return
+	# Overflow: hạ quái trong 2s sau khi tung kỹ năng -> hoàn hồi chiêu
+	var of: int = Global.buff_stack("buff_skill_overflow")
+	if of > 0 and class_skill != null and Time.get_ticks_msec() - _last_skill_msec <= OVERFLOW_WINDOW_MSEC:
+		class_skill.refund_cooldown(OVERFLOW_REFUND_PER_STACK * float(of))
 	if weapon_id == "railgun":
 		var cap: int = Global.buff_stack("buff_capacitor")
 		if cap > 0 and not fire_timer.is_stopped():
@@ -1379,7 +1482,7 @@ func take_damage(amount: int, from_pos: Vector2 = Vector2.ZERO, knock: float = 3
 	if not ignore_invuln and is_invulnerable(): return
 	# Hệ số sát thương quái/boss/bẫy theo tầng (xem Global.enemy_dmg_mult_for_floor) —
 	# chặn điểm chung duy nhất mà MỌI nguồn sát thương từ môi trường đổ vào Player.
-	amount = maxi(1, int(float(amount) * Global.enemy_dmg_mult_for_floor(Global.floor_num)))
+	amount = maxi(1, int(float(amount) * Global.enemy_dmg_mult_for_floor(Global.floor_num) * _passive_damage_taken_mult()))
 	counter_timer = 3.0 # Phản Công: bị đánh trúng mở cửa sổ x2 sát thương
 	Global.player_damaged.emit(amount, max_hp) # HUD nghe: nháy viền đỏ khi đòn nặng
 	Global.player_hurt_by.emit(source, amount) # Telemetry nghe: ai gây sát thương

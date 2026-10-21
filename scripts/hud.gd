@@ -114,6 +114,10 @@ func _update_skill_label(p) -> void:
 	skill_label.visible = true
 	var ups: int = Global.skill_upgrade_count(String(sk.skill_id))
 	var up_tag: String = (" +%d" % ups) if ups > 0 else ""
+	var sp: float = float(p.skill_power())
+	var sh: float = float(p.skill_haste())
+	if sp > 0.001 or absf(sh) > 0.001:
+		up_tag += "  [PWR +%d%% HST %+d%%]" % [int(round(sp * 100.0)), int(round(sh * 100.0))]
 	if sk.active_left > 0.0:
 		skill_label.text = "[Q] %s%s  ACTIVE %.1fs" % [sk.skill_name, up_tag, sk.active_left]
 		skill_label.modulate = Color(1.0, 0.6, 0.2)

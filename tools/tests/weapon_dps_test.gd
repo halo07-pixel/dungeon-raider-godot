@@ -32,7 +32,7 @@ func _init() -> void:
 	await process_frame
 	var WI = load("res://scripts/weapon_instance.gd")
 	var G = root.get_node("Global")
-	G.current_class = "ranger"
+	G.current_class = "mage" # lớp không có nội tại sát thương vũ khí -> số đo trung tính
 	var main = load("res://scenes/main.tscn").instantiate()
 	root.add_child(main)
 	await process_frame

@@ -76,6 +76,10 @@ func _ready() -> void:
 		
 	Global.message.emit(_floor_label(Global.floor_num), Color(1.0, 0.85, 0.2) if Global.floor_num > 10 else Color.WHITE)
 	_spawn_npc_if_needed()
+	if not is_loading_save: # nhắc nội tại class ở đầu ván mới
+		var passive: Dictionary = Global.classes.get(Global.current_class, {}).get("passive", {})
+		if not passive.is_empty():
+			Global.message.emit("%s: %s" % [passive["name"], passive["desc"]], Color(0.7, 0.9, 1.0))
 
 	add_child(BUFF_PICKER_SCENE.instantiate())
 
