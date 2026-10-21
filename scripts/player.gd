@@ -200,6 +200,8 @@ var _steal_acc: float = 0.0
 var fx_rarity: String = "common"
 var weapon_level: int = 0
 var aff: Dictionary = {"dmg": 1.0, "cd": 1.0, "knock": 1.0, "reach": 1.0, "crit": 0.0, "steal": 0.0, "pierce": 0, "burn": 0.0, "slow": 0.0, "bleed": 0.0}
+## Điểm ngắm do bot kiểm thử đặt (tools/bot); null = ngắm theo chuột như bình thường.
+var ai_aim_point = null
 var weapon: Dictionary = {}
 var alive: bool = true
 var rolling: bool = false
@@ -431,7 +433,8 @@ func _physics_process(delta: float) -> void:
 	var input_dir: Vector2 = Input.get_vector("move_left", "move_right", "move_up", "move_down")
 	if input_dir != Vector2.ZERO:
 		last_move_dir = input_dir.normalized()
-	aim_dir = (get_global_mouse_position() - global_position).normalized()
+	var aim_point: Vector2 = get_global_mouse_position() if ai_aim_point == null else Vector2(ai_aim_point)
+	aim_dir = (aim_point - global_position).normalized()
 	if aim_dir == Vector2.ZERO: aim_dir = Vector2.RIGHT
 
 	if Input.is_action_just_pressed("dodge") and not rolling and dodge_cooldown.is_stopped():
