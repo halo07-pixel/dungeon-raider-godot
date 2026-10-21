@@ -16,6 +16,7 @@ const DungeonScript = preload("res://scripts/dungeon.gd")
 const BossCouncil = preload("res://scripts/boss_council.gd")
 const HeatScript = preload("res://scripts/heat.gd")
 const SkillTree = preload("res://scripts/skill_tree.gd")
+const SquadAdapt = preload("res://scripts/squad_adapt.gd")
 
 const TAB_ORDER: Array = ["basics", "classes", "weapons", "buffs", "defense", "enemies", "events", "tips"]
 const TAB_TITLES: Dictionary = {
@@ -288,6 +289,11 @@ static func enemies() -> String:
 		var d: Dictionary = BossScript.BOSS_DATA.get(row[0], {})
 		t += "[b]%s[/b] (%s): %d phases.\n" % [String(d.get("name", row[0])), row[1], int(d.get("phases", 3))]
 	t += "Bosses change their behavior between phases. The Dungeon Lord also watches how you fight and adapts its attack choices.\n"
+	t += _sub("Adaptive squads")
+	t += "From floor %d, groups of enemies watch how you play and adjust their tactics a little. They never get extra HP or damage. " % SquadAdapt.MIN_FLOOR
+	t += "If you shoot from range they close in faster and wrap around tighter; if you fight up close they spread out and their archers keep farther back; "
+	t += "if you keep dodging to one side they cut you off on that side; if you attack in bursts they wait and arrive together. "
+	t += "The Game Over screen lists what they learned. Change how you play and they follow.\n"
 	t += _sub("Council Trial")
 	t += "Clear the Hell Trial on floor %d and a crimson gate opens next to the stairs. It leads to the [b]Council Trial[/b]: the Warden, Necromancer, Frozen Horror and Dungeon Lord all at once, each with %s of its normal HP. " % [DungeonScript.HELL_LAST_FLOOR, _pct(BossCouncil.HP_MULT)]
 	t += "Only %d bosses may use their big attacks at the same time; the others just chase you. Every boss that falls lets one more attack at once and enrages the rest (they jump a phase) and leaves a burning puddle. " % BossCouncil.TOKENS_START

@@ -49,6 +49,14 @@ func record_attack(is_melee: bool) -> void:
 	_confidence = minf(1.0, _confidence + CONF_GROW)
 
 
+## Độ tin cậy 0..1 (SquadAdapt dùng để quyết định có thích nghi hay chưa).
+func confidence() -> float:
+	return _confidence
+
+## Hồ sơ gọn cho SquadAdapt.tactics().
+func profile() -> Dictionary:
+	return {"melee_bias": melee_bias, "dodge_bias": dodge_bias, "shots_per_sec": shots_per_sec, "confidence": _confidence}
+
 ## Biên độ lệch góc ngẫu nhiên ("Human Error") quái nên cộng thêm khi dùng dữ liệu dự đoán —
 ## 18° khi gần như chưa có dữ liệu, giảm dần còn 4° khi đã quan sát đủ lâu (không bao giờ = 0).
 func human_error_rad() -> float:

@@ -7,6 +7,8 @@ extends Node
 ## Quái đăng ký bằng signal `squad_register` (call down, signal up); điều phối tự loại quái đã chết.
 ## Tắt cả hệ thống: đặt ENABLED = false.
 
+const SquadAdapt = preload("res://scripts/squad_adapt.gd")
+
 const ENABLED: bool = true
 const UPDATE_INTERVAL: float = 0.5
 const MIN_SQUAD: int = 3              # ít hơn số quái này thì không phối hợp (đánh thẳng như cũ)
@@ -57,6 +59,8 @@ func _update() -> void:
 	if squad.size() < MIN_SQUAD or not is_instance_valid(p) or not p.alive:
 		return
 	var pp: Vector2 = p.global_position
+	var tac: Dictionary = SquadAdapt.tactics(PlayerProfiler.profile(), Global.floor_num) # đội thích nghi lối chơi
+	_record_adaptation(tac)
 
 	# --- Gọng kìm: quái cận chiến (không phải trâu bò/tầm xa) xếp đều quanh người chơi theo thứ tự góc hiện tại.
 	var flankers: Array = squad.filter(func(e): return not TANKS.has(e.kind) and not RANGED.has(e.kind))
@@ -69,9 +73,9 @@ func _update() -> void:
 			var to_p: Vector2 = pp - e.global_position
 			if to_p.length() <= FLANK_ENGAGE_DIST:
 				continue
-			var slot: Vector2 = pp + Vector2.from_angle(base + TAU * float(i) / float(n)) * FLANK_RADIUS
+			var slot: Vector2 = pp + Vector2.from_angle(base + TAU * float(i) / float(n)) * FLANK_RADIUS * float(tac["flank_radius_mult"])
 			var want: Vector2 = (slot - e.global_position).normalized()
-			e.squad_offset = (want - to_p.normalized()) * FLANK_WEIGHT
+			e.squad_offset = (want - to_p.normalized()) * FLANK_WEIGHT * float(tac["flank_weight_mult"])
 
 	# --- Tầm xa đứng sau trâu bò gần nhất (phía xa người chơi hơn).
 	var tanks: Array = squad.filter(func(e): return TANKS.has(e.kind))
@@ -84,7 +88,7 @@ func _update() -> void:
 				if t.global_position.distance_to(e.global_position) < best.global_position.distance_to(e.global_position):
 					best = t
 			var away: Vector2 = (best.global_position - pp).normalized()
-			e.squad_anchor = best.global_position + away * RANGED_BEHIND_DIST
+			e.squad_anchor = best.global_position + away * RANGED_BEHIND_DIST * float(tac["ranged_behind_mult"])
 
 	# --- Nhóm nhanh chờ nhóm chậm: so ETA tới người chơi.
 	var etas: Dictionary = {}
@@ -92,7 +96,7 @@ func _update() -> void:
 	var far_count: int = 0
 	for e in squad:
 		var d: float = e.global_position.distance_to(pp)
-		if d <= WAIT_ENGAGE_DIST:
+		if d <= WAIT_ENGAGE_DIST * float(tac["wait_dist_mult"]):
 			continue
 		var eta: float = d / maxf(1.0, float(e.data["speed"]))
 		etas[e] = eta
@@ -100,6 +104,41 @@ func _update() -> void:
 		far_count += 1
 	if far_count >= 2:
 		var mean: float = sum / float(far_count)
+		var fast_ratio: float = maxf(WAIT_FAST_RATIO, float(tac["wait_fast_ratio"]))
 		for e in etas:
-			if float(etas[e]) < mean * WAIT_FAST_RATIO:
+			if float(etas[e]) < mean * fast_ratio:
 				e.squad_speed = WAIT_SLOW_MULT
+	_apply_adaptive_melee(squad, pp, tac)
+
+## Phần thích nghi dành cho quái đánh gần (không phải tầm xa): đón đầu hướng né, và chạy nhanh hơn một chút
+## khi người chơi hay đứng xa (chỉ khi quái còn ở xa và chưa bị bắt chờ).
+func _apply_adaptive_melee(squad: Array, pp: Vector2, tac: Dictionary) -> void:
+	if not bool(tac["active"]):
+		return
+	var lead: float = float(tac["lead"])
+	var chase: float = float(tac["chase_speed"])
+	for e in squad:
+		if RANGED.has(e.kind):
+			continue
+		var to_p: Vector2 = pp - e.global_position
+		var d: float = to_p.length()
+		if lead != 0.0 and d >= SquadAdapt.LEAD_MIN_DIST and d <= SquadAdapt.LEAD_MAX_DIST:
+			# bên người chơi hay né tới (trục x), lấy phần vuông góc với hướng đuổi; né dọc theo hướng đuổi thì không lệch
+			var fwd: Vector2 = to_p / d
+			var side: Vector2 = Vector2(signf(lead), 0.0)
+			side -= fwd * side.dot(fwd)
+			if side.length() > 0.2:
+				e.squad_offset += side.normalized() * absf(lead) * minf(1.0, side.length())
+		if chase > 1.0 and d > FLANK_ENGAGE_DIST and e.squad_speed >= 1.0:
+			e.squad_speed = chase
+
+## Ghi nhãn thích nghi vào thống kê ván (để màn Game Over nói cho người chơi biết quái đã học gì).
+func _record_adaptation(tac: Dictionary) -> void:
+	if not bool(tac["active"]):
+		return
+	var seen = Global.run_stats.get("adapted")
+	if not (seen is Dictionary):
+		seen = {}
+		Global.run_stats["adapted"] = seen
+	for tag in tac["tags"]:
+		seen[String(tag)] = true
