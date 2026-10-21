@@ -12,7 +12,7 @@ godot --headless --path . --script tools/bot/run_bot.gd -- --runs 5 --heat-compa
 godot --headless --path . --script tools/bot/run_bot.gd -- --runs 1 --class ranger --trace 1   # in trạng thái mỗi 5 giây
 ```
 
-Tham số: `--runs` (ván/cấu hình), `--class a,b`, `--heat x,y`, `--heat-compare`, `--speed` (tăng tốc, mặc định 6),
+Tham số: `--start-floor F --buffs N` (nhảy thẳng tới tầng F với N buff ngẫu nhiên để đo Hell/Council mà không phải đi từ tầng 1), `--runs` (ván/cấu hình), `--class a,b`, `--heat x,y`, `--heat-compare`, `--speed` (tăng tốc, mặc định 6),
 `--max-min` (trần phút mô phỏng/ván), `--max-floor`, `--seed`, `--out file.json`, `--trace 1`.
 Mỗi ván in một dòng (tầng, kết cục, thời gian, hạ bao nhiêu, số lần lăn né, "săn", kẹt, kẻ hạ gục) rồi bảng tổng hợp
 theo class + Heat.
@@ -25,6 +25,10 @@ theo class + Heat.
 ## Nâng cấp đã làm
 - v1.1: bot nghe trạng thái trùm (`charging`, `tele_mode`) để nghiêng khỏi đường lao và lùi khỏi đòn đang báo trước;
   báo cáo tổng hợp thêm "sát thương nhận" theo nguồn. Ranger qua được Warden tầng 1 ở khoảng 4/6 ván (trước: gần như 0).
+
+- v1.2: tránh bẫy sàn (gai/lava/độc/băng), né đạn địch bằng bước ngang theo điểm gần nhất, đường đi dự phòng theo đồ thị
+  phòng khi lưới không có đường, `--start-floor/--buffs`. Ngắm đón đầu có sẵn nhưng TẮT (`LEAD_FACTOR = 0`): thử với
+  vận tốc quái làm bot tệ đi (8 ván: 2 -> 5 ván sống sót khi tắt), cần xem lại cách lấy vận tốc trước khi bật.
 
 ## Giới hạn hiện tại (cần nâng cấp dần)
 - Bot yếu hơn người chơi thật: chưa ngắm đón đầu, né trùm còn thô, không dùng Forge/Altar/rương/đổi vũ khí, không tự

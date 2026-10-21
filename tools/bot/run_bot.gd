@@ -16,7 +16,7 @@ extends SceneTree
 const BotBrain = preload("res://tools/bot/bot_brain.gd")
 
 var G
-var opts: Dictionary = {"runs": 3, "class": "ranger,brawler,mage,rogue", "heat": "", "speed": 6.0, "max-min": 25.0, "max-floor": 20, "seed": 0, "out": "", "trace": 0}
+var opts: Dictionary = {"runs": 3, "class": "ranger,brawler,mage,rogue", "heat": "", "speed": 6.0, "max-min": 25.0, "max-floor": 20, "seed": 0, "out": "", "trace": 0, "start-floor": 1, "buffs": 0}
 var results: Array = []
 
 func _init() -> void:
@@ -86,6 +86,16 @@ func _play(cid: String, heat_ids: Array) -> Dictionary:
 	for i in 30:
 		await physics_frame
 	var main = current_scene
+	if int(opts["start-floor"]) > 1:
+		# nhảy thẳng tới tầng cần đo (vd Hell 11-15 / Council) với bộ buff ngẫu nhiên cho trước, như người chơi đã đi tới đó
+		for i in int(opts["buffs"]):
+			var pick: Array = G.roll_buff_choices(1)
+			if not pick.is_empty():
+				G.apply_buff(String(pick[0]))
+		G.floor_num = int(opts["start-floor"]) - 1
+		main._next_floor()
+		for i in 30:
+			await physics_frame
 	var brain = BotBrain.new()
 	main.add_child(brain)
 	brain.setup(main)

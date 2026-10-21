@@ -9,6 +9,11 @@ const THINK_INTERVAL: float = 0.1          # giây mô phỏng giữa hai lần 
 const RANGED_KEEP_DIST: float = 230.0
 const RANGED_TOO_CLOSE: float = 150.0
 const KITER_CHASE_DIST: float = 150.0
+const LEAD_MAX_T: float = 0.6
+const LEAD_FACTOR: float = 0.0           # <1: bot không đón đầu hoàn hảo
+const BULLET_LOOKAHEAD: float = 0.55      # giây: tính điểm gần nhất của đạn địch trong khoảng này
+const BULLET_HIT_RADIUS: float = 26.0
+const TRAP_AVOID_DIST: float = 48.0
 const BOSS_KEEP_DIST: float = 300.0
 const MELEE_ENGAGE_PAD: float = 12.0
 const HAZARD_MARGIN: float = 46.0          # thêm vào bán kính vùng nguy hiểm khi tránh
@@ -126,9 +131,35 @@ func _pick_target(list: Array, pp: Vector2):
 			best = e
 	return best if best != null else _nearest(list, pp)
 
+## Điểm ngắm có đón đầu: vị trí mục tiêu cộng vận tốc nhân thời gian đạn bay (tối đa LEAD_MAX_T giây).
+func _lead_point(pp: Vector2, t) -> Vector2:
+	var tp: Vector2 = t.global_position
+	if bool(player.weapon.get("is_melee", false)):
+		return tp
+	var v = t.get("velocity")
+	var bspeed: float = float(player.weapon.get("speed", 600.0))
+	if not (v is Vector2) or bspeed < 50.0:
+		return tp
+	var flight: float = minf(LEAD_MAX_T, pp.distance_to(tp) / bspeed)
+	return tp + (v as Vector2) * flight * LEAD_FACTOR
+
 func _is_kiter(e) -> bool:
 	var d = e.get("data")
 	return d is Dictionary and (bool(d.get("kiter", false)) or bool(d.get("shooter", false)))
+
+## Bẫy/ô nguy hiểm trên sàn (gai, lava, độc, băng): nhận diện bằng đường dẫn script.
+func _floor_traps() -> Array:
+	var out: Array = []
+	for n in G.world.get_children():
+		if not is_instance_valid(n) or not (n is Area2D):
+			continue
+		var sc = n.get_script()
+		if sc == null:
+			continue
+		var path: String = String(sc.resource_path)
+		if path.ends_with("spike_trap.gd") or path.ends_with("lava_tile.gd") or path.ends_with("poison_tile.gd") or path.ends_with("ice_tile.gd"):
+			out.append(n)
+	return out
 
 func _hazards() -> Array:
 	var out: Array = []
@@ -167,6 +198,13 @@ func _think(dt: float) -> void:
 			steer += off.normalized() * (1.6 + (r - d) / r) if d > 1.0 else Vector2.RIGHT
 	if in_hazard:
 		stats["hazard_ticks"] += 1
+	for tr in _floor_traps():
+		var toff: Vector2 = pp - tr.global_position
+		var td: float = toff.length()
+		if td < TRAP_AVOID_DIST and td > 1.0:
+			steer += toff.normalized() * (TRAP_AVOID_DIST - td) / TRAP_AVOID_DIST * 2.2
+	var bullet_steer: Vector2 = _bullet_sidestep(pp)
+	steer += bullet_steer
 	# 2) lăn né đạn địch / vùng nguy hiểm (không hoàn hảo)
 	if _dodge_gap <= 0.0 and player.dodge_cooldown.is_stopped() and not player.rolling:
 		var threat: Vector2 = Vector2.ZERO
@@ -208,7 +246,7 @@ func _think(dt: float) -> void:
 		var to_t: Vector2 = target.global_position - pp
 		var dist: float = to_t.length()
 		var dir_t: Vector2 = to_t.normalized() if dist > 1.0 else Vector2.RIGHT
-		player.ai_aim_point = target.global_position
+		player.ai_aim_point = _lead_point(pp, target)
 		if not _los(pp, target.global_position):
 			# bị tường chắn: đi theo đường tìm được tới mục tiêu thay vì xoay vòng vô ích
 			steer += _path_dir(pp, target.global_position) * 1.2
@@ -279,6 +317,28 @@ func _repel(enemies: Array, pp: Vector2, target) -> Vector2:
 
 ## Phòng thủ trước trùm dựa trên trạng thái trùm công bố (charging / tele_mode): nghiêng người khỏi đường lao,
 ## và lùi ra khỏi tầm đòn đang báo trước (slam/ring/...). Lăn né khi đòn sắp trúng.
+## Với từng đạn địch: tính điểm gần Player nhất trong BULLET_LOOKAHEAD giây; nếu sẽ trúng thì nghiêng người sang
+## phía vuông góc với đường đạn (không cần lăn). Đạn xa hoặc bay lệch thì bỏ qua.
+func _bullet_sidestep(pp: Vector2) -> Vector2:
+	var steer: Vector2 = Vector2.ZERO
+	for b in get_tree().get_nodes_in_group("enemy_bullets"):
+		if not is_instance_valid(b):
+			continue
+		var v: Vector2 = b.dir * float(b.speed)
+		var rel: Vector2 = pp - b.global_position
+		var vv: float = v.length_squared()
+		if vv < 1.0:
+			continue
+		var t_cp: float = clampf(rel.dot(v) / vv, 0.0, BULLET_LOOKAHEAD)
+		var closest: Vector2 = b.global_position + v * t_cp
+		var miss: Vector2 = pp - closest
+		if miss.length() < BULLET_HIT_RADIUS + float(b.radius):
+			var side: Vector2 = Vector2(-b.dir.y, b.dir.x)
+			if side.dot(miss) < 0.0:
+				side = -side
+			steer += side * (1.6 - t_cp)
+	return steer
+
 func _boss_defense(pp: Vector2) -> Vector2:
 	var steer: Vector2 = Vector2.ZERO
 	for b in get_tree().get_nodes_in_group("boss"):
@@ -346,6 +406,12 @@ func _navigate(pp: Vector2) -> Vector2:
 	if goal == null:
 		goal = dungeon.room_center(dungeon.boss_cell)
 	var path: PackedVector2Array = dungeon.find_path(pp, goal)
+	if path.size() < 2:
+		# không có đường theo lưới: đi theo đồ thị phòng tới phòng kế trên đường tới trùm
+		var nxt = _next_cell_toward_boss()
+		if nxt != null:
+			goal = dungeon.room_center(nxt)
+			path = dungeon.find_path(pp, goal)
 	_goal_desc = "goal=(%d,%d) path=%d" % [goal.x, goal.y, path.size()]
 	if path.size() >= 2:
 		var i: int = 1
@@ -353,6 +419,30 @@ func _navigate(pp: Vector2) -> Vector2:
 			i += 1
 		return (path[i] - pp).normalized()
 	return (goal - pp).normalized()
+
+## BFS trên đồ thị cửa của các phòng: ô phòng kế tiếp cần đi để tới phòng trùm (null nếu đã ở đó / không có).
+func _next_cell_toward_boss():
+	var start: Vector2i = dungeon.current_cell
+	var goal: Vector2i = dungeon.boss_cell
+	if start == goal or not dungeon.rooms.has(start):
+		return null
+	var prev: Dictionary = {start: start}
+	var queue: Array = [start]
+	while not queue.is_empty():
+		var c: Vector2i = queue.pop_front()
+		if c == goal:
+			break
+		for d in dungeon.rooms[c]["doors"]:
+			var n: Vector2i = c + d
+			if dungeon.rooms.has(n) and not prev.has(n):
+				prev[n] = c
+				queue.append(n)
+	if not prev.has(goal):
+		return null
+	var c2: Vector2i = goal
+	while prev[c2] != start:
+		c2 = prev[c2]
+	return c2
 
 func _anti_stuck(steer: Vector2, pp: Vector2, dt: float, navigating: bool) -> Vector2:
 	if _jiggle_t > 0.0:
