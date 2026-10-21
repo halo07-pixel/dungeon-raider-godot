@@ -109,25 +109,6 @@ func _ready() -> void:
 	life_timer.timeout.connect(_on_timeout)
 	life_timer.start(life)
 
-## Đạn địch bị Phản Đạn: đổi chủ thành đạn của Player bay theo hướng mới.
-func reflect(new_dir: Vector2, dmg_mult: float) -> void:
-	from_player = true
-	remove_from_group("enemy_bullets")
-	source_q_agent = null
-	_q_reward_sent = true
-	homing = false # bỏ tầm nhiệt kiểu địch (nhắm Player); player có thể bật lại sau khi phản
-	homing_target = null
-	dir = new_dir.normalized()
-	rotation = dir.angle()
-	damage = maxi(1, int(float(damage) * dmg_mult))
-	knock = 140.0
-	_hit.clear()
-	collision_layer = Global.L_PBULLET
-	collision_mask = Global.L_WORLD | Global.L_ENEMY
-	life_timer.start(maxf(life_timer.time_left, 1.0))
-	color = Color(0.6, 1.0, 0.7)
-	queue_redraw()
-
 # ---------------------------------------------------------------- Đạn Tầm Nhiệt (buff_homing)
 ## Khóa mục tiêu (ưu tiên quái trong góc nón phía trước), nhắm tâm hitbox + đón đầu nhẹ, tăng
 ## tốc độ bẻ lái khi vào gần (chống bay vòng quanh), và có thể trễ kích hoạt (homing_delay).
