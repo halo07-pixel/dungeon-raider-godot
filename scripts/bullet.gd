@@ -239,7 +239,11 @@ func _on_body_entered(body: Node) -> void:
 		if effect == "pin" and from_player and _wall_behind(body):
 			hit_dmg = int(float(damage) * pin_mult)
 			pinned_now = true
-		body.take_damage(hit_dmg, global_position - dir * 8.0, knock, false, false, source)
+		# `source` (tên kẻ bắn, cho màn hình tử vong) chỉ Player.take_damage nhận; Enemy/Boss.take_damage có ít tham số hơn.
+		if from_player:
+			body.take_damage(hit_dmg, global_position - dir * 8.0, knock)
+		else:
+			body.take_damage(hit_dmg, global_position - dir * 8.0, knock, false, false, source)
 		if pinned_now:
 			_apply_pin(body)
 		elif effect == "fire" and from_player and body.has_method("apply_element"):
