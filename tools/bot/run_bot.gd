@@ -127,6 +127,9 @@ func _play(cid: String, heat_ids: Array) -> Dictionary:
 	brain.queue_free()
 	return res
 
+func main_name(src: String) -> String:
+	return load("res://scripts/run_telemetry.gd").source_name(src)
+
 func _report(configs: Array) -> void:
 	print("")
 	print("===== TỔNG HỢP (%d ván) =====" % results.size())
@@ -150,4 +153,17 @@ func _report(configs: Array) -> void:
 		for k in deaths:
 			if int(deaths[k]) > tk:
 				tk = int(deaths[k]); top_killer = k
-		print("%-18s tầng TB %.1f (min %d, max %d) | thắng Lord %d/%d | thời gian TB %.0fs | kẻ hạ nhiều nhất: %s" % [key, float(sum_f) / float(arr.size()), floors[0], floors[-1], wins, arr.size(), sum_t / float(arr.size()), top_killer])
+		var src: Dictionary = {}
+		var src_total := 0
+		for r in arr:
+			for row in r["top"]:
+				src[row[0]] = int(src.get(row[0], 0)) + int(row[1])
+				src_total += int(row[1])
+		var src_rows: Array = []
+		for k in src:
+			src_rows.append([k, src[k]])
+		src_rows.sort_custom(func(a, b): return a[1] > b[1])
+		var src_txt: Array = []
+		for row in src_rows.slice(0, 4):
+			src_txt.append("%s %d%%" % [main_name(String(row[0])), int(round(100.0 * float(row[1]) / float(maxi(1, src_total))))])
+		print("%-18s tầng TB %.1f (min %d, max %d) | thắng Lord %d/%d | thời gian TB %.0fs | kẻ hạ nhiều nhất: %s | sát thương nhận: %s" % [key, float(sum_f) / float(arr.size()), floors[0], floors[-1], wins, arr.size(), sum_t / float(arr.size()), top_killer, ", ".join(PackedStringArray(src_txt))])

@@ -22,6 +22,10 @@ theo class + Heat.
   tránh vùng nguy hiểm đang báo trước, lăn né đạn/chạm sát (có xác suất sai), dùng kỹ năng Q khi có >= 3 quái hoặc trùm,
   chọn buff theo bậc hiếm + synergy, nhặt máu/xu gần, đi cổng sang tầng kế, chống kẹt, "săn" khi không hạ được con nào quá lâu.
 
+## Nâng cấp đã làm
+- v1.1: bot nghe trạng thái trùm (`charging`, `tele_mode`) để nghiêng khỏi đường lao và lùi khỏi đòn đang báo trước;
+  báo cáo tổng hợp thêm "sát thương nhận" theo nguồn. Ranger qua được Warden tầng 1 ở khoảng 4/6 ván (trước: gần như 0).
+
 ## Giới hạn hiện tại (cần nâng cấp dần)
 - Bot yếu hơn người chơi thật: chưa ngắm đón đầu, né trùm còn thô, không dùng Forge/Altar/rương/đổi vũ khí, không tự
   chọn vũ khí tốt hơn, chưa biết các chiêu đặc biệt của từng trùm. **Số "tầng chết" tuyệt đối vì thế KHÔNG phải độ khó

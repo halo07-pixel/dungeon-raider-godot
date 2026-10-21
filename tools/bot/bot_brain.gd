@@ -20,6 +20,7 @@ const SKILL_RADIUS: float = 260.0
 const WALL_PUSH_DIST: float = 70.0
 const REPEL_DIST: float = 170.0            # đẩy khỏi MỌI quái gần hơn mức này (không chỉ quái gần nhất)
 const REPEL_WEIGHT: float = 1.5
+const TELEGRAPH_AVOID_DIST: float = 230.0   # trùm đang báo trước đòn: lùi ra khỏi tầm này
 const CONTACT_ROLL_DIST: float = 58.0      # quái chạm sát thì lăn thoát
 const PICKUP_RANGE: float = 170.0
 const HEAL_SEEK_RANGE: float = 520.0
@@ -194,6 +195,7 @@ func _think(dt: float) -> void:
 		_hunt_until = sim_time + HUNT_DURATION
 		_last_progress = sim_time
 		stats["hunts"] = int(stats.get("hunts", 0)) + 1
+	var boss_steer: Vector2 = _boss_defense(pp)
 	if target != null and sim_time < _hunt_until:
 		# săn: bỏ luật giữ khoảng cách, đi thẳng theo đường tới mục tiêu và bắn khi thấy
 		player.ai_aim_point = target.global_position
@@ -231,6 +233,7 @@ func _think(dt: float) -> void:
 		steer += _repel(enemies, pp, target)
 		_maybe_skill(enemies, pp, target)
 		steer += _wall_push(pp)
+		steer += boss_steer
 	else:
 		steer += _navigate(pp)
 	if _shoot:
@@ -273,6 +276,35 @@ func _repel(enemies: Array, pp: Vector2, target) -> Vector2:
 			stats["rolls"] += 1
 			_dodge_gap = DODGE_MIN_GAP
 	return push * REPEL_WEIGHT
+
+## Phòng thủ trước trùm dựa trên trạng thái trùm công bố (charging / tele_mode): nghiêng người khỏi đường lao,
+## và lùi ra khỏi tầm đòn đang báo trước (slam/ring/...). Lăn né khi đòn sắp trúng.
+func _boss_defense(pp: Vector2) -> Vector2:
+	var steer: Vector2 = Vector2.ZERO
+	for b in get_tree().get_nodes_in_group("boss"):
+		if not is_instance_valid(b) or not b.alive or not b.active:
+			continue
+		var to_p: Vector2 = pp - b.global_position
+		var dist: float = to_p.length()
+		if bool(b.charging):
+			var cd: Vector2 = b.charge_dir
+			var along: float = cd.dot(to_p)
+			var lateral: Vector2 = to_p - cd * along
+			if along > -50.0 and lateral.length() < 120.0 and dist < 320.0:
+				var side: Vector2 = lateral.normalized() if lateral.length() > 8.0 else Vector2(-cd.y, cd.x)
+				steer += side * 2.2
+				if _dodge_gap <= 0.0 and player.dodge_cooldown.is_stopped() and not player.rolling and lateral.length() < 90.0 and dist < 200.0:
+					player._start_roll(side.normalized())
+					stats["rolls"] += 1
+					_dodge_gap = DODGE_MIN_GAP
+		elif String(b.tele_mode) != "" and dist < TELEGRAPH_AVOID_DIST:
+			var away: Vector2 = to_p.normalized() if dist > 1.0 else Vector2.RIGHT
+			steer += away * (1.8 + (TELEGRAPH_AVOID_DIST - dist) / TELEGRAPH_AVOID_DIST)
+			if float(b.tele_t) > 0.55 and dist < 170.0 and _dodge_gap <= 0.0 and player.dodge_cooldown.is_stopped() and not player.rolling:
+				player._start_roll(away)
+				stats["rolls"] += 1
+				_dodge_gap = DODGE_MIN_GAP
+	return steer
 
 func _maybe_skill(enemies: Array, pp: Vector2, target) -> void:
 	var cs = player.class_skill
