@@ -125,6 +125,8 @@ func _restore_player_state() -> void:
 			if Global.SkillUpgrades.has(String(uid)):
 				Global.skill_upgrades_taken.append(String(uid))
 		Global.run_buffs = Dictionary(Global.saved_run.get("run_buffs", {})).duplicate()
+		var pity = Global.saved_run.get("weapon_pity", {})
+		Global.weapon_pity = {"epic": int(pity.get("epic", 0)), "legendary": int(pity.get("legendary", 0))} if pity is Dictionary else {"epic": 0, "legendary": 0}
 		Global.run_buffs.erase("buff_lifesteal") # buff đã bị gỡ khỏi game; bỏ khỏi save cũ
 		Global.run_buffs.erase("buff_deflect") # Deflect đã bị gỡ (thay bằng Fortify); bỏ khỏi save cũ
 		Global.coins = int(Global.saved_run.get("gold", Global.coins))
@@ -269,6 +271,7 @@ func _build_saved_run() -> Dictionary:
 		"max_hp": player.max_hp,
 		"shield": player.shield,
 		"run_buffs": Global.run_buffs.duplicate(),
+		"weapon_pity": Global.weapon_pity.duplicate(),
 		"gold": Global.coins + Global.stolen_gold_held, # xu đang cầm (trước đây không lưu nên Continue mất sạch xu)
 		"stats": Global.run_stats.duplicate() if Global.get("run_stats") else {}
 	}

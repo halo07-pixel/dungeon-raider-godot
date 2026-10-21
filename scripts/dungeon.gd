@@ -452,11 +452,9 @@ func _enter_room(cell: Vector2i) -> void:
 		"treasure":
 			room["cleared"] = true
 			
-			# Vũ khí mọi class đều dùng được (không còn lọc theo class); tránh trùng với 2 ô đang cầm.
-			var rarity: String = Global.roll_weapon_rarity(Global.floor_num)
-			_spawn_pickup("weapon", _roll_weapon_drop(rarity), room_center(cell) + Vector2(0.0, -24.0))
+			_spawn_weapon_choice(room_center(cell) + Vector2(0.0, -24.0))
 			_spawn_chest_decor(room_center(cell) + Vector2(0.0, 10.0))
-			Global.message.emit("Treasure Room!", Color(1.0, 0.85, 0.3))
+			Global.message.emit("Treasure Room! Choose 1 of 3 weapons", Color(1.0, 0.85, 0.3))
 		"altar":
 			room["cleared"] = true
 			var altar = _spawn_prop("altar", room_center(cell), cell, {"variant": "gold" if randf() < EventRooms.ALTAR_GOLD_CHANCE else "blood"})
@@ -1014,7 +1012,7 @@ func _room_cleared(cell: Vector2i) -> void:
 			Global.save_game()
 			Global.message.emit("The Council has fallen! Legendary weapon and +%d Purple Gems" % Global.heat_gems(COUNCIL_GEMS), Color(1.0, 0.85, 0.3))
 		elif Global.floor_num % BOSS_WEAPON_REWARD_EVERY == 0:
-			_spawn_pickup("weapon", _roll_weapon_drop(Global.roll_weapon_rarity(Global.floor_num, "rare")), room_center(cell) + Vector2(-72.0, 0.0))
+			_spawn_pickup("weapon", _roll_weapon_drop(Global.roll_weapon_rarity_pity(Global.floor_num, "rare")), room_center(cell) + Vector2(-72.0, 0.0))
 			Global.message.emit("The boss dropped a weapon!", Color(1.0, 0.85, 0.3))
 		if Global.floor_num == HELL_LAST_FLOOR and not Global.in_council:
 			_spawn_pickup("council_portal", "", room_center(cell) + Vector2(0.0, 70.0))
@@ -1036,13 +1034,28 @@ func _room_cleared(cell: Vector2i) -> void:
 
 
 ## Mã chuỗi WeaponInstance cho một vũ khí rơi mới (kèm dòng phụ random theo độ hiếm), tránh trùng id với các ô Player đang cầm.
-func _roll_weapon_drop(rarity: String) -> String:
-	var held: Array = []
+func _roll_weapon_drop(rarity: String, extra_exclude: Array = []) -> String:
+	var held: Array = extra_exclude.duplicate()
 	if is_instance_valid(Global.player):
 		for slot in Global.player.weapon_slots:
 			if not slot.is_empty():
 				held.append(String(slot["id"]))
 	return WeaponInstance.encode(WeaponInstance.roll(Global.random_weapon_id(held), rarity))
+
+
+## Phòng kho báu: 3 vũ khí khác loại xếp hàng ngang, chỉ nhặt được 1 (nhặt xong 2 cái kia biến mất).
+## Cây đầu tiên được đảm bảo tối thiểu Rare (và tính pity); hai cây còn lại roll tự do.
+var _choice_seq: int = 0 # id nhóm "chọn 1 trong N" của các pickup vũ khí
+const WEAPON_CHOICE_SPACING: float = 84.0
+
+func _spawn_weapon_choice(center: Vector2) -> void:
+	_choice_seq += 1
+	var used: Array = []
+	for i in 3:
+		var rarity: String = Global.roll_weapon_rarity_pity(Global.floor_num, "rare") if i == 0 else Global.roll_weapon_rarity(Global.floor_num)
+		var code: String = _roll_weapon_drop(rarity, used)
+		used.append(String(WeaponInstance.decode(code)["id"]))
+		_spawn_pickup("weapon", code, center + Vector2((float(i) - 1.0) * WEAPON_CHOICE_SPACING, 0.0), _choice_seq)
 
 
 ## Player đổi vũ khí tại chỗ (nhặt bằng E khi đủ ô): đặt vũ khí cũ xuống sàn để còn nhặt lại được.
@@ -1102,8 +1115,9 @@ func _spawn_hazard_tiles(cell: Vector2i, count: int) -> void:
 		trap.global_position = pos
 
 
-func _spawn_pickup(kind: String, extra: String, pos: Vector2) -> void:
+func _spawn_pickup(kind: String, extra: String, pos: Vector2, choice_group: int = 0) -> void:
 	var p = PICKUP.instantiate()
 	p.setup(kind, extra)
+	p.choice_group = choice_group
 	entities.add_child(p)
 	p.global_position = pos
