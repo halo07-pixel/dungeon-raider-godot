@@ -488,6 +488,28 @@ func _ready() -> void:
 		"ogre_charge": _mix(0.50, [
 			{"freq": 0.0, "vol": 0.30, "dur": 0.45, "wave": "noise", "lp": 0.35, "swell": 0.15, "decay": 1.0},
 			{"freq": 95.0, "slide": -45.0, "vol": 0.32, "dur": 0.40, "wave": "sine", "decay": 1.0}]),
+		"affix_summon": _mix(0.45, [
+			{"freq": 140.0, "slide": 260.0, "vol": 0.22, "dur": 0.40, "wave": "saw", "swell": 0.5, "decay": 1.1},
+			{"freq": 0.0, "vol": 0.14, "dur": 0.40, "wave": "noise", "lp": 0.25, "swell": 0.6, "decay": 1.2}]),
+		"affix_split": _mix(0.30, [
+			{"freq": 0.0, "vol": 0.24, "dur": 0.12, "wave": "noise", "lp": 0.8, "decay": 2.2},
+			{"freq": 300.0, "slide": 240.0, "vol": 0.16, "dur": 0.14, "wave": "square", "decay": 1.6},
+			{"freq": 380.0, "slide": 300.0, "vol": 0.12, "dur": 0.14, "wave": "square", "delay": 0.09, "decay": 1.6}]),
+		"affix_frenzy": _mix(0.25, [
+			{"freq": 180.0, "slide": 420.0, "vol": 0.14, "dur": 0.20, "wave": "saw", "decay": 1.5},
+			{"freq": 0.0, "vol": 0.08, "dur": 0.15, "wave": "noise", "lp": 0.6, "decay": 1.6}]),
+		"affix_leech": _mix(0.25, [
+			{"freq": 520.0, "slide": -260.0, "vol": 0.13, "dur": 0.20, "wave": "sine", "decay": 1.3},
+			{"freq": 260.0, "slide": -100.0, "vol": 0.10, "dur": 0.20, "wave": "sine", "delay": 0.04, "decay": 1.3}]),
+		"affix_blink_warn": _mix(0.40, [
+			{"freq": 900.0, "slide": 700.0, "vol": 0.22, "dur": 0.35, "wave": "sine", "swell": 0.8, "decay": 0.6},
+			{"freq": 0.0, "vol": 0.10, "dur": 0.35, "wave": "noise", "lp": 0.9, "swell": 0.8, "decay": 0.6}]),
+		"affix_blink": _mix(0.25, [
+			{"freq": 1200.0, "slide": -900.0, "vol": 0.16, "dur": 0.18, "wave": "sine", "decay": 1.6},
+			{"freq": 0.0, "vol": 0.14, "dur": 0.10, "wave": "noise", "lp": 0.9, "decay": 2.0}]),
+		"volatile_boom": _mix(0.45, [
+			{"freq": 0.0, "vol": 0.34, "dur": 0.35, "wave": "noise", "lp": 0.45, "decay": 1.6},
+			{"freq": 120.0, "slide": -70.0, "vol": 0.34, "dur": 0.35, "wave": "sine", "decay": 1.3}]),
 		"ward_cast": _mix(0.45, [
 			{"freq": 520.0, "slide": 300.0, "vol": 0.20, "dur": 0.35, "wave": "sine", "decay": 1.3},
 			{"freq": 780.0, "slide": 200.0, "vol": 0.13, "dur": 0.30, "wave": "sine", "delay": 0.05, "decay": 1.4}]),
