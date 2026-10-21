@@ -1,6 +1,7 @@
 extends CanvasLayer
 ## HUD: thanh máu, thanh Dodge, thông tin tầng/súng/xu, thanh Boss, thông báo, minimap.
 ## Đã gỡ bỏ màn hình Title và Game Over (chuyển sang main.gd quản lý).
+const WeaponInstance = preload("res://scripts/weapon_instance.gd")
 
 const MinimapScript = preload("res://scripts/minimap.gd")
 const ShieldBarScript = preload("res://scripts/shield_bar.gd")
@@ -76,13 +77,10 @@ func _update_weapon_labels(p) -> void:
 			lbl.text = "  [%d] - empty -" % (i + 1)
 			lbl.modulate = Color(0.55, 0.55, 0.55, 0.7)
 			continue
-		var w: Dictionary = Global.weapons[String(slot["id"])]
 		var r: Dictionary = Global.rarities[String(slot["rarity"])]
 		var active: bool = (i == int(p.active_slot))
-		var rank_note: String = ""
-		if p.has_method("rank_text"):
-			rank_note = "  " + String(p.rank_text(String(slot["id"])))
-		lbl.text = "%s[%d] %s (%s)%s%s" % ["> " if active else "  ", i + 1, w["name"], r["name"], rank_note, ("   [%s] swap" % swap_key) if active and not _other_empty(slots, i) else ""]
+		var aff_note: String = "  *%d" % (slot.get("affixes", []) as Array).size() if not (slot.get("affixes", []) as Array).is_empty() else ""
+		lbl.text = "%s[%d] %s (%s)%s%s" % ["> " if active else "  ", i + 1, WeaponInstance.display_name(slot), r["name"], aff_note, ("   [%s] swap" % swap_key) if active and not _other_empty(slots, i) else ""]
 		var c: Color = r["color"]
 		lbl.modulate = c if active else Color(c.r, c.g, c.b, 0.55)
 

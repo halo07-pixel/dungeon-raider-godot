@@ -2,11 +2,14 @@ extends Area2D
 ## Vật phẩm / cổng: kind = coin | heal | weapon | portal. Xu/bình máu/cổng nhặt bằng signal body_entered;
 ## VŨ KHÍ thì KHÔNG tự nhặt: đứng gần và bấm "interact" (E). Còn ô trống thì vào ô trống, đủ ô thì đổi với
 ## vũ khí đang cầm và vũ khí cũ được thả xuống chỗ này (qua Global.weapon_drop_requested).
+const WeaponInstance = preload("res://scripts/weapon_instance.gd")
 
 const WeaponInfo = preload("res://scripts/weapon_info.gd")
 
 ## Sau khi xuất hiện, vũ khí chưa nhặt được trong khoảng này (giây) — tránh nhặt nhầm ngay vũ khí vừa thả.
 const WEAPON_PICKUP_LOCK: float = 0.4
+## Số ký tự tối đa mỗi dòng đặc tính trên thẻ so sánh (font 12px, thẻ rộng 280px).
+const CARD_WRAP_CHARS: int = 42
 
 @onready var sprite: AnimatedSprite2D = $Sprite
 
@@ -14,6 +17,8 @@ var kind: String = "coin"
 var extra: String = ""
 var weapon_id: String = ""
 var weapon_rarity: String = "common"
+## Cây vũ khí mà pickup này đại diện (WeaponInstance) — mã hóa trong `extra` dạng "id:rarity:level:aff1,aff2".
+var weapon_inst: Dictionary = {}
 var _t: float = 0.0
 var _icon_tex: Texture2D
 var _near: bool = false
@@ -25,10 +30,11 @@ func setup(p_kind: String, p_extra: String = "") -> void:
 	kind = p_kind
 	extra = p_extra
 	if kind == "weapon":
-		var parts = extra.split(":")
-		weapon_id = parts[0]
-		if parts.size() > 1:
-			weapon_rarity = parts[1]
+		weapon_inst = WeaponInstance.decode(extra)
+		if weapon_inst.is_empty():
+			weapon_inst = WeaponInstance.make("pistol", "common") # mã hỏng -> vũ khí cơ bản thay vì crash
+		weapon_id = String(weapon_inst["id"])
+		weapon_rarity = String(weapon_inst["rarity"])
 		_icon_tex = Global.load_tex("res://assets/dungeon/weapon_%s.png" % weapon_id)
 
 func _ready() -> void:
@@ -118,9 +124,9 @@ func _try_take() -> void:
 	if _taken_frame == Engine.get_process_frames() or not _is_nearest_candidate(player.global_position):
 		return
 	_taken_frame = Engine.get_process_frames()
-	var displaced: Dictionary = player.equip_weapon(weapon_id, weapon_rarity)
+	var displaced: Dictionary = player.equip_weapon(weapon_inst)
 	if not displaced.is_empty():
-		Global.weapon_drop_requested.emit(String(displaced["id"]), String(displaced["rarity"]), global_position)
+		Global.weapon_drop_requested.emit(displaced, global_position)
 	Global.sfx("pickup")
 	queue_free()
 
@@ -144,7 +150,7 @@ func _on_body_entered(body: Node) -> void:
 
 ## Ánh sáng quanh vũ khí theo độ hiếm: Rare/Epic/Legendary có vầng sáng nhấp nháy; Epic/Legendary thêm cột sáng hướng lên.
 func _draw_rarity_glow(color: Color, rarity: String, bob: float) -> void:
-	var tier: int = ["common", "rare", "epic", "legendary"].find(rarity)
+	var tier: int = ["common", "rare", "epic", "legendary", "mythic"].find(rarity)
 	if tier <= 0:
 		return
 	var pulse: float = 0.5 + 0.5 * sin(_t * 3.0)
@@ -154,43 +160,59 @@ func _draw_rarity_glow(color: Color, rarity: String, bob: float) -> void:
 		var h: float = 34.0 + 14.0 * float(tier - 2)
 		draw_line(Vector2(0.0, bob - 14.0), Vector2(0.0, bob - 14.0 - h), Color(color, 0.30 + 0.2 * pulse), 4.0)
 		draw_line(Vector2(0.0, bob - 14.0), Vector2(0.0, bob - 14.0 - h * 0.7), Color(1.0, 1.0, 1.0, 0.35), 1.5)
+	if tier >= 4: # Mythic: thêm vòng xoáy nhấp nháy hai bên
+		draw_arc(Vector2(0.0, bob), 24.0 + 3.0 * pulse, _t * 2.0, _t * 2.0 + PI * 1.2, 20, Color(color, 0.7), 2.0)
+		draw_arc(Vector2(0.0, bob), 24.0 + 3.0 * pulse, _t * 2.0 + PI, _t * 2.0 + PI * 2.2, 20, Color(color, 0.7), 2.0)
 
 ## Thẻ so sánh khi đứng gần: gợi ý phím + DPS / sát thương / tốc độ so với vũ khí đang cầm (xanh = tốt hơn, đỏ = kém hơn) + đặc tính.
 func _draw_compare_card() -> void:
 	var p = Global.player
 	var swap_note: String = "[E] Pick up"
-	var cur_id: String = ""
-	var cur_rarity: String = "common"
+	var cur_inst: Dictionary = {}
 	if is_instance_valid(p):
-		cur_id = String(p.get("weapon_id"))
-		cur_rarity = String(p.get("weapon_rarity"))
+		cur_inst = p.get("weapon_inst")
 		if not p.has_free_weapon_slot():
 			swap_note = "[E] Swap with %s" % String(p.weapon.get("name", "current"))
 	var lines: Array = [{"text": swap_note, "color": Color.WHITE}]
-	if cur_id != "":
-		lines.append({"text": "vs %s (%s)" % [String(Global.weapons[cur_id]["name"]), String(Global.rarities[cur_rarity]["name"])], "color": Color(0.7, 0.7, 0.78)})
-	lines.append_array(WeaponInfo.compare_rows(weapon_id, weapon_rarity, cur_id, cur_rarity))
-	for t in WeaponInfo.traits(weapon_id, weapon_rarity):
-		lines.append({"text": String(t), "color": Color(0.8, 0.85, 1.0)})
+	if not cur_inst.is_empty():
+		lines.append({"text": "vs %s (%s)" % [WeaponInstance.display_name(cur_inst), String(Global.rarities[cur_inst["rarity"]]["name"])], "color": Color(0.7, 0.7, 0.78)})
+	lines.append_array(WeaponInfo.compare_rows(weapon_inst, cur_inst))
+	for t in WeaponInfo.traits(weapon_inst):
+		var t_color: Color = Color(1.0, 0.55, 0.6) if String(t).begins_with("MYTHIC") else Color(0.8, 0.85, 1.0)
+		for part in _wrap(String(t), CARD_WRAP_CHARS):
+			lines.append({"text": part, "color": t_color})
 	var line_h: float = 15.0
 	var top: float = 30.0
-	var panel := Rect2(Vector2(-120.0, top), Vector2(240.0, line_h * float(lines.size()) + 8.0))
+	var panel := Rect2(Vector2(-140.0, top), Vector2(280.0, line_h * float(lines.size()) + 8.0))
 	draw_rect(panel, Color(0.05, 0.05, 0.09, 0.82))
 	draw_rect(panel, Color(Global.rarities[weapon_rarity]["color"], 0.8), false, 1.5)
 	var y: float = top + 15.0
 	for L in lines:
 		if String(L["text"]) != "":
-			draw_string(ThemeDB.fallback_font, Vector2(-112.0, y), String(L["text"]), HORIZONTAL_ALIGNMENT_LEFT, 224.0, 12, L["color"])
+			draw_string(ThemeDB.fallback_font, Vector2(-132.0, y), String(L["text"]), HORIZONTAL_ALIGNMENT_LEFT, 264.0, 12, L["color"])
 		y += line_h
+
+## Ngắt dòng dài theo số ký tự để thẻ so sánh không bị cắt chữ (dòng nối tiếp thụt vào 2 dấu cách).
+static func _wrap(text: String, max_chars: int) -> Array:
+	var out: Array = []
+	var cur: String = ""
+	for word in text.split(" "):
+		if cur != "" and cur.length() + 1 + word.length() > max_chars:
+			out.append(cur)
+			cur = "  " + word
+		else:
+			cur = word if cur == "" else cur + " " + word
+	if cur != "":
+		out.append(cur)
+	return out
 
 func _draw() -> void:
 	var bob: float = sin(_t * 5.0) * 3.0
 	match kind:
 		"weapon":
-			var w: Dictionary = Global.weapons[weapon_id]
 			var r_data: Dictionary = Global.rarities[weapon_rarity]
 			var r_color: Color = r_data["color"]
-			var display_name: String = w["name"] + " (" + r_data["name"] + ")"
+			var display_name: String = WeaponInstance.display_name(weapon_inst) + " (" + r_data["name"] + ")"
 			
 			_draw_rarity_glow(r_color, weapon_rarity, bob)
 			draw_circle(Vector2(0.0, bob), 13.0, Color(0.1, 0.1, 0.15))

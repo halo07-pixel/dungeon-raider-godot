@@ -1,6 +1,7 @@
 extends Node
 ## Autoload "Global": hằng số vật lý, DỮ LIỆU CÂN BẰNG (vũ khí / quái), tín hiệu chung,
 ## và các hiệu ứng dùng chung (âm thanh tự tổng hợp, hạt, số sát thương bay, hitstop).
+const WeaponInstance = preload("res://scripts/weapon_instance.gd")
 
 signal message(text: String, color: Color)
 signal player_died
@@ -18,7 +19,7 @@ signal player_hit_landed(target: Node, dmg: int, is_crit: bool)
 ## Player vừa nhận sát thương (HUD nghe để nháy viền đỏ khi đòn nặng).
 signal player_damaged(amount: int, max_hp: int)
 ## Player đổi vũ khí lấy từ ô đang cầm (nhặt bằng E khi đủ ô) -> Dungeon nghe để đặt vũ khí cũ xuống sàn.
-signal weapon_drop_requested(weapon_id: String, rarity: String, pos: Vector2)
+signal weapon_drop_requested(inst: Dictionary, pos: Vector2)
 
 const TILE: int = 32
 
@@ -103,7 +104,9 @@ var rarities: Dictionary = {
 	"common": {"name": "Common", "mult": 1.0, "lifesteal": 0.0, "color": Color(0.8, 0.8, 0.8), "weight": 50},
 	"rare": {"name": "Rare", "mult": 1.25, "lifesteal": 0.0, "color": Color(0.2, 0.8, 0.3), "weight": 30},
 	"epic": {"name": "Epic", "mult": 1.5, "lifesteal": 0.05, "color": Color(0.6, 0.2, 0.8), "weight": 15},
-	"legendary": {"name": "Legendary", "mult": 2.0, "lifesteal": 0.10, "color": Color(1.0, 0.8, 0.1), "weight": 5}
+	"legendary": {"name": "Legendary", "mult": 2.0, "lifesteal": 0.10, "color": Color(1.0, 0.8, 0.1), "weight": 5},
+	# Mythic: chỉ rơi từ tầng MYTHIC_MIN_FLOOR (weight 0 = không có trong bảng gốc), hoặc ghép 2 Legendary cùng loại ở Forge.
+	"mythic": {"name": "Mythic", "mult": 2.5, "lifesteal": 0.15, "color": Color(1.0, 0.25, 0.35), "weight": 0}
 }
 
 var weapons: Dictionary = {
@@ -141,7 +144,11 @@ const MAX_WEAPON_SLOTS: int = 2
 ## trọng số cho rare/epic/legendary (trừ từ common), dừng ở WEAPON_RARITY_MAX_FLOORS tầng.
 const WEAPON_RARITY_FLOOR_BONUS: Dictionary = {"rare": 1.0, "epic": 1.0, "legendary": 0.5}
 const WEAPON_RARITY_MAX_FLOORS: int = 12
-const WEAPON_RARITY_ORDER: Array = ["common", "rare", "epic", "legendary"]
+const WEAPON_RARITY_ORDER: Array = ["common", "rare", "epic", "legendary", "mythic"]
+## Mythic chỉ xuất hiện từ tầng này; mỗi tầng sau đó cộng MYTHIC_WEIGHT_PER_FLOOR trọng số (tối đa MYTHIC_WEIGHT_CAP).
+const MYTHIC_MIN_FLOOR: int = 8
+const MYTHIC_WEIGHT_PER_FLOOR: float = 0.5
+const MYTHIC_WEIGHT_CAP: float = 3.0
 
 ## Random độ hiếm vũ khí cho tầng `for_floor`. `min_rarity` nâng độ hiếm tối thiểu (vd boss thưởng từ "rare").
 func roll_weapon_rarity(for_floor: int, min_rarity: String = "common") -> String:
@@ -153,6 +160,8 @@ func roll_weapon_rarity(for_floor: int, min_rarity: String = "common") -> String
 		var bonus: float = float(WEAPON_RARITY_FLOOR_BONUS[rid]) * float(steps)
 		weights[rid] += bonus
 		weights["common"] = maxf(5.0, weights["common"] - bonus)
+	if for_floor >= MYTHIC_MIN_FLOOR:
+		weights["mythic"] = minf(MYTHIC_WEIGHT_CAP, MYTHIC_WEIGHT_PER_FLOOR * float(for_floor - MYTHIC_MIN_FLOOR + 1))
 	var total: float = 0.0
 	for rid in WEAPON_RARITY_ORDER:
 		total += float(weights[rid])
@@ -185,6 +194,16 @@ func weapon_summary(w_id: String, rarity: String) -> String:
 	var mult: float = float(rarities.get(rarity, rarities["common"])["mult"])
 	var kind: String = "melee" if bool(w.get("is_melee", false)) else "ranged"
 	return "%s · DMG %d · %.2fs" % [kind, int(float(w["damage"]) * mult), float(w["cooldown"])]
+
+## Như weapon_summary nhưng cho 1 cây cụ thể (tính cả cấp nâng + dòng phụ Heavy/Swift/Brutal).
+func weapon_instance_summary(inst: Dictionary) -> String:
+	if inst.is_empty():
+		return ""
+	var w: Dictionary = weapons[inst["id"]]
+	var mods: Dictionary = WeaponInstance.affix_mods(inst)
+	var mult: float = float(rarities[inst["rarity"]]["mult"]) * WeaponInstance.level_mult(int(inst["level"])) * float(mods["dmg"])
+	var kind: String = "melee" if bool(w.get("is_melee", false)) else "ranged"
+	return "%s · DMG %d · %.2fs" % [kind, int(float(w["damage"]) * mult), float(w["cooldown"]) * float(mods["cd"])]
 
 var classes: Dictionary = {
 	"ranger": {"name": "Ranger", "max_hp": 100, "default_weapon": "pistol", "skill": "overdrive"},

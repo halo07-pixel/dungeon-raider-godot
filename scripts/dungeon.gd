@@ -3,6 +3,7 @@ extends Node2D
 ## Mỗi phòng = 1 ô lưới CELL_W x CELL_H tile, vẽ vào TileMapLayer có physics (tường/cửa).
 ## Phòng thường: vào là khoá cửa (tile cửa solid) + sinh quái; dọn sạch -> mở cửa.
 ## Phòng Trùm = phòng xa Start nhất. Phòng Kho Báu = ngõ cụt (nhặt vũ khí).
+const WeaponInstance = preload("res://scripts/weapon_instance.gd")
 
 signal rooms_updated
 
@@ -1026,19 +1027,19 @@ func _room_cleared(cell: Vector2i) -> void:
 			_spawn_pickup("heal", "", room_center(cell))
 
 
-## Chuỗi "id:rarity" cho một vũ khí rơi mới, tránh trùng id với các ô Player đang cầm.
+## Mã chuỗi WeaponInstance cho một vũ khí rơi mới (kèm dòng phụ random theo độ hiếm), tránh trùng id với các ô Player đang cầm.
 func _roll_weapon_drop(rarity: String) -> String:
 	var held: Array = []
 	if is_instance_valid(Global.player):
 		for slot in Global.player.weapon_slots:
 			if not slot.is_empty():
 				held.append(String(slot["id"]))
-	return Global.random_weapon_id(held) + ":" + rarity
+	return WeaponInstance.encode(WeaponInstance.roll(Global.random_weapon_id(held), rarity))
 
 
 ## Player đổi vũ khí tại chỗ (nhặt bằng E khi đủ ô): đặt vũ khí cũ xuống sàn để còn nhặt lại được.
-func _on_weapon_drop_requested(w_id: String, rarity: String, pos: Vector2) -> void:
-	_spawn_pickup("weapon", w_id + ":" + rarity, pos)
+func _on_weapon_drop_requested(inst: Dictionary, pos: Vector2) -> void:
+	_spawn_pickup("weapon", WeaponInstance.encode(inst), pos)
 
 
 ## Rương trang trí (tĩnh, không va chạm) đặt dưới vũ khí trong phòng Kho báu — chỉ để đẹp,

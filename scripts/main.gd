@@ -1,5 +1,6 @@
 extends Node2D
 ## Điều phối: tạo tầng, đặt Player, chuyển tầng, Tạm dừng, Save/Load, Game Over & Thưởng Ngọc Tím.
+const WeaponInstance = preload("res://scripts/weapon_instance.gd")
 
 @onready var dungeon: Node2D = $Dungeon
 @onready var player: CharacterBody2D = $Player
@@ -17,8 +18,8 @@ var is_victory_screen: bool = false
 var telemetry: Node = null
 ## Thưởng Ngọc Tím một lần duy nhất khi lần đầu hạ Dungeon Lord (tầng 10) trong ván này.
 const VICTORY_GEM_BONUS: int = 20
-## Phiên bản định dạng saved_run. 1 = 1 vũ khí (weapon_id/weapon_rarity); 2 = thêm weapon_slots + active_slot.
-const SAVE_VERSION: int = 2
+## Phiên bản định dạng saved_run. 1 = 1 vũ khí (weapon_id/weapon_rarity); 2 = thêm weapon_slots + active_slot; 3 = mỗi ô là WeaponInstance (thêm level + affixes, bỏ weapon_kills). Save cũ vẫn đọc được (restore_weapons chuẩn hóa).
+const SAVE_VERSION: int = 3
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS 
@@ -113,7 +114,6 @@ func _restore_player_state() -> void:
 			var w_rarity = String(Global.saved_run.get("weapon_rarity", "common"))
 			if player.has_method("restore_weapons"):
 				player.restore_weapons([{"id": w_id, "rarity": w_rarity}, {}], 0)
-		player.weapon_kills = Dictionary(Global.saved_run.get("weapon_kills", {})).duplicate() # Weapon Rank
 		# Buff phải được khôi phục TRƯỚC (một số buff đổi max_hp / giáp)
 		Global.skill_upgrades_taken.clear()
 		for uid in Global.saved_run.get("skill_upgrades", []):
@@ -257,7 +257,6 @@ func _build_saved_run() -> Dictionary:
 		"weapon_rarity": player.weapon_rarity,
 		"weapon_slots": player.weapon_slots.duplicate(true),
 		"active_slot": player.active_slot,
-		"weapon_kills": player.weapon_kills.duplicate(),
 		"skill_upgrades": Global.skill_upgrades_taken.duplicate(),
 		"has_revived": player.has_revived, # LƯU TRẠNG THÁI HỒI SINH
 		"max_hp": player.max_hp,
