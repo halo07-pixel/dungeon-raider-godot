@@ -21,17 +21,17 @@ signal skill_ended(skill_id: String)
 
 const SKILLS: Dictionary = {
 	# Kỹ năng khởi đầu
-	"overdrive": {"name": "Overdrive", "cooldown": 12.0, "desc": "[Q] Attack much faster for a few seconds."},
-	"slam": {"name": "Slam", "cooldown": 6.0, "desc": "[Q] Smash the ground, hurting and pushing back nearby enemies."},
+	"overdrive": {"name": "Overdrive", "cooldown": 12.0, "desc": "[Q] Attack much faster for a few seconds, and your shots pierce 1 more enemy."},
+	"slam": {"name": "Slam", "cooldown": 6.0, "desc": "[Q] Smash the ground, hurting, pushing back and briefly stunning nearby enemies."},
 	# Kỹ năng tiến hoá (Ranger+ / Brawler+)
 	"barrage": {"name": "Barrage", "cooldown": 7.0, "desc": "[Q] Fire 3 fan volleys of bullets."},
 	"shockwave": {"name": "Shockwave", "cooldown": 9.0, "desc": "[Q] Blast enemies away and clear bullets."},
-	# Mage / Mage+ (tên "Phase Step" để không trùng affix quái Blink)
-	"phase_step": {"name": "Phase Step", "cooldown": 7.0, "desc": "[Q] Dash toward the cursor, immune while dashing, and burst on arrival."},
+	# Mage / Mage+
+	"gravity_well": {"name": "Gravity Well", "cooldown": 8.0, "desc": "[Q] Place a well at your cursor: it pulls enemies in, slows and damages them for a few seconds."},
 	"meteor_storm": {"name": "Meteor Storm", "cooldown": 10.0, "desc": "[Q] Mark the ground at your cursor; meteors crash down there shortly after."},
 	# Rogue / Rogue+
-	"shadow_dash": {"name": "Shadow Dash", "cooldown": 6.0, "desc": "[Q] Dash through enemies, cutting everything in your path."},
-	"shadow_rush": {"name": "Shadow Rush", "cooldown": 8.0, "desc": "[Q] Dash far through enemies, making them bleed, then attack faster for a few seconds."},
+	"shadow_dash": {"name": "Shadow Dash", "cooldown": 6.0, "desc": "[Q] Dash through enemies, cutting everything in your path. Your next hit is a guaranteed critical."},
+	"shadow_rush": {"name": "Shadow Rush", "cooldown": 8.0, "desc": "[Q] Dash far through enemies, making them bleed. Your next 3 hits are guaranteed critical."},
 }
 
 var player: Node = null
@@ -59,10 +59,23 @@ func _mult(key: String) -> float:
 	var m: float = SkillUpgrades.mod_mult(skill_id, Global.skill_upgrades_taken, key)
 	if key == "dmg_mult": # nút meta Honed Technique áp cho mọi kỹ năng
 		m *= Global.SkillTree.skill_damage_mult(Global.upgrades)
+	if key == "radius_mult" and Global.buff_stack("buff_skill_overload") > 0:
+		m *= OVERLOAD_RADIUS_MULT
 	return m
 
 func _effective_cooldown() -> float:
-	return maxf(1.0, (base_cooldown + _add("cooldown_add")) * Global.SkillTree.skill_cooldown_mult(Global.upgrades))
+	var haste: float = float(player.skill_haste()) if is_instance_valid(player) else 0.0
+	return maxf(1.0, (base_cooldown + _add("cooldown_add")) * Global.SkillTree.skill_cooldown_mult(Global.upgrades) / (1.0 + haste))
+
+## Hoàn bớt hồi chiêu (buff Overflow). Tổng hoàn mỗi lần tung tối đa nửa thời gian hồi để không thể tự reset vô hạn.
+var _refunded: float = 0.0
+func refund_cooldown(seconds: float) -> void:
+	if cooldown_left <= 0.0:
+		return
+	var room: float = maxf(0.0, cooldown_total * 0.5 - _refunded)
+	var give: float = minf(seconds, room)
+	_refunded += give
+	cooldown_left = maxf(0.0, cooldown_left - give)
 
 func is_ready() -> bool:
 	return cooldown_left <= 0.0
@@ -91,13 +104,17 @@ func try_activate() -> bool:
 		return false
 	cooldown_total = _effective_cooldown()
 	cooldown_left = cooldown_total
+	_refunded = 0.0
+	if randf() < float(player.spellburst_chance()):
+		cooldown_left = 0.0 # Spellburst: lần tung miễn phí
+		Global.float_text(player.global_position + Vector2(0, -40), "SPELLBURST", Color(0.8, 0.6, 1.0), 18)
 	skill_used.emit(skill_id)
 	match skill_id:
 		"overdrive": _overdrive()
 		"slam": _slam()
 		"barrage": _barrage()
 		"shockwave": _shockwave()
-		"phase_step": _phase_step()
+		"gravity_well": _gravity_well()
 		"meteor_storm": _meteor_storm()
 		"shadow_dash": _shadow_dash(false)
 		"shadow_rush": _shadow_dash(true)
@@ -110,14 +127,17 @@ func _exit_tree() -> void:
 		_end_active()
 
 func _end_active() -> void:
-	if (skill_id == "overdrive" or skill_id == "shadow_rush") and is_instance_valid(player):
+	if skill_id == "overdrive" and is_instance_valid(player):
 		player.skill_attack_cd_mult = 1.0
+		player.skill_pierce_add = 0
 	skill_ended.emit(skill_id)
 
 func _dmg_mult() -> float:
-	return float(player._secondary_dmg_mult())
+	return float(player._secondary_dmg_mult()) * (1.0 + float(player.skill_power()))
 
 # ------------------------------------------------------------------ Ranger+: Barrage
+const OVERLOAD_RADIUS_MULT: float = 1.2
+
 const BARRAGE_VOLLEYS: int = 3
 const BARRAGE_BULLETS: int = 9
 const BARRAGE_FAN_DEG: float = 72.0
@@ -163,16 +183,17 @@ const SLAM_RADIUS: float = 120.0
 const SLAM_KNOCK: float = 420.0
 const SLAM_DMG_BASE: float = 16.0
 const SLAM_DMG_PER_FLOOR: float = 1.5
+const SLAM_BASE_STUN: float = 0.4
 
 func _slam() -> void:
-	_blast(SLAM_RADIUS, SLAM_DMG_BASE, SLAM_DMG_PER_FLOOR, SLAM_KNOCK, false, Color(1.0, 0.85, 0.55), 16, 0.5)
+	_blast(SLAM_RADIUS, SLAM_DMG_BASE, SLAM_DMG_PER_FLOOR, SLAM_KNOCK, false, Color(1.0, 0.85, 0.55), 16, 0.5, SLAM_BASE_STUN)
 
 ## Vụ nổ quanh Player: gây sát thương + đẩy lùi quái/boss trong bán kính; tuỳ chọn xoá đạn địch.
-func _blast(radius: float, dmg_base: float, dmg_per_floor: float, knock: float, clear_bullets: bool, color: Color, burst_n: int, shake: float) -> void:
+func _blast(radius: float, dmg_base: float, dmg_per_floor: float, knock: float, clear_bullets: bool, color: Color, burst_n: int, shake: float, base_stun: float = 0.0) -> void:
 	var origin: Vector2 = player.global_position
 	radius *= _mult("radius_mult") # nâng cấp trong run
 	var dmg: int = maxi(1, int((dmg_base + dmg_per_floor * float(Global.floor_num)) * _dmg_mult() * _mult("dmg_mult")))
-	var stun: float = _add("stun_add")
+	var stun: float = _add("stun_add") + base_stun
 	for e in get_tree().get_nodes_in_group("enemies"):
 		if is_instance_valid(e) and e.alive and e.global_position.distance_to(origin) <= radius:
 			e.take_damage(dmg, origin, knock)
@@ -205,6 +226,7 @@ const OVERDRIVE_CD_MULT: float = 0.5
 func _overdrive() -> void:
 	active_left = OVERDRIVE_DURATION + _add("duration_add")
 	player.skill_attack_cd_mult = OVERDRIVE_CD_MULT * _mult("attack_cd_mult")
+	player.skill_pierce_add = 1 # đạn xuyên thêm 1 quái trong lúc Overdrive
 	Global.burst(player.global_position, Color(1.0, 0.8, 0.3), 14, 200.0, 1.4)
 	Global.shake(0.3, 0.2)
 	Global.sfx("barrage_cast")
@@ -254,24 +276,29 @@ func _ring_fx(pos: Vector2, radius: float, color: Color, duration: float = 0.35)
 	Global.world.add_child(fx)
 	fx.global_position = pos
 
-# ------------------------------------------------------------------ Mage: Phase Step (kỹ năng khởi đầu)
-const PHASE_DIST: float = 140.0
-const PHASE_IFRAMES: float = 0.35
-const PHASE_RADIUS: float = 70.0
-const PHASE_KNOCK: float = 320.0
-const PHASE_DMG_BASE: float = 12.0
-const PHASE_DMG_PER_FLOOR: float = 1.2
-const PHASE_COLOR: Color = Color(0.7, 0.5, 1.0)
+# ------------------------------------------------------------------ Mage: Gravity Well (kỹ năng khởi đầu)
+const GravityWell = preload("res://scripts/gravity_well.gd")
+const WELL_RADIUS: float = 130.0
+const WELL_DURATION: float = 3.0
+const WELL_DMG_BASE: float = 6.0
+const WELL_DMG_PER_FLOOR: float = 0.6
+const WELL_MAX_RANGE: float = 380.0
+const WELL_COLOR: Color = Color(0.6, 0.4, 1.0)
 
-func _phase_step() -> void:
-	var dest: Vector2 = _dash_destination(PHASE_DIST + _add("dist_add"))
-	_relocate_player(dest, PHASE_IFRAMES, PHASE_COLOR)
-	var dmg: int = maxi(1, int((PHASE_DMG_BASE + PHASE_DMG_PER_FLOOR * float(Global.floor_num)) * _dmg_mult() * _mult("dmg_mult")))
-	var radius: float = PHASE_RADIUS * _mult("radius_mult")
-	_damage_area(dest, radius, dmg, PHASE_KNOCK, _add("slow_add"))
-	_ring_fx(dest, radius, PHASE_COLOR, 0.3)
-	Global.burst(dest, PHASE_COLOR, 14, 220.0, 1.6)
-	Global.shake(0.2, 0.15)
+func _gravity_well() -> void:
+	var to: Vector2 = player.get_global_mouse_position() - player.global_position
+	var pos: Vector2 = player.global_position + to.limit_length(WELL_MAX_RANGE)
+	var well := Node2D.new()
+	well.set_script(GravityWell)
+	well.radius = WELL_RADIUS * _mult("radius_mult")
+	well.duration = WELL_DURATION + _add("duration_add")
+	well.tick_damage = maxi(1, int((WELL_DMG_BASE + WELL_DMG_PER_FLOOR * float(Global.floor_num)) * _dmg_mult() * _mult("dmg_mult")))
+	well.color = WELL_COLOR
+	Global.world.add_child(well)
+	well.global_position = pos
+	_ring_fx(pos, well.radius, WELL_COLOR, 0.4)
+	Global.burst(pos, WELL_COLOR, 14, 200.0, 1.4)
+	Global.shake(0.15, 0.12)
 	Global.sfx("phase_step")
 
 # ------------------------------------------------------------------ Mage+: Meteor Storm
@@ -327,9 +354,9 @@ const SHADOW_WIDTH: float = 24.0        # nửa bề rộng "lưỡi" quét dọ
 const SHADOW_KNOCK: float = 150.0
 const SHADOW_DMG_BASE: float = 14.0
 const SHADOW_DMG_PER_FLOOR: float = 1.2
-const RUSH_DMG_MULT: float = 2.0
-const RUSH_HASTE_DURATION: float = 3.0
-const RUSH_HASTE_CD_MULT: float = 0.6
+const RUSH_DMG_MULT: float = 1.5
+const DASH_CRIT_CHARGES: int = 1
+const RUSH_CRIT_CHARGES: int = 3
 const SHADOW_COLOR: Color = Color(0.55, 0.9, 0.55)
 
 func _shadow_dash(rush: bool) -> void:
@@ -339,9 +366,7 @@ func _shadow_dash(rush: bool) -> void:
 	_relocate_player(dest, SHADOW_IFRAMES, SHADOW_COLOR)
 	var dmg: int = maxi(1, int((SHADOW_DMG_BASE + SHADOW_DMG_PER_FLOOR * float(Global.floor_num)) * _dmg_mult() * _mult("dmg_mult") * (RUSH_DMG_MULT if rush else 1.0)))
 	_damage_line(from, dest, dmg, rush)
-	if rush:
-		active_left = RUSH_HASTE_DURATION + _add("duration_add")
-		player.skill_attack_cd_mult = RUSH_HASTE_CD_MULT * _mult("attack_cd_mult")
+	player.grant_skill_crits((RUSH_CRIT_CHARGES if rush else DASH_CRIT_CHARGES) + int(_add("crit_add")))
 	Global.sfx("shadow_dash", 0.85 if rush else 1.0)
 	Global.shake(0.15, 0.1)
 

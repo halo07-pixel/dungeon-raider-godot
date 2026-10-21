@@ -231,12 +231,12 @@ func weapon_instance_summary(inst: Dictionary) -> String:
 	return "%s · DMG %d · %.2fs" % [kind, int(float(w["damage"]) * mult), float(w["cooldown"]) * float(mods["cd"])]
 
 var classes: Dictionary = {
-	"ranger": {"name": "Ranger", "max_hp": 100, "default_weapon": "pistol", "skill": "overdrive"},
-	"brawler": {"name": "Brawler", "max_hp": 200, "default_weapon": "broadsword", "skill": "slam"},
+	"ranger": {"name": "Ranger", "max_hp": 100, "default_weapon": "pistol", "skill": "overdrive", "passive": {"name": "Marksman", "desc": "Ranged weapons deal +12% damage."}},
+	"brawler": {"name": "Brawler", "max_hp": 200, "default_weapon": "broadsword", "skill": "slam", "passive": {"name": "Bulwark", "desc": "Melee weapons deal +12% damage and you take 8% less damage."}},
 	# Cây kiếng: máu thấp, sát thương lớn, né + định vị bằng kỹ năng lướt
-	"mage": {"name": "Mage", "max_hp": 80, "default_weapon": "staff", "skill": "phase_step"},
+	"mage": {"name": "Mage", "max_hp": 80, "default_weapon": "staff", "skill": "gravity_well", "passive": {"name": "Arcane Mind", "desc": "Skills recharge 25% faster."}},
 	# Sát thủ: lướt xuyên quái gây sát thương, dao găm nhanh
-	"rogue": {"name": "Rogue", "max_hp": 90, "default_weapon": "daggers", "skill": "shadow_dash"}
+	"rogue": {"name": "Rogue", "max_hp": 90, "default_weapon": "daggers", "skill": "shadow_dash", "passive": {"name": "Assassin", "desc": "+15% critical chance."}}
 }
 var current_class: String = "brawler"
 
@@ -651,6 +651,9 @@ const BUFF_MAX_STACK: Dictionary = {
 	"buff_perfect_draw": 1, "buff_quickdraw": 3, "buff_overcharge": 1, "buff_capacitor": 3,
 	"buff_aftershock": 1, "buff_volatile": 2, "buff_impale": 1, "buff_reach_master": 3,
 	"buff_reap": 1, "buff_blood_pact": 2,
+	# Kỹ năng
+	"buff_skill_power": 5, "buff_skill_haste": 5, "buff_skill_surge": 3, "buff_skill_overflow": 3,
+	"buff_skill_echo": 1, "buff_skill_burst": 2, "buff_skill_overload": 1,
 }
 ## "class": "any" (mọi vũ khí) | "melee" (chỉ khi đang cầm vũ khí cận chiến) | "ranged" (chỉ tầm xa).
 ## Buff bị lọc khỏi lượt chọn nếu không hợp loại vũ khí đang cầm (xem roll_buff_choices).
@@ -693,6 +696,14 @@ var buff_pool: Dictionary = {
 	"buff_homing": {"name": "Homing", "desc": "Bullets track targets", "tier": "epic", "class": "ranged"},
 	"buff_ring": {"name": "Bullet Ring", "desc": "Every 5th shot: ring of 8 (50%)", "tier": "epic", "class": "ranged"},
 	"buff_super": {"name": "Mega Shot", "desc": "Every 6th shot: x3 damage, pierces 2 enemies", "tier": "epic", "class": "ranged"},
+	# ---- Kỹ năng (Skill Build): hợp mọi class, tăng sức mạnh/tần suất kỹ năng Q
+	"buff_skill_power": {"name": "Arcana", "desc": "+12% skill damage", "tier": "common", "class": "any"},
+	"buff_skill_haste": {"name": "Quick Cast", "desc": "Skills recharge 10% faster", "tier": "common", "class": "any"},
+	"buff_skill_surge": {"name": "Surge", "desc": "Casting a skill grants 20 shield", "tier": "rare", "class": "any"},
+	"buff_skill_overflow": {"name": "Overflow", "desc": "Kills within 2s of a cast refund 1s of skill cooldown", "tier": "rare", "class": "any"},
+	"buff_skill_echo": {"name": "Echo", "desc": "After a cast, your next attack deals x2 damage", "tier": "epic", "class": "any"},
+	"buff_skill_burst": {"name": "Spellburst", "desc": "25% chance a cast costs no cooldown", "tier": "epic", "class": "any"},
+	"buff_skill_overload": {"name": "Overload", "desc": "Skills +40% damage and +20% radius, but 20% slower recharge", "tier": "epic", "class": "any"},
 	# ---- Riêng từng vũ khí: "weapon" = id vũ khí bắt buộc đang cầm (xem roll_buff_choices)
 	"buff_heavy_bolt": {"name": "Heavy Bolt", "desc": "Crossbow: +20% damage and +40 px pin reach", "tier": "rare", "class": "ranged", "weapon": "crossbow"},
 	"buff_nailgun": {"name": "Nailgun", "desc": "Crossbow: pinning an enemy halves the next reload", "tier": "epic", "class": "ranged", "weapon": "crossbow"},
@@ -729,6 +740,12 @@ const SYNERGY_MAP: Dictionary = {
 	"buff_freeze": ["buff_deathnova", "buff_shield_nova"],
 	"buff_shield_nova": ["buff_freeze", "buff_arc"],
 	"buff_arc": ["buff_shield_nova"],
+	"buff_skill_power": ["buff_skill_overload", "buff_skill_echo"],
+	"buff_skill_haste": ["buff_skill_burst", "buff_skill_overflow"],
+	"buff_skill_echo": ["buff_skill_power"],
+	"buff_skill_burst": ["buff_skill_haste"],
+	"buff_skill_overflow": ["buff_skill_haste"],
+	"buff_skill_overload": ["buff_skill_power"],
 }
 
 ## Danh sách tên các buff đối tác mà Player ĐÃ sở hữu của buff `id` (rỗng = không có kết hợp).

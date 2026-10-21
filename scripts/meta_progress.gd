@@ -22,7 +22,7 @@ const EVOLUTIONS: Dictionary = {
 	],
 	"rogue": [
 		{"name": "Rogue+", "skill": "shadow_rush", "skill_name": "Shadow Rush",
-		 "desc": "[Q] Dash far through enemies, making them bleed, then attack faster for a few seconds.",
+		 "desc": "[Q] Dash far through enemies, making them bleed. Your next 3 hits are guaranteed critical.",
 		 "req": {"type": "boss", "kind": "lord", "count": 2}},
 	],
 }
