@@ -9,6 +9,7 @@ const FORGE_SCRIPT = preload("res://scenes/forge.gd")
 const FORGE_OFFSET_X: float = 230.0
 const SETTINGS_MENU_SCENE = preload("res://scenes/settings_menu.tscn")
 const RunTelemetryScript = preload("res://scripts/run_telemetry.gd")
+const SquadAdaptScript = preload("res://scripts/squad_adapt.gd")
 const BUFF_PICKER_SCENE = preload("res://scenes/buff_picker.tscn")
 var current_npc: Node2D = null
 
@@ -315,6 +316,9 @@ func _build_game_over_menu() -> void:
 	info.text = "Floors cleared: %d\nEnemies defeated: %d\nGold collected: %d" % [f, k, c_coin]
 	var tele_text: String = RunTelemetryScript.summary_text(Global.run_stats)
 	var death_text: String = RunTelemetryScript.death_text(Global.run_stats)
+	var adapt_text: String = SquadAdaptScript.adapted_text(Global.run_stats.get("adapted", {}))
+	if adapt_text != "":
+		tele_text += ("\n" if tele_text != "" else "") + adapt_text
 	if death_text != "":
 		tele_text = death_text + ("\n" + tele_text if tele_text != "" else "")
 	if Global.heat_points() > 0:
