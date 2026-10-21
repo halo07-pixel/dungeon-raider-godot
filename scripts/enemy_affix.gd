@@ -127,6 +127,7 @@ func _process(delta: float) -> void:
 				_timer = SUMMON_INTERVAL
 				if _minion_count() < MAX_MINIONS:
 					Global.burst(enemy.global_position, color_of(id), 8, 120.0, 1.5)
+					Global.sfx("affix_summon")
 					summon_requested.emit(enemy)
 		"warden":
 			_timer -= delta
@@ -153,6 +154,7 @@ func _tick_frenzy() -> void:
 	if _last_alive >= 0 and n < _last_alive:
 		_frenzy = minf(FRENZY_MAX, _frenzy + FRENZY_PER_KILL * float(_last_alive - n))
 		enemy.speed_mult = 1.0 + _frenzy
+		Global.sfx("affix_frenzy")
 	_last_alive = n
 
 func _tick_blink(delta: float) -> void:
@@ -162,7 +164,7 @@ func _tick_blink(delta: float) -> void:
 			Global.burst(enemy.global_position, color_of(id), 10, 160.0, 1.5)
 			enemy.global_position = _blink_target
 			Global.burst(_blink_target, color_of(id), 10, 160.0, 1.5)
-			Global.sfx("dodge")
+			Global.sfx("affix_blink")
 		return
 	_timer -= delta
 	if _timer > 0.0:
@@ -182,11 +184,13 @@ func _tick_blink(delta: float) -> void:
 		target = Vector2(hit["position"]) - dir * 16.0
 	_blink_target = target
 	_blink_left = BLINK_TELEGRAPH
+	Global.sfx("affix_blink_warn")
 
 ## Splitter: chỉ tách khi bị hạ bằng sát thương; bị kill() ép chết thì không (dọn phòng).
 func _on_splitter_died(_e = null) -> void:
 	if not is_instance_valid(enemy) or enemy.hurtbox.hp > 0.0:
 		return
+	Global.sfx("affix_split")
 	split_requested.emit(enemy)
 
 ## Leech: melee_hitbox_component gọi khi quái gây sát thương cho người chơi.
@@ -196,6 +200,7 @@ func on_hit_player(damage: int) -> void:
 	var heal: float = float(damage) * LEECH_FRACTION
 	enemy.hurtbox.hp = minf(enemy.hurtbox.max_hp, enemy.hurtbox.hp + heal)
 	Global.burst(enemy.global_position, color_of(id), 6, 110.0, 1.0)
+	Global.sfx("affix_leech")
 
 func _minion_count() -> int:
 	var n: int = 0
@@ -215,6 +220,7 @@ func _grant_wards() -> void:
 	if not _warded.is_empty():
 		_ward_left = WARD_DURATION
 		Global.burst(enemy.global_position, color_of(id), 10, 140.0, 1.5)
+		Global.sfx("ward_cast")
 
 func _clear_wards(_e) -> void:
 	for e in _warded:
@@ -233,6 +239,7 @@ func _on_volatile_died(_e = null) -> void:
 	hz.radius = VOLATILE_RADIUS
 	hz.telegraph_time = VOLATILE_TELEGRAPH
 	hz.single_shot = true
+	hz.fire_sfx = "volatile_boom"
 	hz.color = Color(1.0, 0.5, 0.1, 0.5)
 	Global.world.add_child(hz)
 	hz.global_position = enemy.global_position
