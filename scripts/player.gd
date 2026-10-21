@@ -1087,6 +1087,18 @@ func remove_slot(i: int) -> bool:
 	weapons_changed.emit()
 	return true
 
+## Đặt vũ khí vào đúng ô `slot` (0/1), ô đó thành ô đang cầm; vũ khí cũ trong ô (nếu có) bị bỏ. Dùng cho gacha.
+func place_weapon(slot: int, inst: Dictionary) -> bool:
+	inst = WeaponInstance.normalize(inst)
+	if inst.is_empty() or slot < 0 or slot >= Global.MAX_WEAPON_SLOTS:
+		return false
+	weapon_slots[slot] = inst
+	active_slot = slot
+	_apply_active_weapon()
+	weapons_changed.emit()
+	Global.message.emit("Picked up: " + weapon_label(), rarity_data["color"])
+	return true
+
 ## "Pistol +2 (Epic)" — tên hiển thị của cây đang cầm.
 func weapon_label() -> String:
 	return "%s (%s)" % [WeaponInstance.display_name(weapon_inst), rarity_data["name"]]

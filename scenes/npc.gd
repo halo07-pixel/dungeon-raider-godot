@@ -336,32 +336,43 @@ func _on_spin_finished() -> void:
 	
 	var hbox = HBoxContainer.new()
 	hbox.alignment = BoxContainer.ALIGNMENT_CENTER
-	hbox.add_theme_constant_override("separation", 60)
+	hbox.add_theme_constant_override("separation", 40)
 	confirm_box.add_child(hbox)
-	
-	# 1. Lấy thông số súng Cũ
-	var cur_inst: Dictionary = WeaponInstance.make("pistol", "common")
-	if is_instance_valid(Global.player) and not Global.player.weapon_inst.is_empty():
-		cur_inst = Global.player.weapon_inst
-		
-	var v_old = VBoxContainer.new()
-	var l_old = Label.new()
-	l_old.text = "CURRENTLY EQUIPPED"
-	l_old.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_apply_font(l_old, 12)
-	v_old.add_child(l_old)
-	v_old.add_child(_create_item_panel(cur_inst, true))
-	hbox.add_child(v_old)
-	
-	# 2. Mũi tên >>
+
+	# Hai ô vũ khí hiện tại, mỗi ô có nút đặt vũ khí mới vào đúng ô đó.
+	var slots: Array = [{}, {}]
+	var held: int = 0
+	if is_instance_valid(Global.player):
+		slots = Global.player.weapon_slots
+		held = int(Global.player.active_slot)
+	for i in 2:
+		var col = VBoxContainer.new()
+		col.add_theme_constant_override("separation", 8)
+		var head = Label.new()
+		head.text = "SLOT %d%s" % [i + 1, " (in hand)" if i == held else ""]
+		head.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_apply_font(head, 12)
+		col.add_child(head)
+		var slot_inst: Dictionary = slots[i]
+		if slot_inst.is_empty():
+			col.add_child(_create_empty_panel())
+		else:
+			col.add_child(_create_item_panel(slot_inst, true))
+		var btn_text: String = "PUT IN SLOT %d\n(empty)" % (i + 1) if slot_inst.is_empty() else "PUT IN SLOT %d\n(replaces %s)" % [i + 1, String(Global.weapons[slot_inst["id"]]["name"])]
+		var idx: int = i
+		col.add_child(_create_btn(btn_text, func(): _place_new(idx), Vector2(190, 60), Color(0.2, 0.6, 0.3)))
+		hbox.add_child(col)
+
+	# Mũi tên >>
 	var arrow = Label.new()
-	arrow.text = ">>"
+	arrow.text = "<<"
 	arrow.add_theme_font_size_override("font_size", 45)
 	arrow.add_theme_color_override("font_color", Color(1, 1, 1, 0.5))
 	hbox.add_child(arrow)
-	
-	# 3. Thông số súng Mới
+
+	# Vũ khí mới trúng
 	var v_new = VBoxContainer.new()
+	v_new.add_theme_constant_override("separation", 8)
 	var l_new = Label.new()
 	l_new.text = "NEWLY WON"
 	l_new.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -370,29 +381,32 @@ func _on_spin_finished() -> void:
 	v_new.add_child(l_new)
 	v_new.add_child(_create_item_panel(win_inst, true))
 	hbox.add_child(v_new)
-	
-	# 4. Nút Quyết định
-	var btn_box = HBoxContainer.new()
-	btn_box.alignment = BoxContainer.ALIGNMENT_CENTER
-	btn_box.add_theme_constant_override("separation", 40)
-	confirm_box.add_child(btn_box)
-	
-	# Còn ô trống: vũ khí mới vào ô 2 (không mất vũ khí cũ). Đủ 2 ô: thay vũ khí đang cầm.
-	var has_free: bool = is_instance_valid(Global.player) and Global.player.has_method("has_free_weapon_slot") and Global.player.has_free_weapon_slot()
+
 	var note = Label.new()
-	note.text = "You have a free weapon slot: you keep both." if has_free else "Both slots full: this replaces the weapon in your hand."
+	note.text = "Choose which slot gets the new weapon. The weapon it replaces is lost."
 	note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_apply_font(note, 12)
 	confirm_box.add_child(note)
-	confirm_box.move_child(note, btn_box.get_index())
-
-	btn_box.add_child(_create_btn("TAKE NEW" if has_free else "EQUIP NEW", _equip_new, Vector2(250, 60), Color(0.2, 0.6, 0.3)))
-	btn_box.add_child(_create_btn("SKIP" if has_free else "KEEP CURRENT", _discard_new, Vector2(250, 60), Color(0.7, 0.2, 0.2)))
+	confirm_box.add_child(_create_btn("SKIP (keep both as they are)", _discard_new, Vector2(380, 50), Color(0.7, 0.2, 0.2)))
 
 
-func _equip_new() -> void:
-	if is_instance_valid(Global.player) and Global.player.has_method("equip_weapon"):
-		Global.player.equip_weapon(win_inst) # vũ khí bị thay (nếu có) bỏ đi như trước đây
+func _create_empty_panel() -> Control:
+	var panel = ColorRect.new()
+	panel.custom_minimum_size = Vector2(150, 190)
+	panel.color = Color(0.09, 0.09, 0.12)
+	var lbl = Label.new()
+	lbl.set_anchors_preset(Control.PRESET_FULL_RECT)
+	lbl.text = "- empty -"
+	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	lbl.add_theme_color_override("font_color", Color(0.5, 0.5, 0.5))
+	_apply_font(lbl, 13)
+	panel.add_child(lbl)
+	return panel
+
+func _place_new(slot: int) -> void:
+	if is_instance_valid(Global.player) and Global.player.has_method("place_weapon"):
+		Global.player.place_weapon(slot, win_inst)
 	_reset_to_shop()
 
 func _discard_new() -> void:
