@@ -229,6 +229,25 @@ var enemies: Dictionary = {
 var floor_num: int = 1
 ## true khi đang ở đấu trường Hội Đồng Bốn Boss (tầng 15 giữ nguyên, thoát qua cổng xuống tầng 16).
 var in_council: bool = false
+
+## --- Chế độ Heat (scripts/heat.gd) ---
+## heat_selected: lựa chọn ở menu chọn class (id -> true), lưu trong save. run_heat: bản CHỐT cho ván đang chơi
+## (lấy lúc reset_run, đi theo saved_run) nên đổi menu giữa chừng không ảnh hưởng ván đang dở.
+var heat_selected: Dictionary = {}
+var run_heat: Array = []
+
+func heat_on(id: String) -> bool:
+	return run_heat.has(id)
+
+func heat_points() -> int:
+	return HeatScript.total(run_heat)
+
+## Ngọc Tím sau thưởng Heat của ván hiện tại.
+func heat_gems(base: int) -> int:
+	return HeatScript.gems(base, run_heat)
+
+func selected_heat_ids() -> Array:
+	return HeatScript.sanitize(heat_selected.keys())
 var coins: int = 0
 var player = null
 var camera = null
@@ -270,7 +289,10 @@ func armored_damage(amount: int, armor: float) -> int:
 const ENEMY_DMG_PER_FLOOR: float = 0.1
 const ENEMY_DMG_MULT_CAP: float = 2.5
 func enemy_dmg_mult_for_floor(for_floor_num: int) -> float:
-	return minf(ENEMY_DMG_MULT_CAP, 1.0 + ENEMY_DMG_PER_FLOOR * float(maxi(0, for_floor_num - 1)))
+	var m: float = minf(ENEMY_DMG_MULT_CAP, 1.0 + ENEMY_DMG_PER_FLOOR * float(maxi(0, for_floor_num - 1)))
+	if heat_on("glass"):
+		m *= HeatScript.PLAYER_DAMAGE_MULT # Glass Cannon: nhận thêm sát thương, áp ở điểm chung duy nhất
+	return m
 
 var _sfx: Dictionary = {}
 var _dot_tex: ImageTexture
@@ -518,6 +540,7 @@ var stolen_gold_held: int = 0
 func reset_run() -> void:
 	floor_num = 1
 	in_council = false
+	run_heat = selected_heat_ids()
 	coins = 0
 	stolen_gold_held = 0
 	buff_picks_left = 0
@@ -1051,6 +1074,7 @@ var purple_gems: int = 0
 ## Hồ sơ vĩnh viễn (thống kê + tiến hoá class). Cấu trúc/logic nằm ở scripts/meta_progress.gd.
 const MetaProgress = preload("res://scripts/meta_progress.gd")
 const SkillUpgrades = preload("res://scripts/skill_upgrades.gd")
+const HeatScript = preload("res://scripts/heat.gd")
 var profile: Dictionary = MetaProgress.new_profile()
 var upgrades: Dictionary = {
 	"hp_boost": 0, "start_coin": 0, "mastery": 0, "revive": 0
@@ -1138,7 +1162,8 @@ func save_game() -> void:
 			"saved_run": saved_run, # Lưu thêm ván đang chơi
 			"settings": settings,
 			"profile": profile,
-			"elite_q_table": elite_q_table
+			"elite_q_table": elite_q_table,
+			"heat": selected_heat_ids()
 		}
 		file.store_var(data)
 		file.close()
@@ -1163,6 +1188,11 @@ func load_game() -> void:
 					settings[k] = loaded_settings[k]
 				profile = MetaProgress.merge_loaded(data.get("profile", {}))
 				elite_q_table = _migrate_q_table(data.get("elite_q_table", {}))
+				heat_selected.clear()
+				var hs = data.get("heat", [])
+				if hs is Array:
+					for id in HeatScript.sanitize(hs):
+						heat_selected[id] = true
 			file.close()
 	else:
 		save_game()

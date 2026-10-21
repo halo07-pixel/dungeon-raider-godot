@@ -221,6 +221,9 @@ func setup(hp_mult: float = 1.0, p_kind: String = "warden") -> void:
 	hp = max_hp
 	armor = floor((Global.floor_num - 1) * 1.6) + 2.0 + floor((endless_mult - 1.0) * 10.0)
 	cc_resist = minf(0.3 + (Global.floor_num - 1) * 0.2, 0.9)
+	if Global.heat_on("furious"):
+		phase = mini(Global.HeatScript.BOSS_START_PHASE, int(cfg["phases"])) # Heat: vào trận đã ở pha cao
+		pending_roar = true
 	BODY_RADIUS = BODY_RADIUS_BASE * float(cfg["body_mult"])
 	BODY_CENTER_OFFSET = BODY_CENTER_OFFSET_BASE * float(cfg["body_mult"])
 

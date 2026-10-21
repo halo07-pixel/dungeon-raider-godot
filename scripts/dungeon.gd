@@ -712,7 +712,7 @@ func _spawn_wave(cell: Vector2i, count_override: int = -1) -> void:
 	var avoid: Vector2 = Global.player.global_position
 	var affixed: int = 0
 	for i in count:
-		var e = _spawn_enemy(_pick_kind(), _random_floor_pos(cell, avoid, 200.0), cell, affixed < AffixScript.MAX_PER_ROOM)
+		var e = _spawn_enemy(_pick_kind(), _random_floor_pos(cell, avoid, 200.0), cell, affixed < AffixScript.max_per_room())
 		if e.affix_id != "":
 			affixed += 1
 
@@ -991,6 +991,13 @@ func _room_cleared(cell: Vector2i) -> void:
 	var room: Dictionary = rooms[cell]
 	if room["cleared"]:
 		return
+	# Heat Reinforcements: phòng thường gọi thêm một đợt nhỏ trước khi thật sự được dọn (chỉ một lần mỗi phòng).
+	if Global.heat_on("reinforce") and room["type"] == "normal" and not room.get("reinforced", false):
+		room["reinforced"] = true
+		Global.sfx("trial_horn")
+		Global.message.emit("Reinforcements!", Color(1.0, 0.35, 0.15))
+		_spawn_wave(cell, maxi(2, int(round(float(_wave_size()) * Global.HeatScript.REINFORCE_WAVE_SCALE))))
+		return
 	room["cleared"] = true
 	_unlock_doors(room)
 	rooms_updated.emit()
@@ -1002,9 +1009,9 @@ func _room_cleared(cell: Vector2i) -> void:
 		if Global.in_council:
 			# Phần thưởng Hội Đồng: vũ khí Huyền thoại + ngọc tím
 			_spawn_pickup("weapon", _roll_weapon_drop("legendary"), room_center(cell) + Vector2(-72.0, 0.0))
-			Global.purple_gems += COUNCIL_GEMS
+			Global.purple_gems += Global.heat_gems(COUNCIL_GEMS)
 			Global.save_game()
-			Global.message.emit("The Council has fallen! Legendary weapon and +%d Purple Gems" % COUNCIL_GEMS, Color(1.0, 0.85, 0.3))
+			Global.message.emit("The Council has fallen! Legendary weapon and +%d Purple Gems" % Global.heat_gems(COUNCIL_GEMS), Color(1.0, 0.85, 0.3))
 		elif Global.floor_num % BOSS_WEAPON_REWARD_EVERY == 0:
 			_spawn_pickup("weapon", _roll_weapon_drop(Global.roll_weapon_rarity(Global.floor_num, "rare")), room_center(cell) + Vector2(-72.0, 0.0))
 			Global.message.emit("The boss dropped a weapon!", Color(1.0, 0.85, 0.3))
@@ -1022,7 +1029,8 @@ func _room_cleared(cell: Vector2i) -> void:
 		Global.message.emit("Trial cleared! Take the reward or gamble", Color(1.0, 0.85, 0.3))
 	else:
 		Global.message.emit("Room cleared!", Color(0.6, 1.0, 0.6))
-		if randf() < 0.35:
+		var heal_chance: float = 0.35 * (Global.HeatScript.HEAL_DROP_MULT if Global.heat_on("scarce") else 1.0)
+		if randf() < heal_chance:
 			_spawn_pickup("heal", "", room_center(cell))
 
 

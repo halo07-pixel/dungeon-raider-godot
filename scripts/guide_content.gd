@@ -13,6 +13,7 @@ const BossScript = preload("res://scripts/boss.gd")
 const EnemyScript = preload("res://scripts/enemy.gd")
 const DungeonScript = preload("res://scripts/dungeon.gd")
 const BossCouncil = preload("res://scripts/boss_council.gd")
+const HeatScript = preload("res://scripts/heat.gd")
 
 const TAB_ORDER: Array = ["basics", "classes", "weapons", "buffs", "defense", "enemies", "events", "tips"]
 const TAB_TITLES: Dictionary = {
@@ -307,4 +308,9 @@ static func tips() -> String:
 	t += "- Altars are worth the HP early in a floor, when you can still recover.\n"
 	t += "- Do not rush a boss. Learn each phase, then punish the recovery after its big attacks.\n"
 	t += "- Spend Purple Gems in the SKILL TREE after every run.\n"
+	t += _sub("Heat (optional hard mode)")
+	t += "On the class screen you can switch on Heat modifiers before a run. Each has a cost; the total Heat gives +%s Purple Gems per point at the end of floors and the Council Trial.\n" % _pct(HeatScript.GEM_BONUS_PER_POINT)
+	for id in HeatScript.ORDER:
+		var m: Dictionary = HeatScript.MODS[id]
+		t += "- [b]%s[/b] (Heat %d): %s\n" % [m["name"], int(m["cost"]), m["desc"]]
 	return t
