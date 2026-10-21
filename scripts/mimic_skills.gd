@@ -90,7 +90,7 @@ func drive(delta: float, move: Vector2) -> Array:
 			if have_p and not _lunge_hit and _e.global_position.distance_to(p.global_position) <= 30.0:
 				_lunge_hit = true
 				var dodged: bool = p.has_method("is_invulnerable") and p.is_invulnerable()
-				p.take_damage(LUNGE_DAMAGE, _e.global_position, LUNGE_KNOCK)
+				p.take_damage(LUNGE_DAMAGE, _e.global_position, LUNGE_KNOCK, false, false, "enemy:mimic")
 				if not dodged:
 					Global.sfx("mimic_bite")
 					steal_from(p)
@@ -131,6 +131,7 @@ func _spit(p) -> void:
 	for i in SPIT_COUNT:
 		var hz := Area2D.new()
 		hz.set_script(BOSS_HAZARD)
+		hz.source = "enemy:mimic"
 		hz.damage = SPIT_DAMAGE
 		hz.duration = 0.3
 		hz.single_shot = true

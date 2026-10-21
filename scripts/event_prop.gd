@@ -242,7 +242,7 @@ func _use_chest(pried: bool = false) -> void:
 	else:
 		var p = Global.player
 		if is_instance_valid(p):
-			p.take_damage(maxi(1, int(float(p.max_hp) * EventRooms.TRAP_HP_FRACTION)), global_position, 200.0)
+			p.take_damage(maxi(1, int(float(p.max_hp) * EventRooms.TRAP_HP_FRACTION)), global_position, 200.0, false, false, "trap:event")
 		Global.burst(global_position, Color(0.9, 0.4, 0.2), 16, 220.0, 2.0)
 		Global.message.emit("It was a trap!", Color(1.0, 0.5, 0.2))
 

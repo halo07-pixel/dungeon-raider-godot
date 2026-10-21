@@ -62,4 +62,4 @@ func _process(delta: float) -> void:
 			if p.has_method("apply_status"):
 				p.apply_status("burn", BURN_TICKS)
 			if not (p.has_method("is_invulnerable") and p.is_invulnerable()):
-				p.take_damage(DAMAGE, global_position, 0.0, false, true)
+				p.take_damage(DAMAGE, global_position, 0.0, false, true, "hazard:lava")

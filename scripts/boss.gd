@@ -535,6 +535,7 @@ func _charge_wait(duration: float) -> void:
 func _drop_flame(pos: Vector2) -> void:
 	var hz := Area2D.new()
 	hz.set_script(BOSS_HAZARD)
+	hz.source = "boss:" + kind
 	hz.damage = TRAIL_DAMAGE
 	hz.tick_interval = 0.6
 	hz.duration = TRAIL_DURATION
@@ -586,6 +587,7 @@ func _fire_ring(count: int, angle_offset: float, color: Color) -> void:
 		var ang: float = angle_offset + TAU * float(i) / float(count)
 		var b = BULLET.instantiate()
 		b.setup(false, Vector2.from_angle(ang), 10, 230.0, 3.0, color, 7.0)
+		b.source = "boss:" + kind
 		Global.world.add_child(b)
 		b.global_position = hurt_center() + Vector2.from_angle(ang) * (BODY_RADIUS + 6.0)
 
@@ -635,6 +637,7 @@ func _atk_necro_bolt() -> void:
 		var dir: Vector2 = base_dir.rotated(ang_off)
 		var b = BULLET.instantiate()
 		b.setup(false, dir, 16, 190.0, 3.5, Color(0.7, 0.3, 0.9), 8.0)
+		b.source = "boss:" + kind
 		b.homing = true
 		b.homing_target = p
 		Global.world.add_child(b)
@@ -662,6 +665,7 @@ func _atk_necro_curse() -> void:
 	Global.sfx("door")
 	var hz := Area2D.new()
 	hz.set_script(BOSS_HAZARD)
+	hz.source = "boss:" + kind
 	hz.damage = 8
 	hz.tick_interval = 0.6
 	hz.duration = 3.2
@@ -699,6 +703,7 @@ func _atk_magma_eruption() -> void:
 			q = q.clamp(safe_rect.position, safe_rect.end)
 		var hz := Area2D.new()
 		hz.set_script(BOSS_HAZARD)
+		hz.source = "boss:" + kind
 		hz.damage = MAGMA_DAMAGE
 		hz.tick_interval = 0.6
 		hz.duration = MAGMA_DURATION
@@ -741,6 +746,7 @@ func _atk_fissure() -> void:
 				continue
 			var hz := Area2D.new()
 			hz.set_script(BOSS_HAZARD)
+			hz.source = "boss:" + kind
 			hz.single_shot = true
 			hz.damage = FISSURE_DAMAGE
 			hz.radius = FISSURE_RADIUS
@@ -785,6 +791,7 @@ func _atk_bog_spread() -> void:
 			q = q.clamp(safe_rect.position, safe_rect.end)
 		var hz := Area2D.new()
 		hz.set_script(BOSS_HAZARD)
+		hz.source = "boss:" + kind
 		hz.damage = BOG_DAMAGE
 		hz.tick_interval = 0.6
 		hz.duration = BOG_DURATION
@@ -820,6 +827,7 @@ func _atk_ice_sheet() -> void:
 	Global.sfx("ice_sheet_warn")
 	var hz := Area2D.new()
 	hz.set_script(BOSS_HAZARD)
+	hz.source = "boss:" + kind
 	hz.damage = 0 # chỉ trượt; sát thương đến từ cú húc nối tiếp
 	hz.tick_interval = 0.2
 	hz.duration = ICE_SHEET_DURATION
@@ -872,7 +880,7 @@ func _atk_frost_breath() -> void:
 		if dist < 150.0 and dist > 0.01:
 			var ang: float = absf(charge_dir.angle_to(to_p.normalized()))
 			if ang < deg_to_rad(40.0):
-				p.take_damage(22, global_position, 260.0)
+				p.take_damage(22, global_position, 260.0, false, false, "boss:" + kind)
 	_spawn_ice_patch(global_position + charge_dir * 70.0, 85.0)
 	await get_tree().create_timer(0.3).timeout
 
@@ -883,6 +891,7 @@ func _atk_frost_breath() -> void:
 func _spawn_ice_patch(pos: Vector2, radius: float, duration: float = 2.5) -> void:
 	var hz := Area2D.new()
 	hz.set_script(BOSS_HAZARD)
+	hz.source = "boss:" + kind
 	hz.damage = 4
 	hz.tick_interval = 0.5
 	hz.duration = duration
@@ -910,6 +919,7 @@ func _atk_frost_spike_field() -> void:
 		var pos: Vector2 = center + Vector2.from_angle(ang) * randf_range(20.0, 150.0 if is_lord else 110.0)
 		var hz := Area2D.new()
 		hz.set_script(BOSS_HAZARD)
+		hz.source = "boss:" + kind
 		hz.single_shot = true
 		hz.damage = 18
 		hz.radius = 34.0 * (LORD_AOE_MULT if is_lord else 1.0)
@@ -946,7 +956,7 @@ func _atk_blizzard() -> void:
 	if is_instance_valid(p) and p.alive:
 		var d: float = hurt_center().distance_to(p.hurt_center() if p.has_method("hurt_center") else p.global_position)
 		if d < 260.0:
-			p.take_damage(14, global_position, 180.0)
+			p.take_damage(14, global_position, 180.0, false, false, "boss:" + kind)
 			if p.has_method("apply_status"):
 				p.apply_status("slow", 1.2)
 	Global.burst(global_position, Color(0.6, 0.9, 1.0), 30, 260.0, 2.0)
@@ -972,6 +982,7 @@ func _atk_ice_prison() -> void:
 	Global.sfx("boss_charge")
 	var hz := Area2D.new()
 	hz.set_script(BOSS_HAZARD)
+	hz.source = "boss:" + kind
 	hz.single_shot = true
 	hz.damage = 24
 	hz.radius = 46.0 * (LORD_AOE_MULT if kind == "lord" else 1.0)
@@ -986,6 +997,7 @@ func _atk_ice_prison() -> void:
 		for sgn in [-1.0, 1.0]:
 			var hz2 := Area2D.new()
 			hz2.set_script(BOSS_HAZARD)
+			hz2.source = "boss:" + kind
 			hz2.single_shot = true
 			hz2.damage = 24
 			hz2.radius = 46.0 * LORD_AOE_MULT
@@ -1018,6 +1030,7 @@ func _atk_judgement() -> void:
 	var center: Vector2 = p.global_position if is_instance_valid(p) else global_position
 	var hz := Area2D.new()
 	hz.set_script(BOSS_HAZARD)
+	hz.source = "boss:" + kind
 	hz.single_shot = true
 	hz.damage = LORD_JUDGE_DAMAGE
 	hz.radius = LORD_JUDGE_RADIUS
@@ -1041,6 +1054,7 @@ func _atk_judgement() -> void:
 			chase_pos = p.global_position + p.velocity * LORD_JUDGE_CHASE_LEAD
 		var hz2 := Area2D.new()
 		hz2.set_script(BOSS_HAZARD)
+		hz2.source = "boss:" + kind
 		hz2.single_shot = true
 		hz2.damage = LORD_JUDGE_CHASE_DAMAGE
 		hz2.radius = LORD_JUDGE_CHASE_RADIUS
@@ -1077,12 +1091,12 @@ func _atk_lord_summon_all() -> void:
 # ------------------------------------------------------------------ Va chạm (signal)
 func _on_hitbox_entered(body: Node) -> void:
 	if charging and body.is_in_group("player"):
-		body.take_damage(26, global_position, 520.0)
+		body.take_damage(26, global_position, 520.0, false, false, "boss:" + kind)
 
 
 func _on_slam_entered(body: Node) -> void:
 	if body.is_in_group("player"):
-		body.take_damage(24, global_position, 560.0)
+		body.take_damage(24, global_position, 560.0, false, false, "boss:" + kind)
 
 
 # ------------------------------------------------------------------ Di chuyển
@@ -1111,7 +1125,7 @@ func _physics_process(delta: float) -> void:
 		if dist_to_player < BODY_RADIUS + 5.0:
 			var dmg = 26 if charging else 15
 			var knock = 600.0 if charging else 350.0
-			p.take_damage(dmg, global_position, knock)
+			p.take_damage(dmg, global_position, knock, false, false, "boss:" + kind)
 		# Hào Quang Đóng Băng (Frost, pha 2+): làm chậm Player đứng gần (không cần chạm hẳn)
 		elif kind == "frost" and phase >= 2 and dist_to_player < BODY_RADIUS + 110.0:
 			if p.has_method("apply_status"):

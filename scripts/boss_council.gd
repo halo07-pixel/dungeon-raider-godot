@@ -114,6 +114,7 @@ func _spawn_corpse_hazard(pos: Vector2) -> void:
 	hz.tick_interval = CORPSE_HAZARD_TICK
 	hz.telegraph_time = 0.5
 	hz.apply_burn_ticks = 2
+	hz.source = "hazard:council"
 	hz.color = Color(0.8, 0.25, 0.9, 0.4)
 	Global.world.add_child.call_deferred(hz)
 	hz.set_deferred("global_position", pos)

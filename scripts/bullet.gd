@@ -15,6 +15,7 @@ var pierce: bool = false
 ## rồi biến mất. `pierce` (true) vẫn là xuyên vô hạn, chỉ còn dùng cho sóng kiếm/đòn cận chiến.
 var pierce_left: int = 0
 var from_player: bool = true
+var source: String = "" # ai bắn (đạn địch): "enemy:kind" / "boss:kind", để ghi nguồn sát thương khi trúng Player
 var knock: float = 140.0
 var effect: String = ""
 var _hit: Array = []
@@ -238,7 +239,7 @@ func _on_body_entered(body: Node) -> void:
 		if effect == "pin" and from_player and _wall_behind(body):
 			hit_dmg = int(float(damage) * pin_mult)
 			pinned_now = true
-		body.take_damage(hit_dmg, global_position - dir * 8.0, knock)
+		body.take_damage(hit_dmg, global_position - dir * 8.0, knock, false, false, source)
 		if pinned_now:
 			_apply_pin(body)
 		elif effect == "fire" and from_player and body.has_method("apply_element"):

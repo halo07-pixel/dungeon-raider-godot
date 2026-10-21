@@ -240,6 +240,7 @@ func _on_volatile_died(_e = null) -> void:
 	hz.telegraph_time = VOLATILE_TELEGRAPH
 	hz.single_shot = true
 	hz.fire_sfx = "volatile_boom"
+	hz.source = "affix:volatile"
 	hz.color = Color(1.0, 0.5, 0.1, 0.5)
 	Global.world.add_child(hz)
 	hz.global_position = enemy.global_position

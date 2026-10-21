@@ -351,6 +351,7 @@ func _shoot() -> void:
 
 	var b = BULLET.instantiate()
 	b.setup(false, dir, int(data["bullet_damage"]), float(data["bullet_speed"]), 2.5, data["color"], 6.0, false, String(data.get("bullet_effect", "")))
+	b.source = "enemy:" + kind
 	if is_elite and q_agent:
 		b.source_q_agent = q_agent # bullet.gd báo kết quả trúng/trượt ngược lại qua field này
 	Global.world.add_child(b)

@@ -108,7 +108,7 @@ func _drive_ogre(delta: float, move: Vector2) -> Array:
 				var reach: float = float(_e.data["radius"]) + CHARGE_HIT_REACH
 				if _e.global_position.distance_to(p.global_position) <= reach:
 					_hit = true
-					p.take_damage(CHARGE_DAMAGE, _e.global_position, CHARGE_KNOCK)
+					p.take_damage(CHARGE_DAMAGE, _e.global_position, CHARGE_KNOCK, false, false, "enemy:hell_ogre")
 			if _state_t >= CHARGE_TIME:
 				_state = "recover"
 				_state_t = 0.0
@@ -213,13 +213,14 @@ func _on_died(_enemy = null) -> void:
 			if _e.hurtbox.hp <= 0.0 or _e.has_meta("self_destruct"):
 				# Hoãn sang khung kế: tự nổ xảy ra ngay trong callback vật lý (body_entered), lúc đó không thêm được Area2D.
 				_spawn_hazard.call_deferred(_e.global_position, PUDDLE_RADIUS, PUDDLE_DAMAGE, PUDDLE_TELEGRAPH,
-					PUDDLE_DURATION, PUDDLE_BURN_TICKS, "cinder_burst")
+					PUDDLE_DURATION, PUDDLE_BURN_TICKS, "cinder_burst", "enemy:cinder_tiny")
 		"hell_ogre":
 			_free_line()
 
-func _spawn_hazard(pos: Vector2, radius: float, dmg: int, telegraph: float, duration: float, burn_ticks: int, sfx_name: String) -> void:
+func _spawn_hazard(pos: Vector2, radius: float, dmg: int, telegraph: float, duration: float, burn_ticks: int, sfx_name: String, src: String = "enemy:hell_ogre") -> void:
 	var hz := Area2D.new()
 	hz.set_script(BOSS_HAZARD)
+	hz.source = src
 	hz.damage = dmg
 	hz.radius = radius
 	hz.telegraph_time = telegraph

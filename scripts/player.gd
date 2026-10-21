@@ -384,14 +384,14 @@ func _physics_process(delta: float) -> void:
 			poison_ticks -= 1
 			# Độc BỎ QUA khung bất tử vật lý (hurt_timer) — venom không quan tâm bạn vừa
 			# trúng đòn thường hay chưa, khác hẳn sát thương tiếp xúc thông thường.
-			take_damage(poison_dmg, global_position, 0.0, true, true)
+			take_damage(poison_dmg, global_position, 0.0, true, true, "dot:poison")
 
 	if burn_ticks > 0:
 		burn_timer -= delta
 		if burn_timer <= 0.0:
 			burn_timer = BURN_TICK
 			burn_ticks -= 1
-			take_damage(BURN_DAMAGE, global_position, 0.0, true, true)
+			take_damage(BURN_DAMAGE, global_position, 0.0, true, true, "dot:burn")
 
 	if stun_timer > 0.0:
 		_cancel_charge()
@@ -1344,7 +1344,7 @@ func _on_shield_broken() -> void:
 	if Global.buff_stack("buff_arc") > 0:
 		_arc_strike()
 
-func take_damage(amount: int, from_pos: Vector2 = Vector2.ZERO, knock: float = 300.0, ignore_invuln: bool = false, bypass_shield: bool = false) -> void:
+func take_damage(amount: int, from_pos: Vector2 = Vector2.ZERO, knock: float = 300.0, ignore_invuln: bool = false, bypass_shield: bool = false, source: String = "") -> void:
 	if not alive: return
 	if not ignore_invuln and is_invulnerable(): return
 	# Hệ số sát thương quái/boss/bẫy theo tầng (xem Global.enemy_dmg_mult_for_floor) —
@@ -1352,6 +1352,7 @@ func take_damage(amount: int, from_pos: Vector2 = Vector2.ZERO, knock: float = 3
 	amount = maxi(1, int(float(amount) * Global.enemy_dmg_mult_for_floor(Global.floor_num)))
 	counter_timer = 3.0 # Phản Công: bị đánh trúng mở cửa sổ x2 sát thương
 	Global.player_damaged.emit(amount, max_hp) # HUD nghe: nháy viền đỏ khi đòn nặng
+	Global.player_hurt_by.emit(source, amount) # Telemetry nghe: ai gây sát thương
 	if max_hp > 0 and float(amount) >= HEAVY_HIT_RATIO * float(max_hp):
 		Global.shake(0.9, 0.35)
 		Global.hitstop(0.05)

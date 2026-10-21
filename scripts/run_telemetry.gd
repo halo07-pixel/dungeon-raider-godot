@@ -4,7 +4,17 @@ extends Node
 ## Dữ liệu nằm trong Global.run_stats["telemetry"] nên đi theo save "Continue". Phần tính toán là hàm static
 ## thuần dữ liệu (không đụng scene) để test headless được. Node dừng đếm giờ khi game tạm dừng (PAUSABLE).
 
+const BossScript = preload("res://scripts/boss.gd")
+
 const KEY: String = "telemetry"
+const HURT_KEY: String = "hurt_by"          # {nguồn: tổng sát thương} cả ván
+const LAST_KEY: String = "last_hurt_by"    # nguồn gây sát thương gần nhất (khi chết = kẻ hạ gục)
+const TOP_SOURCES: int = 3
+const SOURCE_NAMES: Dictionary = {
+	"dot:burn": "Burning", "dot:poison": "Poison", "hazard:lava": "Lava", "hazard:poison": "Poison pool",
+	"hazard:ice": "Ice floor", "hazard:boss": "Boss attack zone", "hazard:council": "Council flames",
+	"trap:spikes": "Spike trap", "trap:event": "Trap room", "affix:volatile": "Volatile explosion",
+}
 
 var _floor: int = 1
 var _finished: bool = false
@@ -15,6 +25,7 @@ func _ready() -> void:
 	_floor = maxi(1, Global.floor_num)
 	Global.floor_started.connect(_on_floor_started)
 	Global.player_damaged.connect(_on_player_damaged)
+	Global.player_hurt_by.connect(_on_player_hurt_by)
 
 func _physics_process(delta: float) -> void:
 	if _finished:
@@ -28,6 +39,11 @@ func _on_player_damaged(amount: int, _max_hp: int) -> void:
 	if _finished:
 		return
 	add_damage(Global.run_stats, _floor, amount)
+
+func _on_player_hurt_by(source: String, amount: int) -> void:
+	if _finished:
+		return
+	add_source(Global.run_stats, source, amount)
 
 ## Đánh dấu đã hạ Lord trong ván này (đi tiếp Vô Hạn rồi chết vẫn tính là ván thắng).
 func mark_won() -> void:
@@ -83,6 +99,58 @@ static func summary(stats: Dictionary) -> Dictionary:
 			out["slowest_floor"] = int(f)
 	return out
 
+# --- Nguồn sát thương (ai/cái gì làm Player mất máu) ---
+
+static func add_source(stats: Dictionary, source: String, amount: int) -> void:
+	var src: String = source if source != "" else "unknown"
+	if not (stats.get(HURT_KEY) is Dictionary):
+		stats[HURT_KEY] = {}
+	var d: Dictionary = stats[HURT_KEY]
+	d[src] = int(d.get(src, 0)) + maxi(0, amount)
+	stats[LAST_KEY] = src
+
+## Tên hiển thị: "enemy:hell_ogre" -> "Hell Ogre", "boss:lord" -> "Dungeon Lord".
+static func source_name(source: String) -> String:
+	if SOURCE_NAMES.has(source):
+		return SOURCE_NAMES[source]
+	var parts: PackedStringArray = source.split(":", false, 1)
+	if parts.size() == 2:
+		if parts[0] == "boss" and BossScript.BOSS_DATA.has(parts[1]):
+			return String(BossScript.BOSS_DATA[parts[1]]["name"])
+		return parts[1].replace("_", " ").capitalize()
+	return "Unknown"
+
+## [[nguồn, sát thương, phần trăm]...] giảm dần theo sát thương, tối đa n phần tử.
+static func top_sources(stats: Dictionary, n: int = TOP_SOURCES) -> Array:
+	var d: Dictionary = stats.get(HURT_KEY, {}) if stats.get(HURT_KEY) is Dictionary else {}
+	var total: int = 0
+	for k in d:
+		total += int(d[k])
+	var rows: Array = []
+	for k in d:
+		rows.append([String(k), int(d[k])])
+	rows.sort_custom(func(a, b): return a[1] > b[1] or (a[1] == b[1] and a[0] < b[0]))
+	var out: Array = []
+	for r in rows.slice(0, n):
+		out.append([r[0], r[1], int(round(100.0 * float(r[1]) / float(maxi(1, total))))])
+	return out
+
+static func killer(stats: Dictionary) -> String:
+	return String(stats.get(LAST_KEY, ""))
+
+## Dòng chữ màn Game Over: kẻ hạ gục + các nguồn gây nhiều sát thương nhất ("" nếu chưa có số liệu).
+static func death_text(stats: Dictionary) -> String:
+	var k: String = killer(stats)
+	if k == "":
+		return ""
+	var lines: Array = ["Killed by: %s" % source_name(k)]
+	var parts: Array = []
+	for r in top_sources(stats):
+		parts.append("%s %d%%" % [source_name(r[0]), int(r[2])])
+	if not parts.is_empty():
+		lines.append("Most damage from: " + ", ".join(parts))
+	return "\n".join(lines)
+
 static func fmt_time(secs: float) -> String:
 	var s: int = int(secs)
 	return "%d:%02d" % [s / 60, s % 60]
@@ -103,4 +171,5 @@ static func build_entry(stats: Dictionary, cid: String, last_floor: int, won: bo
 	var s: Dictionary = summary(stats)
 	return {"class": cid, "floor": last_floor, "won": won, "kills": int(stats.get("kills", 0)),
 		"time": snappedf(float(s["total_time"]), 0.1), "damage": int(s["total_damage"]),
-		"hardest_floor": int(s["hardest_floor"])}
+		"hardest_floor": int(s["hardest_floor"]),
+		"killer": killer(stats), "top_source": String(top_sources(stats, 1)[0][0]) if not top_sources(stats, 1).is_empty() else ""}
