@@ -31,9 +31,9 @@ const AFFIXES: Dictionary = {
 const MYTHIC_TRAITS: Dictionary = {
 	"pistol": {"name": "Hail of Lead", "desc": "Every 5th shot fires a 5-bullet piercing fan."},
 	"smg": {"name": "Blazing Barrel", "desc": "Fires 20% faster; every bullet pierces 1 enemy."},
-	"shotgun": {"name": "Dragon's Breath", "desc": "+4 pellets and a longer blast."},
-	"bow": {"name": "Gale Quiver", "desc": "Full draw looses 2 extra piercing arrows."},
-	"railgun": {"name": "Twin Rail", "desc": "+35% damage and 20% faster recharge."},
+	"shotgun": {"name": "Dragon's Breath", "desc": "+3 pellets and a longer blast."},
+	"bow": {"name": "Gale Quiver", "desc": "Full draw looses 1 extra piercing arrow."},
+	"railgun": {"name": "Twin Rail", "desc": "+15% damage and 10% faster recharge."},
 	"staff": {"name": "Cataclysm", "desc": "Explosions are 35% wider."},
 	"crossbow": {"name": "Impaler", "desc": "Pin hits +40% harder, stun +0.8s, 15% faster."},
 	"flamethrower": {"name": "Inferno Heart", "desc": "Burn +50% and flames reach 25% further."},
