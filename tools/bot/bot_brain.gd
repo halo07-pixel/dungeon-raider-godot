@@ -33,6 +33,11 @@ const HEAL_SEEK_HP: float = 0.7
 const STUCK_SECONDS: float = 2.0
 const HUNT_AFTER: float = 40.0              # chừng này giây không hạ được con nào thì chuyển sang "săn": lao thẳng theo đường tới quái
 const HUNT_DURATION: float = 20.0
+const WEAPON_UPGRADE_RATIO: float = 1.12     # chỉ đổi khi vũ khí mới mạnh hơn chừng này
+const MELEE_BOT_FACTOR: float = 0.8         # bot đánh cận chiến kém hơn tầm xa nên trừ điểm
+const WEAPON_PICK_DIST: float = 34.0
+const CHARGE_BOT_FACTOR: float = 0.4
+const SHORT_RANGE: float = 260.0
 const TIER_SCORE: Dictionary = {"common": 1.0, "rare": 2.0, "epic": 3.2, "skill": 4.0}
 
 var G: Node # autoload Global (lấy bằng đường cây vì script chạy ở chế độ --script không biết tên autoload lúc biên dịch)
@@ -40,9 +45,10 @@ var main: Node
 var player: CharacterBody2D
 var dungeon: Node
 var sim_time: float = 0.0
-var stats: Dictionary = {"rolls": 0, "skills": 0, "buffs": [], "stuck_events": 0, "rooms_cleared": 0, "think": 0, "shoot_ticks": 0, "hazard_ticks": 0, "nolos_ticks": 0}
+var stats: Dictionary = {"rolls": 0, "skills": 0, "buffs": [], "stuck_events": 0, "floor_src": {}, "rooms_cleared": 0, "think": 0, "shoot_ticks": 0, "hazard_ticks": 0, "nolos_ticks": 0}
 
 var trace: bool = false
+var immortal: bool = false   # chế độ đo: luôn hồi đầy máu để bot đi hết các tầng, vẫn ghi sát thương đã nhận
 var _goal_desc: String = ""
 var _trace_t: float = 0.0
 var _think_t: float = 0.0
@@ -69,7 +75,15 @@ func setup(p_main: Node) -> void:
 	dungeon = p_main.dungeon
 	process_mode = Node.PROCESS_MODE_PAUSABLE
 	G.buff_choice_requested.connect(_on_buff_choice)
+	G.player_hurt_by.connect(_on_hurt_by)
 	_last_pos = player.global_position
+
+func _on_hurt_by(source: String, amount: int) -> void:
+	var f: int = int(G.floor_num)
+	var fs: Dictionary = stats["floor_src"]
+	if not fs.has(f):
+		fs[f] = {}
+	fs[f][source] = int(fs[f].get(source, 0)) + amount
 
 func _exit_tree() -> void:
 	_release_all()
@@ -81,6 +95,8 @@ func _physics_process(delta: float) -> void:
 		_release_all()
 		return
 	sim_time += delta
+	if immortal and player.hp < player.max_hp * 0.6:
+		player.hp = player.max_hp # hồi đầy (không qua heal() nên không phát hiệu ứng/âm)
 	if trace:
 		_trace_t -= delta
 		if _trace_t <= 0.0:
@@ -258,6 +274,7 @@ func _think(dt: float) -> void:
 			_shoot = dist < reach + 25.0
 		else:
 			var keep: float = BOSS_KEEP_DIST if is_boss else RANGED_KEEP_DIST
+			keep = minf(keep, maxf(110.0, _weapon_range(player.weapon) * 0.7)) # không đứng xa hơn tầm bắn của vũ khí đang cầm
 			if _is_kiter(target):
 				keep = KITER_CHASE_DIST # cung thủ/pháp sư hay lùi: phải áp sát chứ không đứng chờ
 			var perp: Vector2 = Vector2(-dir_t.y, dir_t.x) * (1.0 if int(sim_time / 2.0) % 2 == 0 else -1.0)
@@ -267,7 +284,7 @@ func _think(dt: float) -> void:
 				steer += dir_t * 0.9
 			else:
 				steer += perp * 0.7
-			_shoot = dist < 560.0
+			_shoot = dist < maxf(120.0, minf(560.0, _weapon_range(player.weapon) * 0.95))
 		steer += _repel(enemies, pp, target)
 		_maybe_skill(enemies, pp, target)
 		steer += _wall_push(pp)
@@ -400,11 +417,14 @@ func _navigate(pp: Vector2) -> Vector2:
 		if c != null and pp.distance_to(c.global_position) < PICKUP_RANGE:
 			goal = c.global_position
 	if goal == null:
+		goal = _weapon_goal(pp)
+	if goal == null:
 		var portal = _nearest(_pickups("portal"), pp)
 		if portal != null:
 			goal = portal.global_position
 	if goal == null:
-		goal = dungeon.room_center(dungeon.boss_cell)
+		var tc = _unvisited_treasure()
+		goal = dungeon.room_center(tc) if tc != null else dungeon.room_center(dungeon.boss_cell)
 	var path: PackedVector2Array = dungeon.find_path(pp, goal)
 	if path.size() < 2:
 		# không có đường theo lưới: đi theo đồ thị phòng tới phòng kế trên đường tới trùm
@@ -421,6 +441,69 @@ func _navigate(pp: Vector2) -> Vector2:
 	return (goal - pp).normalized()
 
 ## BFS trên đồ thị cửa của các phòng: ô phòng kế tiếp cần đi để tới phòng trùm (null nếu đã ở đó / không có).
+## Điểm tới vũ khí rơi đáng đổi (rương kho báu / thưởng trùm); tới nơi thì nhặt luôn bằng cách gọi hàm nhặt của vật phẩm.
+func _weapon_goal(pp: Vector2):
+	var best = null
+	var best_gain: float = 0.0
+	var cur: float = _inst_score(player.weapon_inst) if not player.weapon_inst.is_empty() else 0.0
+	var free: bool = player.has_free_weapon_slot()
+	for w in get_tree().get_nodes_in_group("weapon_pickup"):
+		if not is_instance_valid(w) or pp.distance_to(w.global_position) > 900.0:
+			continue
+		var sc: float = _inst_score(w.weapon_inst)
+		var gain: float = sc / maxf(1.0, cur)
+		if (free or gain >= WEAPON_UPGRADE_RATIO) and gain > best_gain:
+			best_gain = gain
+			best = w
+	if best == null:
+		return null
+	if pp.distance_to(best.global_position) < WEAPON_PICK_DIST and float(best._lock) <= 0.0:
+		var name_before: String = String(player.weapon.get("name", "?"))
+		best._try_take()
+		stats["weapons"] = int(stats.get("weapons", 0)) + 1
+		_arrange_weapons()
+		return null
+	return best.global_position
+
+func _unvisited_treasure():
+	for c in dungeon.rooms:
+		var r: Dictionary = dungeon.rooms[c]
+		if String(r["type"]) == "treasure" and not bool(r["visited"]):
+			return c
+	return null
+
+## Điểm vũ khí ~ DPS lý thuyết: sát thương x số viên / hồi đòn x hệ số độ hiếm x cấp; cận chiến bị trừ nhẹ (bot cận chiến dở hơn).
+func _inst_score(inst: Dictionary) -> float:
+	if inst.is_empty():
+		return 0.0
+	var w: Dictionary = G.weapons.get(String(inst.get("id", "")), {})
+	if w.is_empty():
+		return 0.0
+	var dmg: float = float(w.get("damage", 10.0)) * maxf(1.0, float(w.get("pellets", 1)))
+	var cd: float = maxf(0.08, float(w.get("cooldown", 0.5)))
+	var rar: float = float(G.rarities.get(String(inst.get("rarity", "common")), {}).get("mult", 1.0))
+	var sc: float = dmg / cd * rar * (1.0 + 0.08 * float(inst.get("level", 0)))
+	if bool(w.get("is_melee", false)):
+		sc *= MELEE_BOT_FACTOR
+	else:
+		if w.has("charge_time") or bool(w.get("boomerang", false)):
+			sc *= CHARGE_BOT_FACTOR # bot chưa biết nạp/giữ đòn: vũ khí nạp lực hay boomerang bị trừ nặng
+		if _weapon_range(w) < SHORT_RANGE:
+			sc *= 0.6 # tầm ngắn đòi áp sát, bot kite xa nên không hợp
+	return sc
+
+## Tầm bắn hiệu dụng của vũ khí tầm xa (tốc độ đạn x thời gian sống).
+func _weapon_range(w: Dictionary) -> float:
+	return float(w.get("speed", 600.0)) * float(w.get("life", 1.0))
+
+## Giữ vũ khí mạnh hơn ở ô đang cầm.
+func _arrange_weapons() -> void:
+	var other: Dictionary = player.weapon_slots[1 - player.active_slot]
+	if other.is_empty():
+		return
+	if _inst_score(other) > _inst_score(player.weapon_inst) * WEAPON_UPGRADE_RATIO:
+		player.swap_weapon()
+
 func _next_cell_toward_boss():
 	var start: Vector2i = dungeon.current_cell
 	var goal: Vector2i = dungeon.boss_cell

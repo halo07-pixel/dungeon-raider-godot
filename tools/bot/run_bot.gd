@@ -16,7 +16,7 @@ extends SceneTree
 const BotBrain = preload("res://tools/bot/bot_brain.gd")
 
 var G
-var opts: Dictionary = {"runs": 3, "class": "ranger,brawler,mage,rogue", "heat": "", "speed": 6.0, "max-min": 25.0, "max-floor": 20, "seed": 0, "out": "", "trace": 0, "start-floor": 1, "buffs": 0}
+var opts: Dictionary = {"runs": 3, "class": "ranger,brawler,mage,rogue", "heat": "", "speed": 6.0, "max-min": 25.0, "max-floor": 20, "seed": 0, "out": "", "trace": 0, "start-floor": 1, "buffs": 0, "immortal": 0}
 var results: Array = []
 
 func _init() -> void:
@@ -64,7 +64,7 @@ func _main() -> void:
 			res["class"] = cfg["class"]
 			res["heat"] = ",".join(PackedStringArray(cfg["heat"]))
 			results.append(res)
-			print("run %-8s heat=%-3d floor=%2d %-9s t=%5.0fs kills=%3d rolls=%d hunts=%d stuck=%d killer=%s" % [res["class"], G.HeatScript.total(cfg["heat"]), res["floor"], res["end"], res["time"], res["kills"], res["rolls"], res["hunts"], res["stuck"], res["killer"]])
+			print("run %-8s heat=%-3d floor=%2d %-9s t=%5.0fs kills=%3d rolls=%d hunts=%d stuck=%d wpn=%s killer=%s" % [res["class"], G.HeatScript.total(cfg["heat"]), res["floor"], res["end"], res["time"], res["kills"], res["rolls"], res["hunts"], res["stuck"], res["weapon"], res["killer"]])
 	_report(configs)
 	if String(opts["out"]) != "":
 		var f := FileAccess.open(String(opts["out"]), FileAccess.WRITE)
@@ -100,6 +100,7 @@ func _play(cid: String, heat_ids: Array) -> Dictionary:
 	main.add_child(brain)
 	brain.setup(main)
 	brain.trace = int(opts["trace"]) > 0
+	brain.immortal = int(opts["immortal"]) > 0
 	var max_t: float = float(opts["max-min"]) * 60.0
 	var end: String = "timeout"
 	var won: bool = false
@@ -129,18 +130,66 @@ func _play(cid: String, heat_ids: Array) -> Dictionary:
 	var res := {
 		"floor": G.floor_num, "end": end, "won": won, "time": brain.sim_time, "kills": int(G.run_stats.get("kills", 0)),
 		"killer": killer_name, "damage": int(summary["total_damage"]), "rolls": brain.stats["rolls"], "skills": brain.stats["skills"],
-		"stuck": brain.stats["stuck_events"], "hunts": int(brain.stats.get("hunts", 0)), "buffs": brain.stats["buffs"].size(),
+		"stuck": brain.stats["stuck_events"], "hunts": int(brain.stats.get("hunts", 0)), "buffs": brain.stats["buffs"].size(), "weapons": int(brain.stats.get("weapons", 0)), "weapon": String(main.player.weapon.get("name", "?")) if is_instance_valid(main.player) else "?",
 		"top": main.telemetry.top_sources(G.run_stats),
+		"floors": _floor_table(brain, int(main.player.max_hp)),
 	}
 	Engine.time_scale = 1.0
 	paused = false
 	brain.queue_free()
 	return res
 
+## Dòng theo tầng của một ván: thời gian, sát thương nhận, nguồn sát thương (từ telemetry của game + bot).
+func _floor_table(brain, max_hp: int) -> Dictionary:
+	var t: Dictionary = G.run_stats.get("telemetry", {})
+	var out: Dictionary = {}
+	for f in t:
+		var e: Dictionary = t[f]
+		out[int(f)] = {"time": float(e["time"]), "dmg": int(e["dmg"]), "src": brain.stats["floor_src"].get(int(f), {}).duplicate(), "max_hp": max_hp}
+	return out
+
+func _report_floors() -> void:
+	var by_floor: Dictionary = {}
+	for r in results:
+		for f in r["floors"]:
+			var e: Dictionary = r["floors"][f]
+			if float(e["time"]) < 5.0:
+				continue # tầng vừa mới tới lúc ván kết thúc: không đủ dữ liệu
+			if not by_floor.has(f):
+				by_floor[f] = {"n": 0, "time": 0.0, "dmg": 0, "lethal": 0.0, "src": {}}
+			var g: Dictionary = by_floor[f]
+			g["n"] += 1
+			g["time"] += float(e["time"])
+			g["dmg"] += int(e["dmg"])
+			g["lethal"] += float(e["dmg"]) / float(maxi(1, int(e["max_hp"])))
+			for k in e["src"]:
+				g["src"][k] = int(g["src"].get(k, 0)) + int(e["src"][k])
+	if by_floor.is_empty():
+		return
+	print("")
+	print("===== THEO TẦNG (n = số ván tới tầng đó) =====")
+	print("tầng |  n | thời gian TB | sát thương nhận TB | /máu tối đa | nguồn sát thương chính")
+	var keys: Array = by_floor.keys()
+	keys.sort()
+	for f in keys:
+		var g: Dictionary = by_floor[f]
+		var n: float = float(g["n"])
+		var rows: Array = []
+		var tot := 0
+		for k in g["src"]:
+			rows.append([k, g["src"][k]]); tot += int(g["src"][k])
+		rows.sort_custom(func(a, b): return a[1] > b[1])
+		var txt: Array = []
+		for row in rows.slice(0, 3):
+			txt.append("%s %d%%" % [main_name(String(row[0])), int(round(100.0 * float(row[1]) / float(maxi(1, tot))))])
+		print("%4d | %2d | %9.0fs | %18.0f | %10.0f%% | %s" % [f, g["n"], float(g["time"]) / n, float(g["dmg"]) / n, 100.0 * float(g["lethal"]) / n, ", ".join(PackedStringArray(txt))])
+	print("(/máu tối đa >= 100% nghĩa là một người chơi không hồi máu sẽ chết trong tầng đó)")
+
 func main_name(src: String) -> String:
 	return load("res://scripts/run_telemetry.gd").source_name(src)
 
 func _report(configs: Array) -> void:
+	_report_floors()
 	print("")
 	print("===== TỔNG HỢP (%d ván) =====" % results.size())
 	var groups: Dictionary = {}
