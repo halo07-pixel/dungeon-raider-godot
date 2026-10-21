@@ -1069,6 +1069,24 @@ func set_weapon_instance(inst: Dictionary) -> void:
 	weapons_changed.emit()
 	Global.message.emit("Picked up: " + weapon_label(), rarity_data["color"])
 
+## Ghi đè 1 ô (Forge: nâng cấp / reroll / ghép). Ô đang cầm thì áp dụng ngay.
+func set_slot(i: int, inst: Dictionary) -> void:
+	weapon_slots[i] = WeaponInstance.normalize(inst)
+	if i == active_slot:
+		_apply_active_weapon()
+	weapons_changed.emit()
+
+## Bỏ 1 ô (Forge: phân rã / ghép). Không bỏ được nếu đó là cây duy nhất. Bỏ ô đang cầm thì chuyển sang ô kia.
+func remove_slot(i: int) -> bool:
+	if weapon_slots[i].is_empty() or weapon_slots[1 - i].is_empty():
+		return false
+	weapon_slots[i] = {}
+	if i == active_slot:
+		active_slot = 1 - i
+		_apply_active_weapon()
+	weapons_changed.emit()
+	return true
+
 ## "Pistol +2 (Epic)" — tên hiển thị của cây đang cầm.
 func weapon_label() -> String:
 	return "%s (%s)" % [WeaponInstance.display_name(weapon_inst), rarity_data["name"]]

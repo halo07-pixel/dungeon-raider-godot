@@ -58,7 +58,7 @@ func _process(_delta: float) -> void:
 	dodge_bar.value = p.dodge_ratio() * 100.0
 	_update_shield(p)
 	
-	info_label.text = "Floor %d   ·   Gold: %d" % [Global.floor_num, Global.coins]
+	info_label.text = "Floor %d   ·   Gold: %d" % [Global.floor_num, Global.coins] + (("   ·   Scrap: %d" % Global.scrap) if Global.scrap > 0 else "")
 	_update_weapon_labels(p)
 	_update_weapon_bar(p)
 	_update_skill_label(p)

@@ -5,6 +5,8 @@ const WeaponInstance = preload("res://scripts/weapon_instance.gd")
 @onready var dungeon: Node2D = $Dungeon
 @onready var player: CharacterBody2D = $Player
 const NPC_SCENE = preload("res://scenes/npc.tscn")
+const FORGE_SCRIPT = preload("res://scenes/forge.gd")
+const FORGE_OFFSET_X: float = 230.0
 const SETTINGS_MENU_SCENE = preload("res://scenes/settings_menu.tscn")
 const RunTelemetryScript = preload("res://scripts/run_telemetry.gd")
 const BUFF_PICKER_SCENE = preload("res://scenes/buff_picker.tscn")
@@ -125,6 +127,7 @@ func _restore_player_state() -> void:
 			if Global.SkillUpgrades.has(String(uid)):
 				Global.skill_upgrades_taken.append(String(uid))
 		Global.run_buffs = Dictionary(Global.saved_run.get("run_buffs", {})).duplicate()
+		Global.scrap = int(Global.saved_run.get("scrap", 0))
 		var pity = Global.saved_run.get("weapon_pity", {})
 		Global.weapon_pity = {"epic": int(pity.get("epic", 0)), "legendary": int(pity.get("legendary", 0))} if pity is Dictionary else {"epic": 0, "legendary": 0}
 		Global.run_buffs.erase("buff_lifesteal") # buff đã bị gỡ khỏi game; bỏ khỏi save cũ
@@ -272,6 +275,7 @@ func _build_saved_run() -> Dictionary:
 		"shield": player.shield,
 		"run_buffs": Global.run_buffs.duplicate(),
 		"weapon_pity": Global.weapon_pity.duplicate(),
+		"scrap": Global.scrap,
 		"gold": Global.coins + Global.stolen_gold_held, # xu đang cầm (trước đây không lưu nên Continue mất sạch xu)
 		"stats": Global.run_stats.duplicate() if Global.get("run_stats") else {}
 	}
@@ -372,6 +376,12 @@ func _build_victory_menu() -> void:
 	)
 
 
+## Lò Rèn đứng cạnh Thương gia (là con của NPC nên tự dọn khi NPC bị xoá).
+func _spawn_forge(npc: Node2D) -> void:
+	var forge: Area2D = FORGE_SCRIPT.new()
+	npc.add_child(forge)
+	forge.position = Vector2(FORGE_OFFSET_X, 0.0)
+
 func _spawn_npc_if_needed() -> void:
 	if is_instance_valid(current_npc):
 		current_npc.queue_free()
@@ -380,3 +390,4 @@ func _spawn_npc_if_needed() -> void:
 		current_npc = NPC_SCENE.instantiate()
 		add_child(current_npc)
 		current_npc.global_position = dungeon.room_center(dungeon.start_cell) + Vector2(0, -100)
+		_spawn_forge(current_npc)
