@@ -19,6 +19,8 @@ var weapon_id: String = ""
 var weapon_rarity: String = "common"
 ## Cây vũ khí mà pickup này đại diện (WeaponInstance) — mã hóa trong `extra` dạng "id:rarity:level:aff1,aff2".
 var weapon_inst: Dictionary = {}
+## Khác 0: các pickup cùng nhóm là "chọn 1 trong N" — nhặt 1 cái thì các cái còn lại biến mất.
+var choice_group: int = 0
 var _t: float = 0.0
 var _icon_tex: Texture2D
 var _near: bool = false
@@ -128,6 +130,11 @@ func _try_take() -> void:
 	if not displaced.is_empty():
 		Global.weapon_drop_requested.emit(displaced, global_position)
 	Global.sfx("pickup")
+	if choice_group != 0:
+		for other in get_tree().get_nodes_in_group("weapon_pickup"):
+			if other != self and other.choice_group == choice_group:
+				Global.burst(other.global_position, Color(0.8, 0.8, 0.9), 6, 70.0, 0.8)
+				other.queue_free()
 	queue_free()
 
 func _on_body_entered(body: Node) -> void:

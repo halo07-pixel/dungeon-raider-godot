@@ -150,6 +150,28 @@ const MYTHIC_MIN_FLOOR: int = 8
 const MYTHIC_WEIGHT_PER_FLOOR: float = 0.5
 const MYTHIC_WEIGHT_CAP: float = 3.0
 
+## Bảo hiểm xui (pity) cho vũ khí rơi từ rương/boss: sau PITY_EPIC lần liên tiếp không ra Epic+ thì lần kế tiếp tối thiểu Epic;
+## sau PITY_LEGENDARY lần không ra Legendary+ thì lần kế tối thiểu Legendary. Đếm theo ván (reset_run, lưu trong save).
+const PITY_EPIC: int = 4
+const PITY_LEGENDARY: int = 12
+var weapon_pity: Dictionary = {"epic": 0, "legendary": 0}
+
+## Như roll_weapon_rarity nhưng áp dụng + cập nhật bộ đếm pity. Dùng cho drop thật trong ván.
+func roll_weapon_rarity_pity(for_floor: int, min_rarity: String = "common") -> String:
+	var floor_min: String = min_rarity
+	if int(weapon_pity["legendary"]) >= PITY_LEGENDARY:
+		floor_min = _higher_rarity(floor_min, "legendary")
+	elif int(weapon_pity["epic"]) >= PITY_EPIC:
+		floor_min = _higher_rarity(floor_min, "epic")
+	var r: String = roll_weapon_rarity(for_floor, floor_min)
+	var idx: int = WEAPON_RARITY_ORDER.find(r)
+	weapon_pity["epic"] = 0 if idx >= WEAPON_RARITY_ORDER.find("epic") else int(weapon_pity["epic"]) + 1
+	weapon_pity["legendary"] = 0 if idx >= WEAPON_RARITY_ORDER.find("legendary") else int(weapon_pity["legendary"]) + 1
+	return r
+
+func _higher_rarity(a: String, b: String) -> String:
+	return a if WEAPON_RARITY_ORDER.find(a) >= WEAPON_RARITY_ORDER.find(b) else b
+
 ## Random độ hiếm vũ khí cho tầng `for_floor`. `min_rarity` nâng độ hiếm tối thiểu (vd boss thưởng từ "rare").
 func roll_weapon_rarity(for_floor: int, min_rarity: String = "common") -> String:
 	var steps: int = clampi(for_floor - 1 + SkillTree.early_rare_steps(upgrades, for_floor), 0, WEAPON_RARITY_MAX_FLOORS)
@@ -581,6 +603,7 @@ var stolen_gold_held: int = 0
 func reset_run() -> void:
 	floor_num = 1
 	in_council = false
+	weapon_pity = {"epic": 0, "legendary": 0}
 	run_heat = selected_heat_ids()
 	coins = 0
 	stolen_gold_held = 0

@@ -162,6 +162,7 @@ static func weapons() -> String:
 		t += line + "\n"
 	t += "Melee weapons get only %s of the lifesteal (and half again against bosses).\n" % _pct(Global.MELEE_LIFESTEAL_MULT)
 	t += "Epic and Legendary weapons also gain a special effect. Mythic weapons keep the Legendary effect AND add a unique Mythic trait, but only start dropping from floor %d on.\n" % Global.MYTHIC_MIN_FLOOR
+	t += "Where weapons come from: dead-end Treasure Rooms show 3 different weapons and you may take ONE (the other two vanish; the first is at least Rare). Bosses on floors 5, 10 and 15 drop a Rare+ weapon. Bad luck protection: after %d weapon drops without an Epic or better, the next one is at least Epic; after %d without a Legendary, the next is at least Legendary.\n" % [Global.PITY_EPIC, Global.PITY_LEGENDARY]
 	t += _sub("Affixes")
 	t += "Every Rare or better weapon drops with random bonus lines (Rare 1, Epic 2, Legendary 2, Mythic 3). Two weapons of the same type and rarity can be very different:\n"
 	for aid in WeaponInstance.AFFIXES:
