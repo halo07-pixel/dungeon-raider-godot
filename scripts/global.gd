@@ -156,6 +156,8 @@ const MYTHIC_WEIGHT_CAP: float = 3.0
 const PITY_EPIC: int = 4
 const PITY_LEGENDARY: int = 12
 var weapon_pity: Dictionary = {"epic": 0, "legendary": 0}
+## Phế Liệu (chỉ trong ván): nhận khi phân rã vũ khí ở Lò Rèn, dùng để reroll dòng phụ / ghép Mythic.
+var scrap: int = 0
 
 ## Như roll_weapon_rarity nhưng áp dụng + cập nhật bộ đếm pity. Dùng cho drop thật trong ván.
 func roll_weapon_rarity_pity(for_floor: int, min_rarity: String = "common") -> String:
@@ -605,6 +607,7 @@ func reset_run() -> void:
 	floor_num = 1
 	in_council = false
 	weapon_pity = {"epic": 0, "legendary": 0}
+	scrap = 0
 	run_heat = selected_heat_ids()
 	coins = 0
 	stolen_gold_held = 0
