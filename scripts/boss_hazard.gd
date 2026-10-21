@@ -20,6 +20,7 @@ var apply_stun_duration: float = 0.0 # >0: ngoài sát thương còn gây Choán
 var apply_poison_ticks: int = 0 # >0: gây Độc (DoT) khi đứng trong vùng (đòn "Đầm Độc Lan")
 var poison_amount: float = 0.0 # sát thương mỗi nhịp độc
 var apply_slide_duration: float = 0.0 # >0: làm Player trượt mất kiểm soát hướng đi bấy nhiêu giây (đòn "Mặt Băng")
+var source: String = "hazard:boss" # nguồn ghi vào thống kê khi gây sát thương
 var fire_sfx: String = "" # tên âm phát một lần khi vùng kích hoạt (hết báo trước)
 var burst_on_fire: bool = false # true: đòn 1 lần có tia lửa/đá văng khi nổ (Nứt Đất)
 var end_radius: float = 0.0 # >radius: vùng LAN RỘNG dần từ radius tới end_radius suốt thời gian tồn tại
@@ -103,7 +104,7 @@ func _deal_damage() -> void:
 	if is_instance_valid(p) and p.has_method("take_damage"):
 		if not (p.has_method("is_invulnerable") and p.is_invulnerable()):
 			if damage > 0:
-				p.take_damage(damage, global_position, 60.0)
+				p.take_damage(damage, global_position, 60.0, false, false, source)
 			if p.has_method("apply_status"):
 				if apply_slow:
 					p.apply_status("slow", 1.0)

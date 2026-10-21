@@ -18,6 +18,7 @@ signal floor_started(floor_num: int)
 signal player_hit_landed(target: Node, dmg: int, is_crit: bool)
 ## Player vừa nhận sát thương (HUD nghe để nháy viền đỏ khi đòn nặng).
 signal player_damaged(amount: int, max_hp: int)
+signal player_hurt_by(source: String, amount: int) # nguồn: "enemy:kind", "boss:kind", "hazard:...", "trap:...", "dot:burn" ...
 ## Player đổi vũ khí lấy từ ô đang cầm (nhặt bằng E khi đủ ô) -> Dungeon nghe để đặt vũ khí cũ xuống sàn.
 signal weapon_drop_requested(inst: Dictionary, pos: Vector2)
 

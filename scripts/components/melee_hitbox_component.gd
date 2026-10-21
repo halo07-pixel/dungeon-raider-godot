@@ -55,7 +55,7 @@ func try_attack() -> void:
 	if not is_instance_valid(p) or not p.alive:
 		return
 	_hit_landed = not (p.has_method("is_invulnerable") and p.is_invulnerable()) # lăn né = đòn trượt
-	p.take_damage(int(_data["touch"]), _owner2d.global_position, float(_data["touch_knock"]))
+	p.take_damage(int(_data["touch"]), _owner2d.global_position, float(_data["touch_knock"]), false, false, "enemy:" + String(_owner2d.get("kind")))
 	_apply_touch_effect(p)
 	if _hit_landed:
 		var af = _owner2d.get("affix_node")

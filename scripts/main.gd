@@ -310,6 +310,9 @@ func _build_game_over_menu() -> void:
 	var info = Label.new()
 	info.text = "Floors cleared: %d\nEnemies defeated: %d\nGold collected: %d" % [f, k, c_coin]
 	var tele_text: String = RunTelemetryScript.summary_text(Global.run_stats)
+	var death_text: String = RunTelemetryScript.death_text(Global.run_stats)
+	if death_text != "":
+		tele_text = death_text + ("\n" + tele_text if tele_text != "" else "")
 	if Global.heat_points() > 0:
 		tele_text += ("\n" if tele_text != "" else "") + "Heat: %d (+%d%% Purple Gems)" % [Global.heat_points(), int(round((Global.HeatScript.gem_mult(Global.run_heat) - 1.0) * 100.0))]
 	if tele_text != "":

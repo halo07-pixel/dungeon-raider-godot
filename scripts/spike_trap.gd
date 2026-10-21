@@ -72,4 +72,4 @@ func _process(delta: float) -> void:
 	if danger and player_inside:
 		var p = Global.player
 		if is_instance_valid(p) and p.has_method("take_damage"):
-			p.take_damage(DAMAGE, global_position, 0.0, false, true)
+			p.take_damage(DAMAGE, global_position, 0.0, false, true, "trap:spikes")

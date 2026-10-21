@@ -63,4 +63,4 @@ func _process(delta: float) -> void:
 				if p.has_method("apply_status"):
 					p.apply_status("slide", SLIDE_DURATION)
 				if not (p.has_method("is_invulnerable") and p.is_invulnerable()):
-					p.take_damage(DAMAGE, global_position, 0.0)
+					p.take_damage(DAMAGE, global_position, 0.0, false, false, "hazard:ice")
