@@ -55,7 +55,7 @@ const BOW_EPIC_EXTRA_PIERCE: int = 1
 const BOW_RARE_DRAW_MULT: float = 0.8   # Rare: căng dây nhanh hơn 20%
 const BOW_LEGEND_ARROWS: int = 3        # Legendary: căng đầy bắn 3 mũi tên...
 const BOW_LEGEND_SPREAD: float = 14.0
-const BOW_LEGEND_DMG_MULT: float = 0.75 # ...mỗi mũi 75% sát thương
+const BOW_LEGEND_DMG_MULT: float = 0.5 # ...mỗi mũi 75% sát thương
 ## Railgun / Staff
 ## Spear: quái phía sau mũi giáo (không phải quái đầu tiên) ăn bấy nhiêu phần sát thương.
 const SPEAR_BEHIND_MULT: float = 0.6
@@ -596,18 +596,18 @@ func _shoot(charge_ratio_arg: float = -1.0, perfect: bool = false) -> void:
 		if fx_rarity == "rare": cd *= 0.85
 		elif fx_rarity == "epic": pierce_n += PIERCE_PISTOL_EPIC
 		elif fx_rarity == "legendary":
-			pellets = 3; spread = 15.0; dmg = base_dmg * 2
+			pellets = 3; spread = 15.0; dmg = int(float(dmg) * 0.5) # 3 viên, mỗi viên nửa sát thương (tổng ~1.5x độ hiếm — trước đây x6 là outlier)
 	elif weapon_id == "shotgun":
 		if fx_rarity == "rare": pellets = 7; life *= 1.15
 		elif fx_rarity == "epic": w_knock *= 2.0
 		elif fx_rarity == "legendary": eff = "explode"; pellets = 10; p_color = Color(1.0, 0.3, 0.1)
 	elif weapon_id == "laser":
-		if fx_rarity == "rare": cd *= 0.7; dmg = int(base_dmg * 1.3)
-		elif fx_rarity == "epic": eff = "slow"
-		elif fx_rarity == "legendary": eff = "chain"; p_color = Color.RED; dmg = base_dmg * 2
+		if fx_rarity == "rare": cd *= 0.85
+		elif fx_rarity == "epic": eff = "slow"; cd *= 0.9
+		elif fx_rarity == "legendary": eff = "chain"; p_color = Color.RED; cd *= 0.85
 	elif weapon_id == "railgun":
 		if fx_rarity == "rare": cd *= RAILGUN_RARE_CD_MULT
-		elif fx_rarity == "epic": eff = "slow"
+		elif fx_rarity == "epic": eff = "slow"; cd *= 0.92
 		elif fx_rarity == "legendary": eff = "chain"; p_color = Color(1.0, 0.4, 0.9); dmg = int(float(dmg) * RAILGUN_LEGEND_DMG_MULT)
 	elif weapon_id == "crossbow":
 		if fx_rarity == "rare": cd *= CROSSBOW_RARE_CD_MULT
@@ -646,8 +646,8 @@ func _shoot(charge_ratio_arg: float = -1.0, perfect: bool = false) -> void:
 				if (shot_count + 1) % MYTHIC_PISTOL_EVERY == 0:
 					pellets = 5; spread = 24.0; pierce_n += 1
 			"smg": cd *= 0.8; pierce_n += 1
-			"shotgun": pellets += 4; life *= 1.2
-			"railgun": dmg = int(float(dmg) * 1.35); cd *= 0.8
+			"shotgun": pellets += 3; life *= 1.2
+			"railgun": dmg = int(float(dmg) * 1.15); cd *= 0.9
 			"staff": blast_r *= 1.35
 			"crossbow": pin_mult *= 1.4; pin_stun += 0.8; cd *= 0.85
 			"flamethrower": burn_power = int(float(burn_power) * 1.5); life *= 1.25
@@ -701,7 +701,7 @@ func _shoot(charge_ratio_arg: float = -1.0, perfect: bool = false) -> void:
 				spread = BOW_LEGEND_SPREAD
 				dmg = int(float(dmg) * BOW_LEGEND_DMG_MULT)
 			if weapon_rarity == "mythic":
-				pellets += 2 # Gale Quiver
+				pellets += 1 # Gale Quiver
 				pierce_n += 1
 	if weapon_id == "railgun" and Global.buff_stack("buff_overcharge") > 0:
 		railgun_shots += 1
@@ -857,14 +857,14 @@ func _swing() -> void:
 	# LOGIC ĐỘ HIẾM CẬN CHIẾN CHUYÊN SÂU
 	if weapon_id == "broadsword":
 		if fx_rarity == "rare": aoe_range *= 1.2
-		elif fx_rarity == "legendary": aoe_angle = 300.0; dmg = base_dmg * 2
+		elif fx_rarity == "legendary": aoe_angle = 300.0
 	elif weapon_id == "daggers":
-		if fx_rarity == "rare": cd *= 0.75; if randf() < 0.2: is_crit = true
+		if fx_rarity == "rare": cd *= 0.9; if randf() < 0.1: is_crit = true
 		elif fx_rarity == "epic":
 			dagger_combo += 1; dagger_timer = 1.0
 			if dagger_combo >= 4: apply_bleed = true; dagger_combo = 0; Global.sfx("hit")
 		elif fx_rarity == "legendary":
-			cd *= 0.4; if randf() < 0.5: is_crit = true
+			cd *= 0.75; if randf() < 0.25: is_crit = true
 	elif weapon_id == "spear":
 		var rm: int = Global.buff_stack("buff_reach_master")
 		aoe_range *= 1.0 + REACH_MASTER_RANGE_PER_STACK * float(rm)
