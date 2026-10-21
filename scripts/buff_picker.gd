@@ -5,6 +5,7 @@ extends CanvasLayer
 var _title: Label
 var _bg: ColorRect
 var _cards: Array = [] # Array[Dictionary]: panel/style/tier_label/name_label/desc_label/synergy_label/stack_label/id
+var _reroll_label: Label
 var _choosing: bool = false # chống bấm đúp: mỗi lượt chỉ nhận 1 lần chọn
 const CARD_BG: Color = Color(0.12, 0.12, 0.16, 0.95)
 const CARD_BG_HOVER: Color = Color(0.2, 0.2, 0.26, 0.98)
@@ -47,8 +48,15 @@ func _build_ui() -> void:
 	hbox.add_theme_constant_override("separation", 24)
 	vbox.add_child(hbox)
 
-	for i in 3:
+	for i in Global.SkillTree.CHOICE_COUNT_WIDE: # tối đa 4 thẻ (nút Wider Choice); thẻ thừa tự ẩn
 		_cards.append(_make_card(hbox, i))
+
+	_reroll_label = Label.new()
+	_reroll_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_reroll_label.add_theme_font_size_override("font_size", 16)
+	_reroll_label.add_theme_color_override("font_color", Color(0.8, 0.8, 0.9))
+	_reroll_label.visible = false
+	vbox.add_child(_reroll_label)
 
 
 func _make_card(parent: Control, index: int) -> Dictionary:
@@ -152,6 +160,12 @@ func _input(event: InputEvent) -> void:
 		KEY_1, KEY_KP_1: idx = 0
 		KEY_2, KEY_KP_2: idx = 1
 		KEY_3, KEY_KP_3: idx = 2
+		KEY_4, KEY_KP_4: idx = 3
+		KEY_R:
+			if Global.can_reroll():
+				get_viewport().set_input_as_handled()
+				Global.try_reroll()
+			return
 	if idx < 0 or idx >= _cards.size() or not _cards[idx]["panel"].visible:
 		return
 	var id: String = _cards[idx]["id"]
@@ -193,6 +207,8 @@ func _on_buff_choice_requested(choices: Array) -> void:
 		var cur_stack: int = Global.buff_stack(id)
 		c["stack_label"].text = ("x%d" % cur_stack) if cur_stack > 0 else ""
 
+	_reroll_label.visible = Global.can_reroll()
+	_reroll_label.text = "[R] Reroll (%d left)" % Global.rerolls_left
 	_choosing = false
 	_bg.show()
 	get_tree().paused = true
