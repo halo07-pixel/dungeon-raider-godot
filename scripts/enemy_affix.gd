@@ -242,8 +242,9 @@ func _on_volatile_died(_e = null) -> void:
 	hz.fire_sfx = "volatile_boom"
 	hz.source = "affix:volatile"
 	hz.color = Color(1.0, 0.5, 0.1, 0.5)
-	Global.world.add_child(hz)
-	hz.global_position = enemy.global_position
+	# Chết thường xảy ra ngay trong callback va chạm của đạn: thêm Area2D lúc đó bị Godot từ chối -> hoãn sang khung kế.
+	Global.world.add_child.call_deferred(hz)
+	hz.set_deferred("global_position", enemy.global_position)
 
 func _draw() -> void:
 	if id == "frenzy" and is_instance_valid(enemy) and _frenzy > 0.0:
