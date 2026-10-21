@@ -1,5 +1,6 @@
 extends CharacterBody2D
 ## Player: Tích hợp bảng hiệu ứng Sử thi/Huyền thoại chi tiết, Combo Dao Găm & Chém Đạn.
+const WeaponInstance = preload("res://scripts/weapon_instance.gd")
 
 signal died
 ## Ô vũ khí / ô đang cầm vừa đổi (HUD đọc weapon_slots + active_slot khi nghe tín hiệu này).
@@ -59,6 +60,8 @@ const BOW_LEGEND_DMG_MULT: float = 0.75 # ...mỗi mũi 75% sát thương
 ## Spear: quái phía sau mũi giáo (không phải quái đầu tiên) ăn bấy nhiêu phần sát thương.
 const SPEAR_BEHIND_MULT: float = 0.6
 const SPEAR_RARE_RANGE_MULT: float = 1.2
+## Mythic Pistol (Hail of Lead): cứ mỗi MYTHIC_PISTOL_EVERY phát bắn thì bắn loạt quạt 5 viên xuyên.
+const MYTHIC_PISTOL_EVERY: int = 5
 const SPEAR_EPIC_BEHIND_MULT: float = 1.0
 const SPEAR_LEGEND_RANGE_MULT: float = 1.3
 const SPEAR_LEGEND_DMG_MULT: float = 1.5
@@ -77,11 +80,9 @@ const SWAP_BONUS_WINDOW: float = 1.5
 const SWAP_BONUS_MULT: float = 1.5
 const COMBO_WINDOW: float = 2.0
 const COMBO_BONUS_MULT: float = 2.0
-## Hạng vũ khí (Weapon Rank, chỉ trong ván): mỗi vũ khí tích số quái hạ gục; đạt mốc thì lên hạng, mỗi hạng +% sát thương,
-## hạng 3 (tối đa) thêm 1 đặc tính nhỏ riêng. (Khác với kỹ năng meta "mastery" của Global.upgrades.)
-const RANK_KILLS: Array = [10, 30, 60]    # số quái cần cho hạng 1, 2, 3
-const RANK_DMG_PER_LEVEL: float = 0.08
-## Đặc tính hạng 3: cd_mult (nhân hồi đòn / thời gian căng cung), pierce_add, range_mult (tầm cận chiến), blast_mult (vùng nổ), crit_add.
+## Cấp vũ khí (+0..+5, nâng ở Forge — xem WeaponInstance): mỗi cấp +WeaponInstance.LEVEL_DMG sát thương,
+## cấp tối đa (+5) mở thêm 1 đặc tính "Mastery" nhỏ riêng từng loại. (Khác với kỹ năng meta "mastery" của Global.upgrades.)
+## Đặc tính Mastery: cd_mult (nhân hồi đòn / thời gian căng cung), pierce_add, range_mult (tầm cận chiến), blast_mult (vùng nổ), crit_add.
 const RANK_PERKS: Dictionary = {
 	"pistol": {"pierce_add": 1},
 	"smg": {"cd_mult": 0.9},
@@ -149,7 +150,6 @@ var charging: bool = false
 var chakram_discs: Array = []       # đĩa Chakram đang bay (chưa về thì chưa ném được đĩa mới)
 var nailgun_ready: bool = false     # Nailgun: lần nạp kế tiếp nhanh gấp đôi
 var _flame_shots: int = 0
-var weapon_kills: Dictionary = {}   # id vũ khí -> số quái đã hạ gục trong ván này (Weapon Rank)
 var swap_bonus_timer: float = 0.0   # còn bao lâu thì thưởng đổi vũ khí hết hiệu lực
 var swap_bonus_mult: float = 1.0
 var swap_bonus_combo: bool = false
@@ -163,13 +163,20 @@ var reap_stacks: int = 0
 var reap_timer: float = 0.0
 ## Kỹ năng class (vd Overdrive) nhân thời gian hồi đòn đánh; 1.0 = bình thường. Chỉ ClassSkill được ghi vào đây.
 var skill_attack_cd_mult: float = 1.0
-## 2 ô vũ khí: mỗi ô {"id": String, "rarity": String} hoặc {} nếu trống. weapon_id/weapon_rarity/weapon/
+## 2 ô vũ khí: mỗi ô là 1 WeaponInstance {"id","rarity","level","affixes"} hoặc {} nếu trống. weapon_id/weapon_rarity/weapon/
 ## rarity_data bên dưới LUÔN phản ánh ô đang cầm (active_slot) nên toàn bộ code bắn/chém cũ không đổi.
 var weapon_slots: Array = [{}, {}]
 var active_slot: int = 0
 var weapon_id: String = "pistol"
 var weapon_rarity: String = "common"
 var rarity_data: Dictionary = {}
+## Cây vũ khí đang cầm (WeaponInstance) + dữ liệu suy ra: Mythic dùng các nhánh hiệu ứng của Legendary (fx_rarity)
+## cộng đặc tính Mythic riêng; weapon_level = cấp nâng; aff = chỉ số gộp từ dòng phụ (WeaponInstance.affix_mods).
+var weapon_inst: Dictionary = {}
+var _steal_acc: float = 0.0
+var fx_rarity: String = "common"
+var weapon_level: int = 0
+var aff: Dictionary = {"dmg": 1.0, "cd": 1.0, "knock": 1.0, "reach": 1.0, "crit": 0.0, "steal": 0.0, "pierce": 0, "burn": 0.0, "slow": 0.0, "bleed": 0.0}
 var weapon: Dictionary = {}
 var alive: bool = true
 var rolling: bool = false
@@ -248,6 +255,7 @@ func _ready() -> void:
 	Global.player_hit_landed.connect(_on_hit_landed_fortify)
 	Global.player_hit_landed.connect(_on_hit_landed_weapon_buffs)
 	Global.player_hit_landed.connect(_on_hit_landed_combo)
+	Global.player_hit_landed.connect(_on_hit_landed_affix)
 
 	set_weapon_with_rarity(cls["default_weapon"], "common")
 	_attach_class_skill()
@@ -461,10 +469,10 @@ func _secondary_dmg_mult() -> float:
 ## Tầm chém hiện tại của vũ khí cận chiến (đã cộng độ hiếm + Tầm Đánh + Càn Quét) — cùng công thức _swing().
 func current_melee_range() -> float:
 	var r: float = float(weapon.get("range", 40.0))
-	if weapon_id == "broadsword" and weapon_rarity == "rare": r *= 1.2
+	if weapon_id == "broadsword" and fx_rarity == "rare": r *= 1.2
 	elif weapon_id == "hammer":
-		if weapon_rarity == "rare": r *= 1.25
-		elif weapon_rarity == "legendary": r *= 1.5
+		if fx_rarity == "rare": r *= 1.25
+		elif fx_rarity == "legendary": r *= 1.5
 	if Global.buff_stack("buff_reach") > 0:
 		r *= 1.0 + 0.15 * float(Global.buff_stack("buff_reach"))
 	if Global.buff_stack("buff_sweep") > 0:
@@ -498,9 +506,9 @@ func _roll_slash() -> void:
 ## Thời gian (giây) cần để căng đầy: gốc của vũ khí, nhanh hơn theo Rare / buff Haste / Overdrive.
 func _charge_time_needed() -> float:
 	var t: float = float(weapon.get("charge_time", 0.5))
-	if weapon_id == "bow" and weapon_rarity == "rare":
+	if weapon_id == "bow" and fx_rarity == "rare":
 		t *= BOW_RARE_DRAW_MULT
-	t *= pow(0.9, float(Global.buff_stack("buff_haste"))) * _rank_perk("cd_mult", 1.0)
+	t *= pow(0.9, float(Global.buff_stack("buff_haste"))) * _rank_perk("cd_mult", 1.0) * float(aff["cd"])
 	if weapon_id == "bow":
 		t *= pow(QUICKDRAW_PER_STACK, float(Global.buff_stack("buff_quickdraw")))
 	t *= skill_attack_cd_mult
@@ -543,7 +551,6 @@ func _shoot(charge_ratio_arg: float = -1.0, perfect: bool = false) -> void:
 	var mult = rarity_data["mult"]
 	# ÁP DỤNG KỸ NĂNG: Cộng % sát thương (mastery)
 	mult += Global.upgrades["mastery"] * 0.05
-	mult += RANK_DMG_PER_LEVEL * float(weapon_rank(weapon_id))
 	# ÁP DỤNG BUFF: Sức Mạnh / Đà Chiến Đấu / Cuồng Nộ
 	mult += 0.08 * float(Global.buff_stack("buff_dmg"))
 	if Global.buff_stack("buff_momentum") > 0:
@@ -554,7 +561,7 @@ func _shoot(charge_ratio_arg: float = -1.0, perfect: bool = false) -> void:
 	if Global.buff_stack("buff_focus") > 0 and still_time >= 0.6:
 		mult += 0.2 * float(Global.buff_stack("buff_focus"))
 	var dmg = int(base_dmg * mult)
-	var swap_mult: float = _consume_swap_bonus() # thưởng đổi vũ khí, áp SAU các nhánh độ hiếm (chúng có thể gán lại dmg)
+	var swap_mult: float = _consume_swap_bonus() * WeaponInstance.level_mult(weapon_level) * float(aff["dmg"]) # swap + cấp nâng + dòng phụ, áp SAU các nhánh độ hiếm (chúng có thể gán lại dmg)
 
 	var pellets: int = w["pellets"]
 	var spread: float = w["spread"]
@@ -586,26 +593,26 @@ func _shoot(charge_ratio_arg: float = -1.0, perfect: bool = false) -> void:
 
 	# LOGIC ĐỘ HIẾM TẦM XA CHUYÊN SÂU
 	if weapon_id == "pistol":
-		if weapon_rarity == "rare": cd *= 0.85
-		elif weapon_rarity == "epic": pierce_n += PIERCE_PISTOL_EPIC
-		elif weapon_rarity == "legendary":
+		if fx_rarity == "rare": cd *= 0.85
+		elif fx_rarity == "epic": pierce_n += PIERCE_PISTOL_EPIC
+		elif fx_rarity == "legendary":
 			pellets = 3; spread = 15.0; dmg = base_dmg * 2
 	elif weapon_id == "shotgun":
-		if weapon_rarity == "rare": pellets = 7; life *= 1.15
-		elif weapon_rarity == "epic": w_knock *= 2.0
-		elif weapon_rarity == "legendary": eff = "explode"; pellets = 10; p_color = Color(1.0, 0.3, 0.1)
+		if fx_rarity == "rare": pellets = 7; life *= 1.15
+		elif fx_rarity == "epic": w_knock *= 2.0
+		elif fx_rarity == "legendary": eff = "explode"; pellets = 10; p_color = Color(1.0, 0.3, 0.1)
 	elif weapon_id == "laser":
-		if weapon_rarity == "rare": cd *= 0.7; dmg = int(base_dmg * 1.3)
-		elif weapon_rarity == "epic": eff = "slow"
-		elif weapon_rarity == "legendary": eff = "chain"; p_color = Color.RED; dmg = base_dmg * 2
+		if fx_rarity == "rare": cd *= 0.7; dmg = int(base_dmg * 1.3)
+		elif fx_rarity == "epic": eff = "slow"
+		elif fx_rarity == "legendary": eff = "chain"; p_color = Color.RED; dmg = base_dmg * 2
 	elif weapon_id == "railgun":
-		if weapon_rarity == "rare": cd *= RAILGUN_RARE_CD_MULT
-		elif weapon_rarity == "epic": eff = "slow"
-		elif weapon_rarity == "legendary": eff = "chain"; p_color = Color(1.0, 0.4, 0.9); dmg = int(float(dmg) * RAILGUN_LEGEND_DMG_MULT)
+		if fx_rarity == "rare": cd *= RAILGUN_RARE_CD_MULT
+		elif fx_rarity == "epic": eff = "slow"
+		elif fx_rarity == "legendary": eff = "chain"; p_color = Color(1.0, 0.4, 0.9); dmg = int(float(dmg) * RAILGUN_LEGEND_DMG_MULT)
 	elif weapon_id == "crossbow":
-		if weapon_rarity == "rare": cd *= CROSSBOW_RARE_CD_MULT
-		elif weapon_rarity == "epic": pin_stun = CROSSBOW_EPIC_PIN_STUN
-		elif weapon_rarity == "legendary": pin_stun = CROSSBOW_EPIC_PIN_STUN; pin_mult = CROSSBOW_LEGEND_PIN_MULT; dmg = int(float(dmg) * CROSSBOW_LEGEND_DMG_MULT); p_color = Color(1.0, 0.7, 0.3)
+		if fx_rarity == "rare": cd *= CROSSBOW_RARE_CD_MULT
+		elif fx_rarity == "epic": pin_stun = CROSSBOW_EPIC_PIN_STUN
+		elif fx_rarity == "legendary": pin_stun = CROSSBOW_EPIC_PIN_STUN; pin_mult = CROSSBOW_LEGEND_PIN_MULT; dmg = int(float(dmg) * CROSSBOW_LEGEND_DMG_MULT); p_color = Color(1.0, 0.7, 0.3)
 		var hb: int = Global.buff_stack("buff_heavy_bolt")
 		dmg = int(float(dmg) * (1.0 + HEAVY_BOLT_DMG_PER_STACK * float(hb)))
 		pin_reach += HEAVY_BOLT_REACH_PER_STACK * float(hb)
@@ -615,34 +622,53 @@ func _shoot(charge_ratio_arg: float = -1.0, perfect: bool = false) -> void:
 	elif weapon_id == "flamethrower":
 		var burn_mult: float = 1.0 + FUEL_TANK_BURN_PER_STACK * float(Global.buff_stack("buff_fuel_tank"))
 		life *= 1.0 + FUEL_TANK_RANGE_PER_STACK * float(Global.buff_stack("buff_fuel_tank"))
-		if weapon_rarity == "rare": life *= FLAME_RARE_LIFE_MULT
-		elif weapon_rarity == "epic": burn_mult *= FLAME_EPIC_BURN_MULT
-		elif weapon_rarity == "legendary": burn_mult *= FLAME_EPIC_BURN_MULT; dmg = int(float(dmg) * FLAME_LEGEND_DMG_MULT); spread *= FLAME_LEGEND_SPREAD_MULT; p_color = Color(1.0, 0.35, 0.9)
+		if fx_rarity == "rare": life *= FLAME_RARE_LIFE_MULT
+		elif fx_rarity == "epic": burn_mult *= FLAME_EPIC_BURN_MULT
+		elif fx_rarity == "legendary": burn_mult *= FLAME_EPIC_BURN_MULT; dmg = int(float(dmg) * FLAME_LEGEND_DMG_MULT); spread *= FLAME_LEGEND_SPREAD_MULT; p_color = Color(1.0, 0.35, 0.9)
 		burn_power = maxi(2, int(float(dmg) * FLAME_BURN_PER_DMG * burn_mult))
 	elif weapon_id == "chakram":
 		dmg = int(float(dmg) * (1.0 + SHARPENED_DMG_PER_STACK * float(Global.buff_stack("buff_sharpened"))))
-		if weapon_rarity == "rare": speed *= CHAKRAM_RARE_SPEED_MULT
-		elif weapon_rarity == "epic": eff = "slow"
-		elif weapon_rarity == "legendary": eff = "slow"; return_mult = CHAKRAM_LEGEND_RETURN_MULT; p_color = Color(1.0, 0.85, 0.4)
+		if fx_rarity == "rare": speed *= CHAKRAM_RARE_SPEED_MULT
+		elif fx_rarity == "epic": eff = "slow"
+		elif fx_rarity == "legendary": eff = "slow"; return_mult = CHAKRAM_LEGEND_RETURN_MULT; p_color = Color(1.0, 0.85, 0.4)
 		if Global.buff_stack("buff_twin_disc") > 0:
 			pellets = 2
 			spread = TWIN_DISC_SPREAD
 	elif weapon_id == "staff":
-		if weapon_rarity == "rare": blast_r *= STAFF_RARE_RADIUS_MULT
-		elif weapon_rarity == "epic": blast_status = "slow"
-		elif weapon_rarity == "legendary": blast_r *= STAFF_LEGEND_RADIUS_MULT; blast_status = "slow"; blast_echo = true; p_color = Color(1.0, 0.45, 0.8)
+		if fx_rarity == "rare": blast_r *= STAFF_RARE_RADIUS_MULT
+		elif fx_rarity == "epic": blast_status = "slow"
+		elif fx_rarity == "legendary": blast_r *= STAFF_LEGEND_RADIUS_MULT; blast_status = "slow"; blast_echo = true; p_color = Color(1.0, 0.45, 0.8)
+
+	# ĐẶC TÍNH MYTHIC (riêng từng loại, cộng thêm lên nhánh Legendary ở trên)
+	if weapon_rarity == "mythic":
+		match weapon_id:
+			"pistol":
+				if (shot_count + 1) % MYTHIC_PISTOL_EVERY == 0:
+					pellets = 5; spread = 24.0; pierce_n += 1
+			"smg": cd *= 0.8; pierce_n += 1
+			"shotgun": pellets += 4; life *= 1.2
+			"railgun": dmg = int(float(dmg) * 1.35); cd *= 0.8
+			"staff": blast_r *= 1.35
+			"crossbow": pin_mult *= 1.4; pin_stun += 0.8; cd *= 0.85
+			"flamethrower": burn_power = int(float(burn_power) * 1.5); life *= 1.25
+			"chakram": return_mult *= 1.5; speed *= 1.15
+			"laser": pierce_n += 3
+	# Dòng phụ "Reaching": đạn bay xa/nhanh hơn
+	if float(aff["reach"]) > 1.0:
+		life *= float(aff["reach"])
+		speed *= 1.0 + (float(aff["reach"]) - 1.0) * 0.5
 
 	# ÁP DỤNG BUFF: Nhanh Nhẹn / Chí Mạng / Tầm Đánh (tầm xa = bay xa+nhanh hơn) / Vung Kiếm Càn Quét (tầm xa = xuyên)
 	cd *= pow(0.9, float(Global.buff_stack("buff_haste")))
-	cd *= skill_attack_cd_mult * _rank_perk("cd_mult", 1.0)
-	if randf() < 0.08 * float(Global.buff_stack("buff_crit")) + _rank_perk("crit_add", 0.0):
+	cd *= skill_attack_cd_mult * _rank_perk("cd_mult", 1.0) * float(aff["cd"])
+	if randf() < 0.08 * float(Global.buff_stack("buff_crit")) + _rank_perk("crit_add", 0.0) + float(aff["crit"]):
 		is_crit = true
 	if Global.buff_stack("buff_reach") > 0:
 		life *= 1.0 + 0.15 * float(Global.buff_stack("buff_reach"))
 		speed *= 1.0 + 0.08 * float(Global.buff_stack("buff_reach"))
 	if Global.buff_stack("buff_sweep") > 0:
 		pierce_n += PIERCE_SWEEP
-	pierce_n += int(_rank_perk("pierce_add", 0.0))
+	pierce_n += int(_rank_perk("pierce_add", 0.0)) + int(aff["pierce"])
 	if blast_r > 0.0:
 		blast_r *= _rank_perk("blast_mult", 1.0)
 	if is_crit: dmg *= 2
@@ -668,12 +694,15 @@ func _shoot(charge_ratio_arg: float = -1.0, perfect: bool = false) -> void:
 				dmg = int(float(dmg) * PERFECT_DRAW_DMG_MULT)
 				p_color = Color(1.0, 1.0, 1.0)
 				Global.float_text(global_position + Vector2(0, -30), "PERFECT", Color(1.0, 0.95, 0.4), 18)
-			if weapon_rarity == "epic":
+			if fx_rarity == "epic":
 				pierce_n += BOW_EPIC_EXTRA_PIERCE
-			elif weapon_rarity == "legendary":
+			elif fx_rarity == "legendary":
 				pellets = BOW_LEGEND_ARROWS
 				spread = BOW_LEGEND_SPREAD
 				dmg = int(float(dmg) * BOW_LEGEND_DMG_MULT)
+			if weapon_rarity == "mythic":
+				pellets += 2 # Gale Quiver
+				pierce_n += 1
 	if weapon_id == "railgun" and Global.buff_stack("buff_overcharge") > 0:
 		railgun_shots += 1
 		if railgun_shots % OVERCHARGE_EVERY == 0:
@@ -801,7 +830,6 @@ func _swing() -> void:
 	var mult = rarity_data["mult"]
 	# ÁP DỤNG KỸ NĂNG: Cộng % sát thương (mastery)
 	mult += Global.upgrades["mastery"] * 0.05
-	mult += RANK_DMG_PER_LEVEL * float(weapon_rank(weapon_id))
 	# ÁP DỤNG BUFF: Sức Mạnh / Đà Chiến Đấu / Cuồng Nộ
 	mult += 0.08 * float(Global.buff_stack("buff_dmg"))
 	if Global.buff_stack("buff_momentum") > 0:
@@ -809,7 +837,7 @@ func _swing() -> void:
 	if Global.buff_stack("buff_berserk") > 0 and max_hp > 0:
 		mult += 0.4 * (1.0 - float(hp) / float(max_hp))
 	var dmg = int(base_dmg * mult)
-	var swap_mult: float = _consume_swap_bonus() # thưởng đổi vũ khí, áp SAU các nhánh độ hiếm (chúng có thể gán lại dmg)
+	var swap_mult: float = _consume_swap_bonus() * WeaponInstance.level_mult(weapon_level) * float(aff["dmg"]) # swap + cấp nâng + dòng phụ, áp SAU các nhánh độ hiếm (chúng có thể gán lại dmg)
 
 	var cd = float(w["cooldown"])
 	var aoe_range = float(w["range"])
@@ -828,34 +856,49 @@ func _swing() -> void:
 	
 	# LOGIC ĐỘ HIẾM CẬN CHIẾN CHUYÊN SÂU
 	if weapon_id == "broadsword":
-		if weapon_rarity == "rare": aoe_range *= 1.2
-		elif weapon_rarity == "legendary": aoe_angle = 300.0; dmg = base_dmg * 2
+		if fx_rarity == "rare": aoe_range *= 1.2
+		elif fx_rarity == "legendary": aoe_angle = 300.0; dmg = base_dmg * 2
 	elif weapon_id == "daggers":
-		if weapon_rarity == "rare": cd *= 0.75; if randf() < 0.2: is_crit = true
-		elif weapon_rarity == "epic":
+		if fx_rarity == "rare": cd *= 0.75; if randf() < 0.2: is_crit = true
+		elif fx_rarity == "epic":
 			dagger_combo += 1; dagger_timer = 1.0
 			if dagger_combo >= 4: apply_bleed = true; dagger_combo = 0; Global.sfx("hit")
-		elif weapon_rarity == "legendary":
+		elif fx_rarity == "legendary":
 			cd *= 0.4; if randf() < 0.5: is_crit = true
 	elif weapon_id == "spear":
 		var rm: int = Global.buff_stack("buff_reach_master")
 		aoe_range *= 1.0 + REACH_MASTER_RANGE_PER_STACK * float(rm)
 		behind_mult = minf(1.0, behind_mult + REACH_MASTER_BEHIND_PER_STACK * float(rm))
-		if weapon_rarity == "rare": aoe_range *= SPEAR_RARE_RANGE_MULT
-		elif weapon_rarity == "epic": behind_mult = SPEAR_EPIC_BEHIND_MULT
-		elif weapon_rarity == "legendary": behind_mult = SPEAR_EPIC_BEHIND_MULT; aoe_range *= SPEAR_LEGEND_RANGE_MULT; dmg = int(float(dmg) * SPEAR_LEGEND_DMG_MULT)
+		if fx_rarity == "rare": aoe_range *= SPEAR_RARE_RANGE_MULT
+		elif fx_rarity == "epic": behind_mult = SPEAR_EPIC_BEHIND_MULT
+		elif fx_rarity == "legendary": behind_mult = SPEAR_EPIC_BEHIND_MULT; aoe_range *= SPEAR_LEGEND_RANGE_MULT; dmg = int(float(dmg) * SPEAR_LEGEND_DMG_MULT)
 	elif weapon_id == "scythe":
 		var bp: int = Global.buff_stack("buff_blood_pact")
 		scythe_heal_pct = BLOOD_PACT_HEAL_PCT * float(bp)
-		if weapon_rarity == "rare": aoe_range *= SCYTHE_RARE_RANGE_MULT
-		elif weapon_rarity == "epic": scythe_cost_pct = SCYTHE_EPIC_COST_PCT; scythe_heal_pct += SCYTHE_EPIC_HEAL_PCT
-		elif weapon_rarity == "legendary":
+		if fx_rarity == "rare": aoe_range *= SCYTHE_RARE_RANGE_MULT
+		elif fx_rarity == "epic": scythe_cost_pct = SCYTHE_EPIC_COST_PCT; scythe_heal_pct += SCYTHE_EPIC_HEAL_PCT
+		elif fx_rarity == "legendary":
 			scythe_cost_pct = SCYTHE_LEGEND_COST_PCT; scythe_heal_pct += SCYTHE_LEGEND_HEAL_PCT
 			dmg = int(float(dmg) * SCYTHE_LEGEND_DMG_MULT)
 	elif weapon_id == "hammer":
-		if weapon_rarity == "rare": aoe_range *= 1.25; knock *= 1.5
-		elif weapon_rarity == "epic": apply_stun = true; stun_duration = 1.0
-		elif weapon_rarity == "legendary": apply_stun = true; stun_duration = 1.5; aoe_range *= 1.5
+		if fx_rarity == "rare": aoe_range *= 1.25; knock *= 1.5
+		elif fx_rarity == "epic": apply_stun = true; stun_duration = 1.0
+		elif fx_rarity == "legendary": apply_stun = true; stun_duration = 1.5; aoe_range *= 1.5
+
+	# ĐẶC TÍNH MYTHIC cận chiến
+	if weapon_rarity == "mythic":
+		match weapon_id:
+			"broadsword":
+				aoe_range *= 1.2
+				if randf() < 0.2: is_crit = true
+			"daggers": cd *= 0.8; apply_bleed = true
+			"spear": behind_mult = 1.0; aoe_range *= 1.1
+			"scythe": scythe_cost_pct *= 0.5; scythe_heal_pct += 0.05
+			"hammer": aoe_range *= 1.2; apply_stun = true; stun_duration = 2.0
+	# Dòng phụ: tầm chém (Reaching), hất lùi (Brutal), hút máu (Vampiric)
+	aoe_range *= float(aff["reach"])
+	knock *= float(aff["knock"])
+	lifesteal += float(aff["steal"]) * Global.MELEE_LIFESTEAL_MULT
 
 	# Lưỡi Liềm: Blood Pact giảm mức đổi máu; Reap tăng tốc vung theo số kill gần đây
 	if weapon_id == "scythe":
@@ -865,8 +908,8 @@ func _swing() -> void:
 
 	# ÁP DỤNG BUFF: Nhanh Nhẹn / Chí Mạng / Tầm Đánh / Vung Kiếm Càn Quét
 	cd *= pow(0.9, float(Global.buff_stack("buff_haste")))
-	cd *= skill_attack_cd_mult * _rank_perk("cd_mult", 1.0)
-	if randf() < 0.08 * float(Global.buff_stack("buff_crit")) + _rank_perk("crit_add", 0.0):
+	cd *= skill_attack_cd_mult * _rank_perk("cd_mult", 1.0) * float(aff["cd"])
+	if randf() < 0.08 * float(Global.buff_stack("buff_crit")) + _rank_perk("crit_add", 0.0) + float(aff["crit"]):
 		is_crit = true
 	if Global.buff_stack("buff_reach") > 0:
 		aoe_range *= 1.0 + 0.15 * float(Global.buff_stack("buff_reach"))
@@ -946,7 +989,7 @@ func _swing() -> void:
 					hit_something = true
 					if scythe_heal_pct > 0.0:
 						total_heal += maxi(1, int(float(hit_dmg) * scythe_heal_pct))
-						if not e.alive and weapon_rarity == "legendary":
+						if not e.alive and fx_rarity == "legendary":
 							total_heal += maxi(1, int(float(max_hp) * SCYTHE_LEGEND_KILL_HEAL_PCT))
 					Global.burst(e_center, Color(1.0, 0.95, 0.7), 5, 150.0, 1.2) # tia lửa chỗ trúng
 					if apply_bleed and e.has_method("apply_status"): e.apply_status("bleed", 0.0)
@@ -957,7 +1000,7 @@ func _swing() -> void:
 					if e.has_method("apply_status"):
 						if randf() < minf(0.6, 0.15 * float(Global.buff_stack("buff_bleed_proc"))): e.apply_status("bleed", 0.0)
 						if randf() < minf(0.6, 0.20 * float(Global.buff_stack("buff_slow_proc"))): e.apply_status("slow", 1.5)
-					if weapon_id == "hammer" and weapon_rarity == "legendary":
+					if weapon_id == "hammer" and fx_rarity == "legendary":
 						e.take_damage(20, global_position, 0.0, true) # Lava phụ trợ
 						
 	for b in get_tree().get_nodes_in_group("boss"):
@@ -996,7 +1039,7 @@ func _swing() -> void:
 			wb.global_position = global_position + wd * 25.0
 
 	# Kiếm Dài Sử Thi: Phóng Kiếm Khí
-	if weapon_id == "broadsword" and (weapon_rarity == "epic" or weapon_rarity == "legendary"):
+	if weapon_id == "broadsword" and (fx_rarity == "epic" or fx_rarity == "legendary"):
 		var b = BULLET.instantiate()
 		b.setup(true, aim_dir, dmg/2, 450.0, 0.35, w["color"], 10.0, true)
 		Global.world.add_child(b)
@@ -1014,26 +1057,40 @@ func _swing() -> void:
 ## Đặt thẳng vũ khí vào ô ĐANG CẦM (ghi đè) — dùng cho vũ khí khởi đầu và tương thích code cũ.
 ## Nhặt vũ khí mới trong lúc chơi dùng equip_weapon() (biết dùng ô trống trước).
 func set_weapon_with_rarity(id: String, rarity: String) -> void:
-	weapon_slots[active_slot] = {"id": id, "rarity": rarity}
+	set_weapon_instance(WeaponInstance.make(id, rarity))
+
+## Như set_weapon_with_rarity nhưng nhận nguyên cây vũ khí (cấp + dòng phụ).
+func set_weapon_instance(inst: Dictionary) -> void:
+	inst = WeaponInstance.normalize(inst)
+	if inst.is_empty():
+		return
+	weapon_slots[active_slot] = inst
 	_apply_active_weapon()
 	weapons_changed.emit()
-	var display_name = weapon["name"] + " (" + rarity_data["name"] + ")"
-	Global.message.emit("Picked up: " + display_name, rarity_data["color"])
+	Global.message.emit("Picked up: " + weapon_label(), rarity_data["color"])
+
+## "Pistol +2 (Epic)" — tên hiển thị của cây đang cầm.
+func weapon_label() -> String:
+	return "%s (%s)" % [WeaponInstance.display_name(weapon_inst), rarity_data["name"]]
 
 ## Nhặt vũ khí: còn ô trống thì vào ô trống (và cầm luôn), đủ ô thì thay vũ khí ô đang cầm.
-## Trả về vũ khí bị thay ({"id","rarity"}) hoặc {} nếu không có — nơi gọi quyết định thả xuống sàn hay bỏ.
-func equip_weapon(id: String, rarity: String) -> Dictionary:
+## Trả về vũ khí bị thay (WeaponInstance) hoặc {} nếu không có — nơi gọi quyết định thả xuống sàn hay bỏ.
+func equip_weapon(inst, rarity: String = "common") -> Dictionary:
+	if inst is String: # tương thích gọi cũ equip_weapon(id, rarity)
+		inst = WeaponInstance.make(String(inst), rarity)
+	inst = WeaponInstance.normalize(inst)
+	if inst.is_empty():
+		return {}
 	var displaced: Dictionary = {}
 	var target: int = _first_empty_slot()
 	if target == -1:
 		target = active_slot
 		displaced = weapon_slots[target]
-	weapon_slots[target] = {"id": id, "rarity": rarity}
+	weapon_slots[target] = inst
 	active_slot = target
 	_apply_active_weapon()
 	weapons_changed.emit()
-	var display_name = weapon["name"] + " (" + rarity_data["name"] + ")"
-	Global.message.emit("Picked up: " + display_name, rarity_data["color"])
+	Global.message.emit("Picked up: " + weapon_label(), rarity_data["color"])
 	return displaced
 
 func has_free_weapon_slot() -> bool:
@@ -1051,7 +1108,7 @@ func swap_weapon() -> bool:
 	fire_timer.start(maxf(fire_timer.time_left, SWAP_COOLDOWN))
 	weapons_changed.emit()
 	Global.sfx("pickup")
-	Global.message.emit("%s (%s)" % [weapon["name"], rarity_data["name"]], rarity_data["color"])
+	Global.message.emit(weapon_label(), rarity_data["color"])
 	return true
 
 ## Ghi nhận loại vũ khí của đòn trúng gần nhất (để tính Combo khi đổi sang loại khác).
@@ -1086,16 +1143,13 @@ func _consume_swap_bonus() -> float:
 func restore_weapons(slots: Array, active: int) -> void:
 	var cleaned: Array = [{}, {}]
 	for i in mini(slots.size(), Global.MAX_WEAPON_SLOTS):
-		var entry = slots[i]
-		if entry is Dictionary and Global.weapons.has(String(entry.get("id", ""))) \
-				and Global.rarities.has(String(entry.get("rarity", ""))):
-			cleaned[i] = {"id": String(entry["id"]), "rarity": String(entry["rarity"])}
+		cleaned[i] = WeaponInstance.normalize(slots[i]) # save cũ {"id","rarity"} -> cấp 0, chưa có dòng phụ
 	weapon_slots = cleaned
 	active_slot = clampi(active, 0, Global.MAX_WEAPON_SLOTS - 1)
 	if weapon_slots[active_slot].is_empty():
 		var other: int = 1 - active_slot
 		if weapon_slots[other].is_empty():
-			weapon_slots[active_slot] = {"id": Global.classes[Global.current_class]["default_weapon"], "rarity": "common"}
+			weapon_slots[active_slot] = WeaponInstance.make(String(Global.classes[Global.current_class]["default_weapon"]), "common")
 		else:
 			active_slot = other
 	_apply_active_weapon()
@@ -1114,8 +1168,12 @@ func _other_slot_empty() -> bool:
 func _apply_active_weapon() -> void:
 	_cancel_charge()
 	var entry: Dictionary = weapon_slots[active_slot]
+	weapon_inst = entry
 	weapon_id = String(entry["id"])
 	weapon_rarity = String(entry["rarity"])
+	weapon_level = int(entry.get("level", 0))
+	aff = WeaponInstance.affix_mods(entry)
+	fx_rarity = "legendary" if weapon_rarity == "mythic" else weapon_rarity # Mythic = nhánh Legendary + đặc tính Mythic
 	weapon = Global.weapons[weapon_id]
 	rarity_data = Global.rarities[weapon_rarity]
 	weapon_sprite.texture = Global.load_tex("res://assets/dungeon/weapon_%s.png" % weapon_id)
@@ -1177,38 +1235,31 @@ func _tick_shield(delta: float) -> void:
 	elif shield < float(max_shield):
 		shield = minf(float(max_shield), shield + SHIELD_REGEN_RATE * (1.0 + 0.25 * float(Global.buff_stack("buff_shield_regen"))) * Global.SkillTree.shield_regen_mult(Global.upgrades) * delta)
 
-## Hạng của vũ khí theo số quái đã hạ (0..3).
-func weapon_rank(id: String) -> int:
-	var k: int = int(weapon_kills.get(id, 0))
-	var r: int = 0
-	for need in RANK_KILLS:
-		if k >= int(need):
-			r += 1
-	return r
-
-## Đặc tính hạng 3 của vũ khí đang cầm (đã đạt hạng 3), không thì trả về mặc định.
+## Đặc tính Mastery của vũ khí đang cầm (chỉ khi đã nâng tối đa +5), không thì trả về mặc định.
 func _rank_perk(key: String, default_val: float) -> float:
-	if weapon_rank(weapon_id) < RANK_KILLS.size():
+	if weapon_level < WeaponInstance.MAX_LEVEL:
 		return default_val
 	return float(RANK_PERKS.get(weapon_id, {}).get(key, default_val))
 
-## Chữ HUD: "R2 12/30" hoặc "R3 MAX" (rỗng nếu chưa có quái nào).
-func rank_text(id: String) -> String:
-	var r: int = weapon_rank(id)
-	if r >= RANK_KILLS.size():
-		return "R%d MAX" % r
-	return "R%d %d/%d" % [r, int(weapon_kills.get(id, 0)), int(RANK_KILLS[r])]
-
-func _add_weapon_kill() -> void:
-	var before: int = weapon_rank(weapon_id)
-	weapon_kills[weapon_id] = int(weapon_kills.get(weapon_id, 0)) + 1
-	var after: int = weapon_rank(weapon_id)
-	if after > before:
-		var nm: String = String(weapon.get("name", weapon_id))
-		Global.float_text(global_position + Vector2(0, -44), "%s RANK %d" % [nm.to_upper(), after], Color(1.0, 0.9, 0.4), 18)
-		Global.burst(global_position, Color(1.0, 0.9, 0.4), 12, 160.0, 1.5)
-		Global.message.emit("%s rank %d!" % [nm, after], Color(1.0, 0.9, 0.4))
-		Global.sfx("pickup")
+## Dòng phụ trạng thái khi đòn của Player trúng (Burning / Chilling / Serrated) + Vampiric cho tầm xa.
+## Nghe Global.player_hit_landed — cả cận chiến lẫn đạn đều đi qua đây nên không phải sửa bullet.gd.
+func _on_hit_landed_affix(target: Node, dmg: int, _is_crit: bool) -> void:
+	if not is_instance_valid(target) or not alive or weapon_inst.is_empty():
+		return
+	if float(aff["burn"]) > 0.0 and randf() < float(aff["burn"]) and target.has_method("apply_element"):
+		target.apply_element("burn", maxi(2, int(float(dmg) * 0.12)), 0)
+	if target.has_method("apply_status"):
+		if float(aff["slow"]) > 0.0 and randf() < float(aff["slow"]):
+			target.apply_status("slow", 1.5)
+		if float(aff["bleed"]) > 0.0 and randf() < float(aff["bleed"]):
+			target.apply_status("bleed", 0.0)
+	# Cận chiến đã tự cộng hút máu trong _swing(); ở đây chỉ lo tầm xa.
+	if not bool(weapon.get("is_melee", false)) and float(aff["steal"]) > 0.0:
+		_steal_acc += float(dmg) * float(aff["steal"]) # tích phần lẻ để đạn sát thương thấp vẫn hút được
+		var h: int = int(_steal_acc)
+		if h > 0:
+			_steal_acc -= float(h)
+			heal(h)
 
 ## Buff riêng vũ khí phản ứng khi hạ gục: Capacitor (Railgun) cắt hồi đòn, Reap (Lưỡi Liềm) cộng stack tốc độ.
 ## player_hit_landed phát SAU take_damage nên target.alive == false nghĩa là đòn này vừa hạ gục.
@@ -1232,7 +1283,6 @@ func _inferno_pop(pos: Vector2, dead: Node) -> void:
 func _on_hit_landed_weapon_buffs(target: Node, _dmg: int, _is_crit: bool) -> void:
 	if not is_instance_valid(target) or bool(target.get("alive")):
 		return
-	_add_weapon_kill()
 	if weapon_id == "railgun":
 		var cap: int = Global.buff_stack("buff_capacitor")
 		if cap > 0 and not fire_timer.is_stopped():
@@ -1373,7 +1423,7 @@ func _melee_half_angle() -> float:
 	if swinging and display_swing_half_angle > 0.0:
 		return display_swing_half_angle
 	var half_angle = deg_to_rad(float(weapon["cleave_angle"])) * 0.5
-	if weapon_id == "broadsword" and weapon_rarity == "legendary": half_angle = deg_to_rad(300.0) * 0.5
+	if weapon_id == "broadsword" and fx_rarity == "legendary": half_angle = deg_to_rad(300.0) * 0.5
 	return half_angle
 
 ## Icon vũ khí thật (WeaponSprite, res://assets/dungeon/weapon_<id>.png) được xoay/lật

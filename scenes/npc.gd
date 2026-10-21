@@ -1,4 +1,5 @@
 extends Area2D
+const WeaponInstance = preload("res://scripts/weapon_instance.gd")
 
 ## Thân người thương gia dùng sprite "elf_f" (nữ yêu tinh) từ bộ asset 0x72 -
 ## bộ chưa được dùng cho nhân vật nào khác, giữ phong cách đồng bộ pixel art.
@@ -24,6 +25,7 @@ var wheel_clip: Control
 var wheel_strip: HBoxContainer
 var win_id: String = ""
 var win_rarity: String = ""
+var win_inst: Dictionary = {} # cây vũ khí vừa quay trúng (có dòng phụ random)
 
 func _ready() -> void:
 	_setup_sprite()
@@ -173,12 +175,12 @@ func _create_btn(text_val: String, action: Callable, min_size: Vector2, custom_c
 	return btn
 
 # Tạo 1 ô Vũ khí (Dùng chung cho Băng chuyền & Màn hình So sánh)
-func _create_item_panel(w_id: String, r_str: String) -> Control:
-	var w_data = Global.weapons[w_id]
-	var r_data = Global.rarities[r_str]
+# inst = WeaponInstance; detail = true thì liệt kê thêm các dòng phụ (màn hình so sánh).
+func _create_item_panel(inst: Dictionary, detail: bool = false) -> Control:
+	var r_data = Global.rarities[String(inst["rarity"])]
 	
 	var panel = ColorRect.new()
-	panel.custom_minimum_size = Vector2(150, 150)
+	panel.custom_minimum_size = Vector2(150, 190 if detail else 150)
 	panel.color = Color(0.12, 0.12, 0.16)
 	
 	var border = ReferenceRect.new()
@@ -190,7 +192,10 @@ func _create_item_panel(w_id: String, r_str: String) -> Control:
 	
 	var lbl = Label.new()
 	lbl.set_anchors_preset(Control.PRESET_FULL_RECT)
-	lbl.text = w_data["name"] + "\n\n" + r_data["name"]
+	lbl.text = WeaponInstance.display_name(inst) + "\n\n" + String(r_data["name"])
+	if detail:
+		for aid in inst.get("affixes", []):
+			lbl.text += "\n" + WeaponInstance.affix_name(String(aid))
 	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	lbl.add_theme_color_override("font_color", r_data["color"])
@@ -283,6 +288,7 @@ func _roll_gacha(cost: int, is_premium: bool) -> void:
 	# Vũ khí mọi class đều dùng được: random trong toàn bộ kho
 	var w_pool: Array = Global.weapons.keys()
 	win_id = String(w_pool.pick_random())
+	win_inst = WeaponInstance.roll(win_id, win_rarity)
 	
 	# ----------------------------------------------------
 	# XÂY DỰNG BĂNG CHUYỀN CS:GO
@@ -294,12 +300,12 @@ func _roll_gacha(cost: int, is_premium: bool) -> void:
 	
 	for i in range(45):
 		if i == target_index:
-			wheel_strip.add_child(_create_item_panel(win_id, win_rarity))
+			wheel_strip.add_child(_create_item_panel(win_inst))
 		else:
 			var rand_r = r_list.pick_random()
 			if is_premium and rand_r == "common": rand_r = "rare" # Gacha xịn thì rác nhất là Xanh
 			var rand_w = w_pool.pick_random()
-			wheel_strip.add_child(_create_item_panel(rand_w, rand_r))
+			wheel_strip.add_child(_create_item_panel(WeaponInstance.make(String(rand_w), String(rand_r))))
 			
 	wheel_strip.position.x = 0
 	
@@ -334,11 +340,9 @@ func _on_spin_finished() -> void:
 	confirm_box.add_child(hbox)
 	
 	# 1. Lấy thông số súng Cũ
-	var cur_id = "pistol"
-	var cur_r = "common"
-	if is_instance_valid(Global.player):
-		cur_id = Global.player.weapon_id
-		cur_r = Global.player.weapon_rarity
+	var cur_inst: Dictionary = WeaponInstance.make("pistol", "common")
+	if is_instance_valid(Global.player) and not Global.player.weapon_inst.is_empty():
+		cur_inst = Global.player.weapon_inst
 		
 	var v_old = VBoxContainer.new()
 	var l_old = Label.new()
@@ -346,7 +350,7 @@ func _on_spin_finished() -> void:
 	l_old.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_apply_font(l_old, 12)
 	v_old.add_child(l_old)
-	v_old.add_child(_create_item_panel(cur_id, cur_r))
+	v_old.add_child(_create_item_panel(cur_inst, true))
 	hbox.add_child(v_old)
 	
 	# 2. Mũi tên >>
@@ -364,7 +368,7 @@ func _on_spin_finished() -> void:
 	_apply_font(l_new, 12)
 	l_new.add_theme_color_override("font_color", Color(1.0, 0.8, 0.2))
 	v_new.add_child(l_new)
-	v_new.add_child(_create_item_panel(win_id, win_rarity))
+	v_new.add_child(_create_item_panel(win_inst, true))
 	hbox.add_child(v_new)
 	
 	# 4. Nút Quyết định
@@ -388,7 +392,7 @@ func _on_spin_finished() -> void:
 
 func _equip_new() -> void:
 	if is_instance_valid(Global.player) and Global.player.has_method("equip_weapon"):
-		Global.player.equip_weapon(win_id, win_rarity) # vũ khí bị thay (nếu có) bỏ đi như trước đây
+		Global.player.equip_weapon(win_inst) # vũ khí bị thay (nếu có) bỏ đi như trước đây
 	_reset_to_shop()
 
 func _discard_new() -> void:
