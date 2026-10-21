@@ -42,6 +42,10 @@ func _ready() -> void:
 		# Vốn khởi điểm (nâng cấp Starting Capital) phải đặt SAU reset_run() — trước đây menu đặt xu rồi
 		# reset_run() xoá về 0 nên nâng cấp này không có tác dụng.
 		Global.coins = int(Global.upgrades.get("start_coin", 0)) * 10
+		if Global.SkillTree.has_start_buff(Global.upgrades): # nút Packed Supplies
+			var starter: Array = Global.roll_buff_choices(1, "common")
+			if not starter.is_empty():
+				Global.apply_buff(String(starter[0]))
 		Global.record_run_start() # hồ sơ vĩnh viễn: +1 ván cho class đang chơi
 		Global.record_floor_reached(1)
 		

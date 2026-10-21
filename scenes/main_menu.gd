@@ -31,6 +31,8 @@ var upg_data = {
 	"mastery": {"name": "Weapon Mastery", "desc": "+5% base damage per level.", "max": 5},
 	"revive": {"name": "Phoenix Rebirth", "desc": "Revive once with 50% HP on death.", "max": 1}
 }
+const SkillTree = preload("res://scripts/skill_tree.gd")
+var tree_ui_elements = {}
 var upg_ui_elements = {} # Lưu trữ các nút/chữ để tự động cập nhật
 var gem_label: Label
 
@@ -349,9 +351,14 @@ func _build_upgrade_menu() -> void:
 	vbox.add_child(sep)
 
 	# Danh sách các kỹ năng
+	var scroll = ScrollContainer.new()
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	vbox.add_child(scroll)
 	var list_vbox = VBoxContainer.new()
 	list_vbox.add_theme_constant_override("separation", 10)
-	vbox.add_child(list_vbox)
+	list_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(list_vbox)
 
 	for key in upg_data:
 		var row = HBoxContainer.new()
@@ -370,9 +377,28 @@ func _build_upgrade_menu() -> void:
 
 		upg_ui_elements[key] = {"info": info, "btn": btn}
 
-	var spacer = Control.new()
-	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	vbox.add_child(spacer)
+	# Cây mở rộng (scripts/skill_tree.gd): hai nhánh, mỗi nút mua một lần, có thể cần nút trước.
+	for branch in SkillTree.BRANCH_ORDER:
+		var head = Label.new()
+		head.text = "— %s —" % SkillTree.BRANCH_TITLE[branch]
+		head.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_apply_font(head, 14)
+		head.add_theme_color_override("font_color", Color(0.8, 0.6, 1.0))
+		list_vbox.add_child(head)
+		for id in SkillTree.ids():
+			if String(SkillTree.NODES[id]["branch"]) != branch:
+				continue
+			var trow = HBoxContainer.new()
+			trow.alignment = BoxContainer.ALIGNMENT_CENTER
+			list_vbox.add_child(trow)
+			var tinfo = Label.new()
+			tinfo.custom_minimum_size = Vector2(500, 0)
+			tinfo.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			_apply_font(tinfo, 12)
+			trow.add_child(tinfo)
+			var tbtn = _create_btn("Unlock", func(): _buy_tree_node(id), Vector2(180, 50), Color(0.2, 0.6, 0.3), 12)
+			trow.add_child(tbtn)
+			tree_ui_elements[id] = {"info": tinfo, "btn": tbtn}
 
 	var center_btn = CenterContainer.new()
 	vbox.add_child(center_btn)
@@ -465,6 +491,7 @@ func _evolve(cid: String) -> void:
 
 func _update_upgrade_ui() -> void:
 	gem_label.text = "Gems: %d" % Global.purple_gems
+	_update_tree_ui()
 
 	for key in upg_data:
 		var current_lv = Global.upgrades[key]
@@ -486,6 +513,35 @@ func _update_upgrade_ui() -> void:
 			btn.text = "%d Gems" % cost
 			btn.disabled = false
 			btn.modulate = Color.WHITE
+
+func _update_tree_ui() -> void:
+	for id in tree_ui_elements:
+		var node: Dictionary = SkillTree.NODES[id]
+		var req: String = String(node["req"])
+		var line: String = "%s\n> %s" % [node["name"], node["desc"]]
+		if req != "":
+			line += " (needs %s)" % SkillTree.NODES[req]["name"]
+		tree_ui_elements[id]["info"].text = line
+		var btn: Button = tree_ui_elements[id]["btn"]
+		if SkillTree.owned(Global.upgrades, id):
+			btn.text = "OWNED"
+			btn.disabled = true
+			btn.modulate = Color(0.5, 0.5, 0.5)
+		elif not SkillTree.can_unlock(Global.upgrades, id):
+			btn.text = "LOCKED"
+			btn.disabled = true
+			btn.modulate = Color(0.5, 0.5, 0.5)
+		else:
+			btn.text = "%d Gems" % SkillTree.cost(id)
+			btn.disabled = Global.purple_gems < SkillTree.cost(id)
+			btn.modulate = Color(0.5, 0.5, 0.5) if btn.disabled else Color.WHITE
+
+func _buy_tree_node(id: String) -> void:
+	var wallet := {"gems": Global.purple_gems}
+	if SkillTree.buy(Global.upgrades, wallet, id):
+		Global.purple_gems = int(wallet["gems"])
+		Global.save_game()
+		_update_upgrade_ui()
 
 func _buy_upgrade(key: String) -> void:
 	var cost = Global.upgrades[key] + 1

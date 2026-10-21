@@ -1175,7 +1175,7 @@ func _tick_shield(delta: float) -> void:
 	if shield_delay_timer > 0.0:
 		shield_delay_timer = maxf(0.0, shield_delay_timer - delta)
 	elif shield < float(max_shield):
-		shield = minf(float(max_shield), shield + SHIELD_REGEN_RATE * (1.0 + 0.25 * float(Global.buff_stack("buff_shield_regen"))) * delta)
+		shield = minf(float(max_shield), shield + SHIELD_REGEN_RATE * (1.0 + 0.25 * float(Global.buff_stack("buff_shield_regen"))) * Global.SkillTree.shield_regen_mult(Global.upgrades) * delta)
 
 ## Hạng của vũ khí theo số quái đã hạ (0..3).
 func weapon_rank(id: String) -> int:

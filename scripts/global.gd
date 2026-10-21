@@ -145,7 +145,7 @@ const WEAPON_RARITY_ORDER: Array = ["common", "rare", "epic", "legendary"]
 
 ## Random độ hiếm vũ khí cho tầng `for_floor`. `min_rarity` nâng độ hiếm tối thiểu (vd boss thưởng từ "rare").
 func roll_weapon_rarity(for_floor: int, min_rarity: String = "common") -> String:
-	var steps: int = clampi(for_floor - 1, 0, WEAPON_RARITY_MAX_FLOORS)
+	var steps: int = clampi(for_floor - 1 + SkillTree.early_rare_steps(upgrades, for_floor), 0, WEAPON_RARITY_MAX_FLOORS)
 	var weights: Dictionary = {}
 	for rid in WEAPON_RARITY_ORDER:
 		weights[rid] = float(rarities[rid]["weight"])
@@ -747,7 +747,24 @@ func request_buff_choice_of(choices: Array, title: String) -> bool:
 
 func request_buff_choice() -> void:
 	buff_picks_left = BUFF_PICKS_PER_BOSS
+	rerolls_left = SkillTree.rerolls_per_offer(upgrades)
 	_offer_next_buff_pick()
+
+## Đổi bài (nút Second Thoughts): chỉ cho lượt chọn buff thường, mỗi lượt mời một lần.
+var rerolls_left: int = 0
+
+func can_reroll() -> bool:
+	return rerolls_left > 0 and buff_picks_left > 0 and buff_choice_title == BUFF_TITLE_DEFAULT
+
+func try_reroll() -> bool:
+	if not can_reroll():
+		return false
+	var choices: Array = roll_buff_choices(SkillTree.buff_choice_count(upgrades))
+	if choices.is_empty():
+		return false
+	rerolls_left -= 1
+	buff_choice_requested.emit(choices)
+	return true
 
 ## Phát 3 lựa chọn cho lượt kế tiếp (nếu còn lượt). buff_picker gọi lại sau mỗi lần chọn.
 ## Hết lượt buff thường thì mới tới lượt nâng cấp kỹ năng (nếu đang chờ).
@@ -755,7 +772,7 @@ func _offer_next_buff_pick() -> void:
 	if buff_picks_left <= 0:
 		_offer_pending_skill_upgrade()
 		return
-	var choices: Array = roll_buff_choices(3)
+	var choices: Array = roll_buff_choices(SkillTree.buff_choice_count(upgrades))
 	if choices.is_empty():
 		buff_picks_left = 0
 		_offer_pending_skill_upgrade()
@@ -877,11 +894,18 @@ func apply_buff(id: String) -> void:
 	message.emit("Buff: " + buff_pool[id]["name"], BUFF_TIER_COLOR.get(buff_pool[id]["tier"], Color.WHITE))
 
 
+var _coin_bonus_acc: float = 0.0
+
 func add_coin() -> void:
-	coins += 1
+	var gained: int = 1
+	_coin_bonus_acc += SkillTree.coin_bonus(upgrades) # nút Deep Pockets: dồn dần, đủ 1 xu thì thưởng thêm
+	if _coin_bonus_acc >= 0.9999:
+		_coin_bonus_acc -= 1.0
+		gained += 1
+	coins += gained
 	# Bổ sung dòng này để ghi chép vào sổ thống kê Game Over
 	if get("run_stats") != null and run_stats.has("coins"):
-		run_stats["coins"] += 1
+		run_stats["coins"] += gained
 
 
 # ---------------------------------------------------------------- Input map (tạo bằng code)
@@ -1075,9 +1099,12 @@ var purple_gems: int = 0
 const MetaProgress = preload("res://scripts/meta_progress.gd")
 const SkillUpgrades = preload("res://scripts/skill_upgrades.gd")
 const HeatScript = preload("res://scripts/heat.gd")
+const SkillTree = preload("res://scripts/skill_tree.gd")
 var profile: Dictionary = MetaProgress.new_profile()
 var upgrades: Dictionary = {
-	"hp_boost": 0, "start_coin": 0, "mastery": 0, "revive": 0
+	"hp_boost": 0, "start_coin": 0, "mastery": 0, "revive": 0,
+	"choice4": 0, "reroll": 0, "early_rare": 0, "coin_bonus": 0,
+	"start_buff": 0, "q_cooldown": 0, "q_damage": 0, "soft_shield": 0
 }
 
 # Lưu toàn bộ trạng thái của một ván chơi đang dở dang

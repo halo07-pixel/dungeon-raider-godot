@@ -56,10 +56,13 @@ func _add(key: String) -> float:
 	return SkillUpgrades.mod_add(skill_id, Global.skill_upgrades_taken, key)
 
 func _mult(key: String) -> float:
-	return SkillUpgrades.mod_mult(skill_id, Global.skill_upgrades_taken, key)
+	var m: float = SkillUpgrades.mod_mult(skill_id, Global.skill_upgrades_taken, key)
+	if key == "dmg_mult": # nút meta Honed Technique áp cho mọi kỹ năng
+		m *= Global.SkillTree.skill_damage_mult(Global.upgrades)
+	return m
 
 func _effective_cooldown() -> float:
-	return maxf(1.0, base_cooldown + _add("cooldown_add"))
+	return maxf(1.0, (base_cooldown + _add("cooldown_add")) * Global.SkillTree.skill_cooldown_mult(Global.upgrades))
 
 func is_ready() -> bool:
 	return cooldown_left <= 0.0
