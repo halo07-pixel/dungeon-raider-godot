@@ -113,6 +113,10 @@ const ENEMY_SPRITES: Dictionary = {
 }
 
 ## Quái bắn tầm xa (data["shooter"]) và quái giữ khoảng cách / lùi khi bị áp sát (data["kiter"]).
+## Heat Swift Foes: nhân tốc độ mọi quái (Global.run_heat đọc mỗi khung, rẻ).
+func _heat_speed() -> float:
+	return Global.HeatScript.ENEMY_SPEED_MULT if Global.heat_on("swift") else 1.0
+
 func _is_shooter() -> bool:
 	return bool(data.get("shooter", false))
 
@@ -509,7 +513,7 @@ func _physics_process(delta: float) -> void:
 		var drv: Array = skills.drive(delta, move)
 		move = drv[0]
 		skill_speed = float(drv[1])
-	velocity = move * float(data["speed"]) * skill_speed * speed_mult * squad_speed + knockback
+	velocity = move * float(data["speed"]) * skill_speed * speed_mult * squad_speed * _heat_speed() + knockback
 	knockback = knockback.move_toward(Vector2.ZERO, 900.0 * delta)
 	move_and_slide()
 	_update_sprite(move.length() > 0.05)

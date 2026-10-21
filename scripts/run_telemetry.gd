@@ -39,6 +39,7 @@ func finish_run(won: bool) -> Dictionary:
 		return {}
 	_finished = true
 	var entry: Dictionary = build_entry(Global.run_stats, Global.current_class, _floor, won or _won)
+	entry["heat"] = Global.heat_points()
 	Global.record_run_end(entry)
 	return entry
 

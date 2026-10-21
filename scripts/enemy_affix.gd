@@ -77,9 +77,16 @@ static func chance_for_floor(floor_num: int) -> float:
 		return HELL_CHANCE
 	return clampf(CHANCE_BASE + CHANCE_PER_FLOOR * float(floor_num - 2), 0.0, CHANCE_MAX)
 
+## Số quái có affix tối đa mỗi phòng (Heat Veteran Packs cộng thêm).
+static func max_per_room() -> int:
+	return MAX_PER_ROOM + (Global.HeatScript.AFFIX_EXTRA_PER_ROOM if Global.heat_on("elite_pack") else 0)
+
 ## Chọn affix cho 1 quái: "" nếu không trúng / không có affix hợp lệ.
 static func roll(kind: String, floor_num: int) -> String:
-	if randf() >= chance_for_floor(floor_num):
+	var chance: float = chance_for_floor(floor_num)
+	if chance > 0.0 and Global.heat_on("elite_pack"):
+		chance = minf(1.0, chance + Global.HeatScript.AFFIX_CHANCE_BONUS) # Heat: Veteran Packs
+	if randf() >= chance:
 		return ""
 	var valid: Array = []
 	for aid in AFFIXES:

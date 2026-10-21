@@ -35,6 +35,7 @@ func _ready() -> void:
 		var stats = Global.saved_run.get("stats", {})
 		Global.run_stats = stats.duplicate()
 		Global.floor_num = stats.get("floors", 1)
+		Global.run_heat = Global.HeatScript.sanitize(Array(Global.saved_run.get("heat", [])))
 	else:
 		if Global.has_method("reset_run"): Global.reset_run()
 		if Global.has_method("reset_run_stats"): Global.reset_run_stats()
@@ -173,7 +174,7 @@ func _next_floor() -> void:
 	Global.in_council = false
 	# === BỔ SUNG LOGIC THƯỞNG NGỌC TÍM (ĐIỀU KIỆN 3) ===
 	if Global.floor_num > 0 and Global.floor_num % 5 == 0:
-		var gems_earned = int(Global.floor_num / 5)
+		var gems_earned = Global.heat_gems(int(Global.floor_num / 5)) # Heat cộng thêm Ngọc Tím
 		Global.purple_gems += gems_earned
 		Global.save_game() 
 		Global.message.emit("Great! Floor %d milestone reached: +%d Purple Gems!" % [Global.floor_num, gems_earned], Color(0.8, 0.3, 0.9))
@@ -198,7 +199,8 @@ func _next_floor() -> void:
 	_spawn_npc_if_needed()
 	
 	player.knockback = Vector2.ZERO
-	player.heal(int(float(player.max_hp) * 0.3))
+	var heal_frac: float = Global.HeatScript.FLOOR_HEAL_FRACTION_SCARCE if Global.heat_on("scarce") else Global.HeatScript.FLOOR_HEAL_FRACTION
+	player.heal(int(float(player.max_hp) * heal_frac))
 	Global.message.emit(_floor_label(Global.floor_num), Color(1.0, 0.85, 0.2) if Global.floor_num > 10 else Color.WHITE)
 	_changing = false
 
@@ -259,6 +261,7 @@ func _build_saved_run() -> Dictionary:
 		"active_slot": player.active_slot,
 		"weapon_kills": player.weapon_kills.duplicate(),
 		"skill_upgrades": Global.skill_upgrades_taken.duplicate(),
+		"heat": Global.run_heat.duplicate(),
 		"has_revived": player.has_revived, # LƯU TRẠNG THÁI HỒI SINH
 		"max_hp": player.max_hp,
 		"shield": player.shield,
@@ -301,6 +304,8 @@ func _build_game_over_menu() -> void:
 	var info = Label.new()
 	info.text = "Floors cleared: %d\nEnemies defeated: %d\nGold collected: %d" % [f, k, c_coin]
 	var tele_text: String = RunTelemetryScript.summary_text(Global.run_stats)
+	if Global.heat_points() > 0:
+		tele_text += ("\n" if tele_text != "" else "") + "Heat: %d (+%d%% Purple Gems)" % [Global.heat_points(), int(round((Global.HeatScript.gem_mult(Global.run_heat) - 1.0) * 100.0))]
 	if tele_text != "":
 		info.text += "\n" + tele_text
 	info.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -318,7 +323,7 @@ func _show_victory() -> void:
 	is_victory_screen = true
 	telemetry.mark_won()
 	Global.record_win()
-	Global.purple_gems += VICTORY_GEM_BONUS
+	Global.purple_gems += Global.heat_gems(VICTORY_GEM_BONUS)
 	Global.save_game()
 
 	get_tree().paused = true
@@ -344,7 +349,7 @@ func _build_victory_menu() -> void:
 	var c_coin = Global.run_stats.get("coins", 0) if Global.get("run_stats") else 0
 
 	var info = Label.new()
-	info.text = "Floors cleared: %d\nEnemies defeated: %d\nGold collected: %d\n+%d Purple Gems (first-clear bonus)" % [Global.floor_num, k, c_coin, VICTORY_GEM_BONUS]
+	info.text = "Floors cleared: %d\nEnemies defeated: %d\nGold collected: %d\n+%d Purple Gems (first-clear bonus)" % [Global.floor_num, k, c_coin, Global.heat_gems(VICTORY_GEM_BONUS)]
 	info.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	pause_ui.add_child(info)
 

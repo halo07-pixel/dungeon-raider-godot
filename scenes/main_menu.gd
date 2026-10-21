@@ -195,7 +195,7 @@ func _build_class_menu() -> void:
 	ui_layer.add_child(class_node)
 
 	var vbox = VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 30)
+	vbox.add_theme_constant_override("separation", 14)
 	vbox.alignment = BoxContainer.ALIGNMENT_CENTER
 	class_node.add_child(vbox)
 
@@ -215,8 +215,73 @@ func _build_class_menu() -> void:
 	hbox.add_child(_build_class_option("wizard_m", _class_card_text("mage", "HP: 80\nWeapon: Arcane Staff"), func(): _start_new_game("mage"), Color(0.6, 0.35, 0.9)))
 	hbox.add_child(_build_class_option("lizard_m", _class_card_text("rogue", "HP: 90\nWeapon: Daggers"), func(): _start_new_game("rogue"), Color(0.3, 0.7, 0.3)))
 
-	vbox.add_child(_create_btn("BACK", show_main_menu, Vector2(250, 60), Color(0.4, 0.4, 0.4)))
+	_build_heat_panel(vbox)
+	var back_btn: Control = _create_btn("BACK", show_main_menu, Vector2(250, 60), Color(0.4, 0.4, 0.4))
+	back_btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	vbox.add_child(back_btn)
 	class_node.hide()
+
+
+## --- Chế độ Heat (scripts/heat.gd): chọn điều kiện khó hơn trước khi vào ván, đổi lấy nhiều Ngọc Tím hơn ---
+var heat_summary: Label
+
+func _build_heat_panel(parent: Node) -> void:
+	var col := VBoxContainer.new()
+	col.add_theme_constant_override("separation", 6)
+	col.alignment = BoxContainer.ALIGNMENT_CENTER
+	parent.add_child(col)
+	var title := Label.new()
+	title.text = "HEAT (optional): harder runs, more Purple Gems"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_color_override("font_color", Color(1.0, 0.55, 0.25))
+	_apply_font(title, 14)
+	col.add_child(title)
+	var grid := GridContainer.new()
+	grid.columns = 3
+	grid.add_theme_constant_override("h_separation", 28)
+	grid.add_theme_constant_override("v_separation", 4)
+	col.add_child(grid)
+	for id in Global.HeatScript.ORDER:
+		var m: Dictionary = Global.HeatScript.MODS[id]
+		var cell := VBoxContainer.new()
+		cell.custom_minimum_size = Vector2(300, 0)
+		var cb := CheckButton.new()
+		cb.text = "%s  [%d]" % [m["name"], int(m["cost"])]
+		cb.button_pressed = Global.heat_selected.has(id)
+		cb.tooltip_text = String(m["desc"])
+		_apply_font(cb, 12)
+		cb.toggled.connect(_on_heat_toggled.bind(id))
+		cell.add_child(cb)
+		var d := Label.new()
+		d.text = String(m["desc"])
+		d.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		d.add_theme_color_override("font_color", Color(0.7, 0.7, 0.75))
+		_apply_font(d, 10)
+		cell.add_child(d)
+		grid.add_child(cell)
+	heat_summary = Label.new()
+	heat_summary.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_apply_font(heat_summary, 13)
+	col.add_child(heat_summary)
+	_update_heat_summary()
+
+func _on_heat_toggled(on: bool, id: String) -> void:
+	if on:
+		Global.heat_selected[id] = true
+	else:
+		Global.heat_selected.erase(id)
+	Global.save_game()
+	_update_heat_summary()
+
+func _update_heat_summary() -> void:
+	var ids: Array = Global.selected_heat_ids()
+	var pts: int = Global.HeatScript.total(ids)
+	if pts <= 0:
+		heat_summary.text = "Heat 0 - normal run"
+		heat_summary.add_theme_color_override("font_color", Color(0.75, 0.75, 0.8))
+	else:
+		heat_summary.text = "Heat %d: +%d%% Purple Gems" % [pts, int(round((Global.HeatScript.gem_mult(ids) - 1.0) * 100.0))]
+		heat_summary.add_theme_color_override("font_color", Color(1.0, 0.6, 0.25))
 
 
 ## Chữ trên thẻ chọn class: tên theo bậc tiến hoá + kỹ năng riêng (nếu đã mở).
