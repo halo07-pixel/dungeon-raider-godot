@@ -11,6 +11,11 @@ var radius: float = 130.0
 var duration: float = 3.0
 var tick_damage: int = 6
 var color: Color = Color(0.6, 0.4, 1.0)
+## Black Hole (Tome): kéo mạnh hơn và nổ khi hết giờ (end_dmg > 0).
+var pull_mult: float = 1.0
+var end_dmg: int = 0
+var end_radius: float = 0.0
+var end_knock: float = 380.0
 var _t: float = 0.0
 var _tick: float = 0.0
 
@@ -20,6 +25,8 @@ func _ready() -> void:
 func _physics_process(delta: float) -> void:
 	_t += delta
 	if _t >= duration:
+		if end_dmg > 0:
+			_explode()
 		queue_free()
 		return
 	_tick += delta
@@ -33,8 +40,8 @@ func _physics_process(delta: float) -> void:
 		var to: Vector2 = global_position - e.global_position
 		if to.length() > radius:
 			continue
-		if to.length() > 10.0 and e.get("knockback") != null and (e.knockback as Vector2).length() < PULL_MAX:
-			e.knockback = (e.knockback + to.normalized() * PULL_ACCEL * delta).limit_length(PULL_MAX)
+		if to.length() > 10.0 and e.get("knockback") != null and (e.knockback as Vector2).length() < PULL_MAX * pull_mult:
+			e.knockback = (e.knockback + to.normalized() * PULL_ACCEL * pull_mult * delta).limit_length(PULL_MAX * pull_mult)
 		if do_tick:
 			e.take_damage(tick_damage, global_position, 0.0)
 			if e.alive and e.has_method("apply_status"):
@@ -46,6 +53,20 @@ func _physics_process(delta: float) -> void:
 				b.take_damage(tick_damage, global_position, 0.0)
 				Global.on_secondary_hit(b, tick_damage, false)
 	queue_redraw()
+
+## Nổ cuối vòng đời: sát thương + đẩy lùi mọi quái/boss trong end_radius.
+func _explode() -> void:
+	for e in get_tree().get_nodes_in_group("enemies"):
+		if is_instance_valid(e) and e.alive and e.global_position.distance_to(global_position) <= end_radius:
+			e.take_damage(end_dmg, global_position, end_knock)
+			Global.on_secondary_hit(e, end_dmg, false)
+	for b in get_tree().get_nodes_in_group("boss"):
+		if is_instance_valid(b) and b.alive and b.global_position.distance_to(global_position) <= end_radius + 20.0:
+			b.take_damage(end_dmg, global_position, 0.0)
+			Global.on_secondary_hit(b, end_dmg, false)
+	Global.burst(global_position, color, 24, 300.0, 2.0)
+	Global.shake(0.45, 0.3)
+	Global.sfx("meteor_impact")
 
 func _draw() -> void:
 	var life: float = clampf(1.0 - _t / maxf(duration, 0.01), 0.0, 1.0)

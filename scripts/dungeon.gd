@@ -17,6 +17,8 @@ const LavaTileScript = preload("res://scripts/lava_tile.gd")
 const IceTileScript = preload("res://scripts/ice_tile.gd")
 ## Boss ở các tầng chia hết cho số này rơi thêm 1 vũ khí (tối thiểu Rare). Tầng 5, 10, 15...
 const BOSS_WEAPON_REWARD_EVERY: int = 5
+## Cứ mỗi N tầng, Boss rơi thêm 1 Tome (ngoài phòng kho báu).
+const BOSS_TOME_REWARD_EVERY: int = 3
 const LordArenaRuneScript = preload("res://scripts/lord_arena_rune.gd")
 const AffixScript = preload("res://scripts/enemy_affix.gd")
 const EventRooms = preload("res://scripts/event_rooms.gd")
@@ -118,6 +120,7 @@ func _ready() -> void:
 	add_child(entities)
 	Global.world = entities
 	Global.weapon_drop_requested.connect(_on_weapon_drop_requested)
+	Global.tome_drop_requested.connect(_on_tome_drop_requested)
 
 
 ## Chỉ dựng lại atlas tileset khi ĐỔI biome (giữa các tầng cùng biome thì giữ nguyên,
@@ -454,7 +457,8 @@ func _enter_room(cell: Vector2i) -> void:
 			
 			_spawn_weapon_choice(room_center(cell) + Vector2(0.0, -24.0))
 			_spawn_chest_decor(room_center(cell) + Vector2(0.0, 10.0))
-			Global.message.emit("Treasure Room! Choose 1 of 3 weapons", Color(1.0, 0.85, 0.3))
+			_spawn_tome_choice(room_center(cell) + Vector2(0.0, 80.0), 2)
+			Global.message.emit("Treasure Room! Choose 1 of 3 weapons, plus 1 of 2 Tomes", Color(1.0, 0.85, 0.3))
 		"altar":
 			room["cleared"] = true
 			var altar = _spawn_prop("altar", room_center(cell), cell, {"variant": "gold" if randf() < EventRooms.ALTAR_GOLD_CHANCE else "blood"})
@@ -1014,6 +1018,9 @@ func _room_cleared(cell: Vector2i) -> void:
 		elif Global.floor_num % BOSS_WEAPON_REWARD_EVERY == 0:
 			_spawn_pickup("weapon", _roll_weapon_drop(Global.roll_weapon_rarity_pity(Global.floor_num, "rare")), room_center(cell) + Vector2(-72.0, 0.0))
 			Global.message.emit("The boss dropped a weapon!", Color(1.0, 0.85, 0.3))
+		if Global.floor_num % BOSS_TOME_REWARD_EVERY == 0 and not Global.in_council:
+			_spawn_tome_choice(room_center(cell) + Vector2(72.0, 0.0), 1)
+			Global.message.emit("The boss dropped a Tome!", Color(0.8, 0.6, 1.0))
 		if Global.floor_num == HELL_LAST_FLOOR and not Global.in_council:
 			_spawn_pickup("council_portal", "", room_center(cell) + Vector2(0.0, 70.0))
 			Global.message.emit("A crimson gate opens: the Council awaits", Color(1.0, 0.4, 0.3))
@@ -1056,6 +1063,20 @@ func _spawn_weapon_choice(center: Vector2) -> void:
 		var code: String = _roll_weapon_drop(rarity, used)
 		used.append(String(WeaponInstance.decode(code)["id"]))
 		_spawn_pickup("weapon", code, center + Vector2((float(i) - 1.0) * WEAPON_CHOICE_SPACING, 0.0), _choice_seq)
+
+
+## Tome: `count` Tome khác nhau (không trùng Tome đang cầm) xếp hàng ngang, chọn 1 (nhặt 1 cái thì các cái còn lại biến mất).
+func _spawn_tome_choice(center: Vector2, count: int) -> void:
+	_choice_seq += 1
+	var held: Array = []
+	if is_instance_valid(Global.player) and Global.player.tome_skill != null:
+		held.append(String(Global.player.tome_skill.skill_id))
+	var ids: Array = Global.random_tome_ids(count, held)
+	for i in ids.size():
+		_spawn_pickup("tome", String(ids[i]), center + Vector2((float(i) - float(ids.size() - 1) * 0.5) * WEAPON_CHOICE_SPACING, 0.0), _choice_seq)
+
+func _on_tome_drop_requested(tome_id: String, pos: Vector2) -> void:
+	_spawn_pickup("tome", tome_id, pos)
 
 
 ## Player đổi vũ khí tại chỗ (nhặt bằng E khi đủ ô): đặt vũ khí cũ xuống sàn để còn nhặt lại được.

@@ -20,6 +20,7 @@ var boss_ticks: Control
 var _boss_phases: int = 3
 var info_label: Label
 var skill_label: Label
+var tome_label: Label
 var weapon_bar: ProgressBar ## cung: mức căng dây; vũ khí khác: hồi đòn
 var weapon_bar_fill: StyleBoxFlat
 var weapon_labels: Array = [] ## 2 nhãn, mỗi nhãn một ô vũ khí (ô đang cầm sáng + có dấu ">")
@@ -62,6 +63,7 @@ func _process(_delta: float) -> void:
 	_update_weapon_labels(p)
 	_update_weapon_bar(p)
 	_update_skill_label(p)
+	_update_tome_label(p)
 	_update_debug_label()
 
 ## Hai ô vũ khí: ô đang cầm có dấu ">" và sáng; ô kia mờ (đổi bằng phím swap_weapon). Màu chữ theo độ hiếm.
@@ -127,6 +129,21 @@ func _update_skill_label(p) -> void:
 	else:
 		skill_label.text = "[Q] %s%s  %.1fs" % [sk.skill_name, up_tag, sk.cooldown_left]
 		skill_label.modulate = Color(0.7, 0.7, 0.7)
+
+## Ô kỹ năng phụ (Tome): "[F] Frost Nova READY" hoặc đếm ngược hồi chiêu. Ẩn khi chưa có Tome.
+func _update_tome_label(p) -> void:
+	var tk = p.get("tome_skill")
+	if tk == null or not is_instance_valid(tk):
+		tome_label.visible = false
+		return
+	tome_label.visible = true
+	var key: String = Global.key_name_for_action("tome")
+	if tk.is_ready():
+		tome_label.text = "[%s] %s  READY" % [key, tk.skill_name]
+		tome_label.modulate = Color(0.85, 0.7, 1.0)
+	else:
+		tome_label.text = "[%s] %s  %.1fs" % [key, tk.skill_name, tk.cooldown_left]
+		tome_label.modulate = Color(0.65, 0.6, 0.7)
 
 ## TẠM: debug overlay bắt bug "qua tầng mới spawn vào phòng quái thay vì phòng start"
 ## và bug "quái hết mà cổng không mở". Xoá khi tìm ra nguyên nhân.
@@ -331,6 +348,8 @@ func _build_ui() -> void:
 	info_label = _label(self, "", 16, Vector2(20.0, 72.0), Vector2(500.0, 26.0))
 	skill_label = _label(self, "", 14, Vector2(20.0, 98.0), Vector2(300.0, 22.0))
 	skill_label.visible = false
+	tome_label = _label(self, "", 14, Vector2(340.0, 98.0), Vector2(300.0, 22.0))
+	tome_label.visible = false
 	for i in Global.MAX_WEAPON_SLOTS:
 		weapon_labels.append(_label(self, "", 14, Vector2(20.0, 122.0 + 20.0 * float(i)), Vector2(360.0, 22.0)))
 	weapon_bar = _bar(self, Vector2(20.0, 126.0 + 20.0 * float(Global.MAX_WEAPON_SLOTS)), Vector2(220.0, 6.0), Color(0.6, 0.6, 0.65))

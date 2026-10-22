@@ -5,6 +5,8 @@ extends Area2D
 const WeaponInstance = preload("res://scripts/weapon_instance.gd")
 
 const WeaponInfo = preload("res://scripts/weapon_info.gd")
+## Tome: pickup "tome" (extra = id Tome) cũng nhặt bằng E; đã có Tome thì đổi, Tome cũ rơi xuống chỗ này.
+const TomeSkillScript = preload("res://scripts/tome_skill.gd")
 
 ## Sau khi xuất hiện, vũ khí chưa nhặt được trong khoảng này (giây) — tránh nhặt nhầm ngay vũ khí vừa thả.
 const WEAPON_PICKUP_LOCK: float = 0.4
@@ -48,6 +50,10 @@ func _ready() -> void:
 	body_entered.connect(_on_body_entered)
 	if kind == "weapon":
 		add_to_group("weapon_pickup")
+		_lock = WEAPON_PICKUP_LOCK
+		body_exited.connect(_on_body_exited)
+	if kind == "tome":
+		add_to_group("tome_pickup")
 		_lock = WEAPON_PICKUP_LOCK
 		body_exited.connect(_on_body_exited)
 	if kind == "portal" or kind == "council_portal":
@@ -103,10 +109,14 @@ func _process(delta: float) -> void:
 		_lock = maxf(0.0, _lock - delta)
 		if _near and _lock <= 0.0 and Input.is_action_just_pressed("interact"):
 			_try_take()
+	elif kind == "tome":
+		_lock = maxf(0.0, _lock - delta)
+		if _near and _lock <= 0.0 and Input.is_action_just_pressed("interact"):
+			_try_take_tome()
 	queue_redraw()
 
 func _on_body_exited(body: Node) -> void:
-	if kind == "weapon" and body.is_in_group("player"):
+	if (kind == "weapon" or kind == "tome") and body.is_in_group("player"):
 		_near = false
 
 ## Vũ khí chỉ nhặt được khi đây là vũ khí GẦN Player nhất trong số các vũ khí đang trong tầm (tránh nhặt nhầm khi có 2 món).
@@ -118,6 +128,29 @@ func _is_nearest_candidate(player_pos: Vector2) -> bool:
 		if other.global_position.distance_squared_to(player_pos) < my_d:
 			return false
 	return true
+
+func _try_take_tome() -> void:
+	var player: Node = Global.player
+	if not is_instance_valid(player) or not player.alive or not player.has_method("equip_tome"):
+		return
+	if _taken_frame == Engine.get_process_frames():
+		return
+	# nhiều Tome trong tầm: chỉ lấy cái gần nhất
+	for other in get_tree().get_nodes_in_group("tome_pickup"):
+		if other != self and other._near and other._lock <= 0.0 and other.global_position.distance_squared_to(player.global_position) < global_position.distance_squared_to(player.global_position):
+			return
+	_taken_frame = Engine.get_process_frames()
+	var displaced: String = player.equip_tome(extra)
+	if displaced != "":
+		Global.tome_drop_requested.emit(displaced, global_position)
+	Global.sfx("pickup")
+	Global.message.emit("Tome: %s  [%s]" % [String(TomeSkillScript.TOMES[extra]["name"]), Global.key_name_for_action("tome")], Color(0.8, 0.6, 1.0))
+	if choice_group != 0:
+		for other in get_tree().get_nodes_in_group("tome_pickup"):
+			if other != self and other.choice_group == choice_group:
+				Global.burst(other.global_position, Color(0.8, 0.8, 0.9), 6, 70.0, 0.8)
+				other.queue_free()
+	queue_free()
 
 func _try_take() -> void:
 	var player: Node = Global.player
@@ -140,7 +173,7 @@ func _try_take() -> void:
 func _on_body_entered(body: Node) -> void:
 	if not body.is_in_group("player"):
 		return
-	if kind == "weapon":
+	if kind == "weapon" or kind == "tome":
 		_near = true
 		return
 	match kind:
@@ -234,6 +267,24 @@ func _draw() -> void:
 			draw_string(ThemeDB.fallback_font, Vector2(-100.0, bob - 22.0), display_name, HORIZONTAL_ALIGNMENT_CENTER, 200.0, 14, r_color)
 			if _near:
 				_draw_compare_card()
+		"tome":
+			var info: Dictionary = TomeSkillScript.TOMES.get(extra, {})
+			var tc := Color(0.75, 0.55, 1.0)
+			draw_circle(Vector2(0.0, bob), 15.0, Color(0.1, 0.07, 0.18))
+			draw_arc(Vector2(0.0, bob), 15.0, 0.0, TAU, 24, tc, 3.0)
+			draw_rect(Rect2(Vector2(-7.0, bob - 8.0), Vector2(14.0, 16.0)), Color(0.45, 0.25, 0.7))
+			draw_rect(Rect2(Vector2(-7.0, bob - 8.0), Vector2(3.0, 16.0)), Color(0.8, 0.65, 1.0))
+			draw_string(ThemeDB.fallback_font, Vector2(-100.0, bob - 24.0), String(info.get("name", "Tome")) + " (Tome)", HORIZONTAL_ALIGNMENT_CENTER, 200.0, 14, tc)
+			if _near:
+				var lines: Array = _wrap("%s  |  cooldown %ds" % [String(info.get("desc", "")), int(float(info.get("cooldown", 0.0)))], CARD_WRAP_CHARS)
+				var h: float = 18.0 + 15.0 * float(lines.size())
+				draw_rect(Rect2(Vector2(-140.0, -50.0 - h), Vector2(280.0, h)), Color(0.05, 0.04, 0.1, 0.92))
+				draw_rect(Rect2(Vector2(-140.0, -50.0 - h), Vector2(280.0, h)), tc, false, 1.5)
+				var y: float = -50.0 - h + 16.0
+				for ln in lines:
+					draw_string(ThemeDB.fallback_font, Vector2(-134.0, y), String(ln), HORIZONTAL_ALIGNMENT_LEFT, 270.0, 12, Color(0.92, 0.9, 1.0))
+					y += 15.0
+				draw_string(ThemeDB.fallback_font, Vector2(-134.0, -52.0), "[E] take  (use with %s)" % Global.key_name_for_action("tome"), HORIZONTAL_ALIGNMENT_LEFT, 270.0, 11, Color(1.0, 0.9, 0.5))
 		"portal":
 			var pulse: float = 1.0 + 0.1 * sin(_t * 4.0)
 			draw_circle(Vector2.ZERO, 28.0 * pulse, Color(0.3, 0.2, 0.9, 0.35))

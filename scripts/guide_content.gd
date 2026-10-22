@@ -18,6 +18,7 @@ const BossCouncil = preload("res://scripts/boss_council.gd")
 const HeatScript = preload("res://scripts/heat.gd")
 const SkillTree = preload("res://scripts/skill_tree.gd")
 const SquadAdapt = preload("res://scripts/squad_adapt.gd")
+const TomeSkillScript = preload("res://scripts/tome_skill.gd")
 
 const TAB_ORDER: Array = ["basics", "classes", "weapons", "buffs", "defense", "enemies", "events", "tips"]
 const TAB_TITLES: Dictionary = {
@@ -74,6 +75,7 @@ static func basics() -> String:
 	t += "Aim and attack: [b]Mouse[/b] (hold to keep attacking)\n"
 	t += "Dodge roll: %s (brief invulnerability, short cooldown)\n" % _key("dodge")
 	t += "Class skill: %s (every class starts with one; evolving your class unlocks a stronger one)\n" % _key("skill")
+	t += "Tome skill: %s (a second skill from any class, found in a run; see CLASSES)\n" % _key("tome")
 	t += "After the boss on floors 5 and 10 you also pick 1 of 2 upgrades for your class skill (this run only).\n"
 	t += "Interact: %s (altars, chests, shrines, picking up weapons)\n" % _key("interact")
 	t += "Swap weapon: %s or [b]Right mouse[/b] (you can carry 2 weapons; any class can use any weapon)\n" % _key("swap_weapon")
@@ -116,6 +118,13 @@ static func classes() -> String:
 		t += "\n"
 	t += "[b]Skill Power[/b] raises your skill's damage and effects; [b]Skill Haste[/b] shortens its cooldown. Both come from the Skill buffs "
 	t += "(Arcana, Quick Cast, Surge, Overflow, Echo, Spellburst, Overload) and from some passives, so you can build around your skill instead of your weapon.\n"
+	t += _sub("Tomes (second skill)")
+	t += "A Tome is an extra skill that any class can use, on %s. You carry one. Find them in Treasure Rooms (pick 1 of 2) and as a drop from the boss every 3rd floor. " % _key("tome")
+	t += "Take another and your old Tome drops on the floor; the new one starts on cooldown. Skill Power and Skill Haste apply to Tomes too.\n"
+	for tid in TomeSkillScript.ORDER:
+		var tc: Dictionary = TomeSkillScript.TOMES[tid]
+		t += "  [b]%s[/b], cooldown %s s: %s\n" % [tc["name"], _num(float(tc["cooldown"])), tc["desc"]]
+	t += "\n"
 	t += "A class sets your HP, starting weapon, passive and skill. Any class can use any weapon, and you carry two. "
 	t += "The weapon in your hand decides the buffs you are offered: ranged-only buffs such as Ricochet and Homing appear while holding a gun, "
 	t += "melee-only buffs such as Sword Wave while holding a blade.\n"
