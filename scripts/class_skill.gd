@@ -12,6 +12,7 @@ const BULLET = preload("res://scenes/bullet.tscn")
 const RingFx = preload("res://scripts/skill_ring_fx.gd")
 const WarnFx = preload("res://scripts/skill_warn_fx.gd")
 const SkillUpgrades = preload("res://scripts/skill_upgrades.gd")
+const Sigils = preload("res://scripts/sigils.gd")
 
 signal skill_used(skill_id: String)
 ## Hồi chiêu xong (sẵn sàng dùng lại).
@@ -58,8 +59,18 @@ func setup(p_player: Node, p_skill_id: String) -> void:
 func _add(key: String) -> float:
 	return SkillUpgrades.mod_add(skill_id, Global.skill_upgrades_taken, key)
 
+## Giá trị gộp của các Sigil đang gắn vào kỹ năng class (xem sigils.gd).
+func _sigil(key: String) -> float:
+	return Sigils.total(Global.run_sigils.get("class", []), key)
+
 func _mult(key: String) -> float:
 	var m: float = SkillUpgrades.mod_mult(skill_id, Global.skill_upgrades_taken, key)
+	if key == "dmg_mult":
+		m *= _sigil("dmg")
+	elif key == "radius_mult":
+		m *= _sigil("radius")
+	elif key == "life_mult":
+		m *= _sigil("life")
 	if key == "dmg_mult": # nút meta Honed Technique áp cho mọi kỹ năng
 		m *= Global.SkillTree.skill_damage_mult(Global.upgrades)
 	if key == "radius_mult" and Global.buff_stack("buff_skill_overload") > 0:
@@ -68,7 +79,7 @@ func _mult(key: String) -> float:
 
 func _effective_cooldown() -> float:
 	var haste: float = float(player.skill_haste()) if is_instance_valid(player) else 0.0
-	return maxf(1.0, (base_cooldown + _add("cooldown_add")) * Global.SkillTree.skill_cooldown_mult(Global.upgrades) / (1.0 + haste))
+	return maxf(1.0, (base_cooldown + _add("cooldown_add")) * Global.SkillTree.skill_cooldown_mult(Global.upgrades) * _sigil("cd") / (1.0 + haste))
 
 ## Hoàn bớt hồi chiêu (buff Overflow). Tổng hoàn mỗi lần tung tối đa nửa thời gian hồi để không thể tự reset vô hạn.
 var _refunded: float = 0.0
@@ -112,6 +123,11 @@ func try_activate() -> bool:
 		cooldown_left = 0.0 # Spellburst: lần tung miễn phí
 		Global.float_text(player.global_position + Vector2(0, -40), "SPELLBURST", Color(0.8, 0.6, 1.0), 18)
 	skill_used.emit(skill_id)
+	execute_free()
+	return true
+
+## Chạy hiệu ứng kỹ năng, KHÔNG tốn hồi chiêu và không phát skill_used (dùng cho tung lại của Sigil Echo).
+func execute_free() -> void:
 	match skill_id:
 		"overdrive": _overdrive()
 		"slam": _slam()
@@ -123,7 +139,6 @@ func try_activate() -> bool:
 		"shadow_rush": _shadow_dash(true)
 		"summon": _summon()
 		"legion": _legion()
-	return true
 
 ## Dọn hiệu ứng kéo dài khi Player chết / node bị gỡ để không để lại buff vĩnh viễn trên Player.
 func _exit_tree() -> void:
@@ -169,6 +184,7 @@ func _fire_volley(pitch: float = 1.0, bullets: int = BARRAGE_BULLETS) -> void:
 		var off: float = lerpf(-fan * 0.5, fan * 0.5, float(i) / float(bullets - 1))
 		var b = BULLET.instantiate()
 		b.setup(true, Vector2.from_angle(base + off), dmg, 680.0, 0.9, Color(0.5, 0.9, 1.0), 5.0)
+		b.skill_src = "class"
 		Global.world.add_child(b)
 		b.global_position = player.global_position + Vector2.from_angle(base + off) * 22.0
 	Global.sfx("barrage_volley", pitch)
@@ -204,11 +220,11 @@ func _blast(radius: float, dmg_base: float, dmg_per_floor: float, knock: float, 
 			e.take_damage(dmg, origin, knock)
 			if stun > 0.0 and e.alive and e.has_method("apply_status"):
 				e.apply_status("stun", stun)
-			Global.on_secondary_hit(e, dmg, false)
+			Global.on_secondary_hit(e, dmg, false, "class")
 	for b in get_tree().get_nodes_in_group("boss"):
 		if is_instance_valid(b) and b.alive and b.global_position.distance_to(origin) <= radius + 20.0:
 			b.take_damage(dmg, origin, 0.0)
-			Global.on_secondary_hit(b, dmg, false)
+			Global.on_secondary_hit(b, dmg, false, "class")
 	if clear_bullets:
 		for eb in get_tree().get_nodes_in_group("enemy_bullets"):
 			if is_instance_valid(eb) and eb.global_position.distance_to(origin) <= radius + 10.0:
@@ -229,7 +245,7 @@ const OVERDRIVE_DURATION: float = 4.0
 const OVERDRIVE_CD_MULT: float = 0.5
 
 func _overdrive() -> void:
-	active_left = OVERDRIVE_DURATION + _add("duration_add")
+	active_left = (OVERDRIVE_DURATION + _add("duration_add")) * _sigil("life")
 	player.skill_attack_cd_mult = OVERDRIVE_CD_MULT * _mult("attack_cd_mult")
 	player.skill_pierce_add = 1 # đạn xuyên thêm 1 quái trong lúc Overdrive
 	Global.burst(player.global_position, Color(1.0, 0.8, 0.3), 14, 200.0, 1.4)
@@ -266,11 +282,11 @@ func _damage_area(origin: Vector2, radius: float, dmg: int, knock: float, slow: 
 			e.take_damage(dmg, origin, knock)
 			if slow > 0.0 and e.alive and e.has_method("apply_status"):
 				e.apply_status("slow", slow)
-			Global.on_secondary_hit(e, dmg, false)
+			Global.on_secondary_hit(e, dmg, false, "class")
 	for b in get_tree().get_nodes_in_group("boss"):
 		if is_instance_valid(b) and b.alive and b.global_position.distance_to(origin) <= radius + 20.0:
 			b.take_damage(dmg, origin, 0.0)
-			Global.on_secondary_hit(b, dmg, false)
+			Global.on_secondary_hit(b, dmg, false, "class")
 
 func _ring_fx(pos: Vector2, radius: float, color: Color, duration: float = 0.35) -> void:
 	var fx := Node2D.new()
@@ -296,9 +312,10 @@ func _gravity_well() -> void:
 	var well := Node2D.new()
 	well.set_script(GravityWell)
 	well.radius = WELL_RADIUS * _mult("radius_mult")
-	well.duration = WELL_DURATION + _add("duration_add")
+	well.duration = (WELL_DURATION + _add("duration_add")) * _sigil("life")
 	well.tick_damage = maxi(1, int((WELL_DMG_BASE + WELL_DMG_PER_FLOOR * float(Global.floor_num)) * _dmg_mult() * _mult("dmg_mult")))
 	well.color = WELL_COLOR
+	well.src = "class"
 	Global.world.add_child(well)
 	well.global_position = pos
 	_ring_fx(pos, well.radius, WELL_COLOR, 0.4)
@@ -371,7 +388,7 @@ func _summon_power() -> float:
 func _summon() -> void:
 	var kind: String = String(SUMMON_ORDER[_summon_idx % SUMMON_ORDER.size()])
 	_summon_idx += 1
-	var m: Node = MinionScript.spawn(player, kind, player.global_position + player.aim_dir * 30.0, _summon_power(), _mult("life_mult"), _summon_idx % 3)
+	var m: Node = MinionScript.spawn(player, kind, player.global_position + player.aim_dir * 30.0, _summon_power(), _mult("life_mult"), _summon_idx % 3, "class")
 	m.set_meta("summoned", true)
 	var cap: int = _minion_cap() + int(_add("minions_add"))
 	var mine: Array = _my_minions(SUMMON_ORDER)
@@ -389,7 +406,7 @@ func _legion() -> void:
 	var count: int = LEGION_COUNT + int(_add("minions_add"))
 	for i in count:
 		var ang: float = TAU * float(i) / float(count)
-		var m: Node = MinionScript.spawn(player, "mini", player.global_position + Vector2.from_angle(ang) * 26.0, _summon_power(), _mult("life_mult"), i)
+		var m: Node = MinionScript.spawn(player, "mini", player.global_position + Vector2.from_angle(ang) * 26.0, _summon_power(), _mult("life_mult"), i, "class")
 		m.set_meta("summoned", true)
 	var mine: Array = _my_minions(["mini"])
 	while mine.size() > count * 2:
@@ -431,11 +448,11 @@ func _damage_line(a: Vector2, b: Vector2, dmg: int, bleed: bool) -> void:
 			if bleed and e.alive and e.has_method("apply_status"):
 				e.apply_status("bleed", 0.0)
 			Global.burst(e.global_position, SHADOW_COLOR, 6, 140.0, 1.2)
-			Global.on_secondary_hit(e, dmg, false)
+			Global.on_secondary_hit(e, dmg, false, "class")
 	for bs in get_tree().get_nodes_in_group("boss"):
 		if is_instance_valid(bs) and bs.alive and _dist_to_segment(bs.global_position, a, b) <= SHADOW_WIDTH + 34.0:
 			bs.take_damage(dmg, a, 0.0)
-			Global.on_secondary_hit(bs, dmg, false)
+			Global.on_secondary_hit(bs, dmg, false, "class")
 
 static func _dist_to_segment(p: Vector2, a: Vector2, b: Vector2) -> float:
 	var ab: Vector2 = b - a

@@ -19,6 +19,7 @@ const HeatScript = preload("res://scripts/heat.gd")
 const SkillTree = preload("res://scripts/skill_tree.gd")
 const SquadAdapt = preload("res://scripts/squad_adapt.gd")
 const TomeSkillScript = preload("res://scripts/tome_skill.gd")
+const SigilsScript = preload("res://scripts/sigils.gd")
 
 const TAB_ORDER: Array = ["basics", "classes", "weapons", "buffs", "defense", "enemies", "events", "tips"]
 const TAB_TITLES: Dictionary = {
@@ -124,6 +125,16 @@ static func classes() -> String:
 	for tid in TomeSkillScript.ORDER:
 		var tc: Dictionary = TomeSkillScript.TOMES[tid]
 		t += "  [b]%s[/b], cooldown %s s: %s\n" % [tc["name"], _num(float(tc["cooldown"])), tc["desc"]]
+	t += "\n"
+	t += _sub("Sigils (skill runes)")
+	t += "Sigils are runes you socket into a skill to change how it plays. The class skill (%s) has 2 sockets, 3 once your class has evolved; the Tome has 2. " % _key("skill")
+	t += "The boss leaves a cache of 3 Sigils every 2nd floor: take 1. Press %s on a Sigil to put it in your class skill (then the Tome if full); hold [b]Shift[/b] while pressing %s to prefer the Tome. " % [_key("interact"), _key("interact")]
+	t += "When every socket is full, the new Sigil replaces the oldest in that skill, and the old one drops on the floor.\n"
+	for rar in SigilsScript.RARITY_ORDER:
+		for sid in SigilsScript.SIGILS:
+			var sg: Dictionary = SigilsScript.SIGILS[sid]
+			if String(sg["rarity"]) == rar:
+				t += "  [b][color=%s]%s[/color][/b] (%s): %s\n" % ["#" + SigilsScript.RARITY_COLOR[rar].to_html(false), sg["name"], SigilsScript.RARITY_NAME[rar], sg["desc"]]
 	t += "\n"
 	t += "A class sets your HP, starting weapon, passive and skill. Any class can use any weapon, and you carry two. "
 	t += "The weapon in your hand decides the buffs you are offered: ranged-only buffs such as Ricochet and Homing appear while holding a gun, "

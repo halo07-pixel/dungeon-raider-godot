@@ -16,6 +16,8 @@ var pull_mult: float = 1.0
 var end_dmg: int = 0
 var end_radius: float = 0.0
 var end_knock: float = 380.0
+## Nguồn đòn cho Sigil: "class" (Gravity Well) hoặc "tome" (Black Hole).
+var src: String = "class"
 var _t: float = 0.0
 var _tick: float = 0.0
 
@@ -46,12 +48,12 @@ func _physics_process(delta: float) -> void:
 			e.take_damage(tick_damage, global_position, 0.0)
 			if e.alive and e.has_method("apply_status"):
 				e.apply_status("slow", SLOW_SECONDS)
-			Global.on_secondary_hit(e, tick_damage, false)
+			Global.on_secondary_hit(e, tick_damage, false, src)
 	if do_tick:
 		for b in get_tree().get_nodes_in_group("boss"):
 			if is_instance_valid(b) and b.alive and b.global_position.distance_to(global_position) <= radius + 20.0:
 				b.take_damage(tick_damage, global_position, 0.0)
-				Global.on_secondary_hit(b, tick_damage, false)
+				Global.on_secondary_hit(b, tick_damage, false, src)
 	queue_redraw()
 
 ## Nổ cuối vòng đời: sát thương + đẩy lùi mọi quái/boss trong end_radius.
@@ -59,11 +61,11 @@ func _explode() -> void:
 	for e in get_tree().get_nodes_in_group("enemies"):
 		if is_instance_valid(e) and e.alive and e.global_position.distance_to(global_position) <= end_radius:
 			e.take_damage(end_dmg, global_position, end_knock)
-			Global.on_secondary_hit(e, end_dmg, false)
+			Global.on_secondary_hit(e, end_dmg, false, src)
 	for b in get_tree().get_nodes_in_group("boss"):
 		if is_instance_valid(b) and b.alive and b.global_position.distance_to(global_position) <= end_radius + 20.0:
 			b.take_damage(end_dmg, global_position, 0.0)
-			Global.on_secondary_hit(b, end_dmg, false)
+			Global.on_secondary_hit(b, end_dmg, false, src)
 	Global.burst(global_position, color, 24, 300.0, 2.0)
 	Global.shake(0.45, 0.3)
 	Global.sfx("meteor_impact")

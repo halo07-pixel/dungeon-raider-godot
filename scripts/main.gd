@@ -134,6 +134,7 @@ func _restore_player_state() -> void:
 		Global.run_buffs = Dictionary(Global.saved_run.get("run_buffs", {})).duplicate()
 		Global.scrap = int(Global.saved_run.get("scrap", 0))
 		Global.run_tome = String(Global.saved_run.get("tome", ""))
+		Global.run_sigils = Global.SigilsScript.normalize(Global.saved_run.get("sigils", {}), player.class_evolved() if player.has_method("class_evolved") else false)
 		if Global.run_tome != "" and player.has_method("equip_tome"):
 			player.equip_tome(Global.run_tome)
 		var pity = Global.saved_run.get("weapon_pity", {})
@@ -285,6 +286,7 @@ func _build_saved_run() -> Dictionary:
 		"weapon_pity": Global.weapon_pity.duplicate(),
 		"scrap": Global.scrap,
 		"tome": Global.run_tome,
+		"sigils": Global.run_sigils.duplicate(true),
 		"gold": Global.coins + Global.stolen_gold_held, # xu đang cầm (trước đây không lưu nên Continue mất sạch xu)
 		"stats": Global.run_stats.duplicate() if Global.get("run_stats") else {}
 	}
