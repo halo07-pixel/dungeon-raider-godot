@@ -46,3 +46,10 @@ theo class + Heat.
 - Chế độ immortal: > 20 phút mô phỏng không đổi tầng thì ép qua tầng (`forced_floors` trong kết quả) – tầng bị ép KHÔNG tính vào thời gian/sát thương trung bình.
 - Kết quả mẫu: `tools/bot/results/immortal_floor1-10_summary.md` (4 class x 2 ván, seed 11).
 - Lưu ý: số liệu là xấp xỉ "kỹ năng cố định"; bot ăn sát thương nhiều hơn người; dùng để SO SÁNH giữa các tầng/nguồn, không phải độ khó tuyệt đối. Tầng 4–9 (đầm lầy, băng) bot hay kẹt nên mẫu ít.
+
+## v1.5
+- Bỏ né bẫy khi đã sát cổng portal (cổng nằm cạnh ô độc/băng làm bot dội ra mãi).
+- Boss triệu hồi bầy (> 8 quái): ưu tiên đánh boss nếu có tầm nhìn.
+- Vũ khí tầm cực ngắn (Flamethrower ~99px): giảm khoảng giữ/bắn tối thiểu để bắn trúng.
+- Báo cáo mới `THỜI GIAN CLEAR TỚI MỐC NÂNG CẤP KỸ NĂNG` (mốc tầng 5 và 10, chỉ tính ván sạch).
+- Còn tồn tại: tầng 5–9 vẫn thường phải ép qua tầng; chưa đủ ván sạch để so class.

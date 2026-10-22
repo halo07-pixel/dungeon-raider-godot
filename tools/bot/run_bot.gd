@@ -200,8 +200,42 @@ func _report_floors() -> void:
 func main_name(src: String) -> String:
 	return load("res://scripts/run_telemetry.gd").source_name(src)
 
+## Thời gian clear tích lũy tới 2 mốc nâng cấp kỹ năng của class (tầng 5 và 10): chỉ tính ván "sạch" (không tầng nào bị ép qua).
+func _report_milestones() -> void:
+	print("")
+	print("===== THỜI GIAN CLEAR TỚI MỐC NÂNG CẤP KỸ NĂNG (phút mô phỏng, ván sạch) =====")
+	for cls in ["ranger", "brawler", "mage", "rogue"]:
+		var line: String = "%-8s" % cls
+		for mile in [5, 10]:
+			var ts: Array = []
+			var total: int = 0
+			for r in results:
+				if String(r["class"]) != cls:
+					continue
+				total += 1
+				var fl: Dictionary = r["floors"]
+				var forced: Array = r.get("forced_floors", [])
+				var ok: bool = fl.has(str(mile + 1))
+				var t: float = 0.0
+				for i in range(1, mile + 1):
+					if not fl.has(str(i)) or forced.has(i):
+						ok = false
+						break
+					t += float(fl[str(i)]["time"])
+				if ok:
+					ts.append(t / 60.0)
+			if total == 0:
+				line += " | mốc %d: -" % mile
+			elif ts.is_empty():
+				line += " | mốc %d: 0/%d ván sạch" % [mile, total]
+			else:
+				ts.sort()
+				line += " | mốc %d: TB %.1fp (min %.1f, max %.1f, %d/%d sạch)" % [mile, ts.reduce(func(a, b): return a + b) / ts.size(), ts[0], ts[-1], ts.size(), total]
+		print(line)
+
 func _report(configs: Array) -> void:
 	_report_floors()
+	_report_milestones()
 	print("")
 	print("===== TỔNG HỢP (%d ván) =====" % results.size())
 	var groups: Dictionary = {}

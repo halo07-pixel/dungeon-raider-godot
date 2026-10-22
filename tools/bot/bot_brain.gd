@@ -31,6 +31,7 @@ const PICKUP_RANGE: float = 170.0
 const HEAL_SEEK_RANGE: float = 520.0
 const HEAL_SEEK_HP: float = 0.7
 const STUCK_SECONDS: float = 2.0
+const SWARM_SIZE: int = 8
 const HUNT_AFTER: float = 40.0              # chừng này giây không hạ được con nào thì chuyển sang "săn": lao thẳng theo đường tới quái
 const HUNT_DURATION: float = 20.0
 const WEAPON_UPGRADE_RATIO: float = 1.12     # chỉ đổi khi vũ khí mới mạnh hơn chừng này
@@ -51,6 +52,8 @@ var stats: Dictionary = {"rolls": 0, "skills": 0, "buffs": [], "stuck_events": 0
 var trace: bool = false
 var immortal: bool = false   # chế độ đo: luôn hồi đầy máu để bot đi hết các tầng, vẫn ghi sát thương đã nhận
 var _goal_desc: String = ""
+var _goal_pos = null
+var _goal_is_portal: bool = false
 var _wgoal_id: int = 0
 var _wgoal_t: float = 0.0
 var _wgoal_banned: Dictionary = {}
@@ -142,6 +145,10 @@ func _nearest(list: Array, from: Vector2):
 
 ## Mục tiêu: gần nhất trong số quái đang THẤY được (tia nhìn không bị tường chắn); không ai thấy thì gần nhất.
 func _pick_target(list: Array, pp: Vector2):
+	if list.size() > SWARM_SIZE: # boss triệu hồi bầy (Necromancer): đánh thẳng boss thay vì sa lầy với lính
+		for e in list:
+			if e.get("tele_mode") != null and _los(pp, e.global_position):
+				return e
 	var best = null
 	var bd: float = INF
 	for e in list:
@@ -218,7 +225,11 @@ func _think(dt: float) -> void:
 			steer += off.normalized() * (1.6 + (r - d) / r) if d > 1.0 else Vector2.RIGHT
 	if in_hazard:
 		stats["hazard_ticks"] += 1
+	# cổng/portal nằm cạnh ô độc/băng/gai: tới sát cổng thì bỏ né bẫy để bước vào (trước đây bot dội ra mãi)
+	var near_portal: bool = _goal_is_portal and _goal_pos != null and pp.distance_to(_goal_pos) < 120.0
 	for tr in _floor_traps():
+		if near_portal:
+			break
 		var toff: Vector2 = pp - tr.global_position
 		var td: float = toff.length()
 		if td < TRAP_AVOID_DIST and td > 1.0:
@@ -278,7 +289,7 @@ func _think(dt: float) -> void:
 			_shoot = dist < reach + 25.0
 		else:
 			var keep: float = BOSS_KEEP_DIST if is_boss else RANGED_KEEP_DIST
-			keep = minf(keep, maxf(110.0, _weapon_range(player.weapon) * 0.7)) # không đứng xa hơn tầm bắn của vũ khí đang cầm
+			keep = minf(keep, maxf(55.0, _weapon_range(player.weapon) * 0.7)) # không đứng xa hơn tầm bắn của vũ khí đang cầm
 			if _is_kiter(target):
 				keep = KITER_CHASE_DIST # cung thủ/pháp sư hay lùi: phải áp sát chứ không đứng chờ
 			var perp: Vector2 = Vector2(-dir_t.y, dir_t.x) * (1.0 if int(sim_time / 2.0) % 2 == 0 else -1.0)
@@ -288,7 +299,7 @@ func _think(dt: float) -> void:
 				steer += dir_t * 0.9
 			else:
 				steer += perp * 0.7
-			_shoot = dist < maxf(120.0, minf(560.0, _weapon_range(player.weapon) * 0.95))
+			_shoot = dist < maxf(60.0, minf(560.0, _weapon_range(player.weapon) * 0.95))
 		steer += _repel(enemies, pp, target)
 		_maybe_skill(enemies, pp, target)
 		steer += _wall_push(pp)
@@ -422,13 +433,16 @@ func _navigate(pp: Vector2) -> Vector2:
 			goal = c.global_position
 	if goal == null:
 		goal = _weapon_goal(pp)
+	_goal_is_portal = false
 	if goal == null:
 		var portal = _nearest(_pickups("portal"), pp)
 		if portal != null:
 			goal = portal.global_position
+			_goal_is_portal = true
 	if goal == null:
 		var tc = _unvisited_treasure()
 		goal = dungeon.room_center(tc) if tc != null else dungeon.room_center(dungeon.boss_cell)
+	_goal_pos = goal
 	var path: PackedVector2Array = dungeon.find_path(pp, goal)
 	if path.size() < 2:
 		# không có đường theo lưới: đi theo đồ thị phòng tới phòng kế trên đường tới trùm
