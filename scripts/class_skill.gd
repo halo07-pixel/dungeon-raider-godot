@@ -31,6 +31,9 @@ const SKILLS: Dictionary = {
 	"meteor_storm": {"name": "Meteor Storm", "cooldown": 10.0, "desc": "[Q] Mark the ground at your cursor; meteors crash down there shortly after."},
 	# Rogue / Rogue+
 	"shadow_dash": {"name": "Shadow Dash", "cooldown": 6.0, "desc": "[Q] Dash through enemies, cutting everything in your path. Your next hit is a guaranteed critical."},
+	# Summoner / Summoner+
+	"summon": {"name": "Summon", "cooldown": 6.0, "desc": "[Q] Call a minion that fights for you: Spirit (melee), Wisp (ranged), Guardian (blocks bullets), in turn. Up to 2 at once."},
+	"legion": {"name": "Legion", "cooldown": 12.0, "desc": "[Q] Call 3 Spitelings that rush enemies and explode when their time runs out."},
 	"shadow_rush": {"name": "Shadow Rush", "cooldown": 8.0, "desc": "[Q] Dash far through enemies, making them bleed. Your next 3 hits are guaranteed critical."},
 }
 
@@ -118,6 +121,8 @@ func try_activate() -> bool:
 		"meteor_storm": _meteor_storm()
 		"shadow_dash": _shadow_dash(false)
 		"shadow_rush": _shadow_dash(true)
+		"summon": _summon()
+		"legion": _legion()
 	return true
 
 ## Dọn hiệu ứng kéo dài khi Player chết / node bị gỡ để không để lại buff vĩnh viễn trên Player.
@@ -345,6 +350,54 @@ func _meteor_land(pos: Vector2, radius: float, delay: float) -> void:
 	Global.burst(pos, METEOR_COLOR, 20, 260.0, 2.0)
 	Global.shake(0.4, 0.25)
 	Global.sfx("meteor_impact")
+
+# ------------------------------------------------------------------ Summoner: Summon / Summoner+: Legion
+const MinionScript = preload("res://scripts/minion.gd")
+const SUMMON_ORDER: Array = ["spirit", "wisp", "guardian"]
+const LEGION_COUNT: int = 3
+var _summon_idx: int = 0
+
+## Lính tự triệu hồi (đánh dấu meta "summoned") — không tính lính do Tome tạo.
+func _my_minions(kinds: Array) -> Array:
+	var out: Array = []
+	for m in get_tree().get_nodes_in_group("minions"):
+		if is_instance_valid(m) and not m.is_queued_for_deletion() and m.owner_player == player and m.has_meta("summoned") and kinds.has(m.kind):
+			out.append(m)
+	return out
+
+func _summon_power() -> float:
+	return _dmg_mult() * _mult("dmg_mult") * float(player.minion_dmg_mult())
+
+func _summon() -> void:
+	var kind: String = String(SUMMON_ORDER[_summon_idx % SUMMON_ORDER.size()])
+	_summon_idx += 1
+	var m: Node = MinionScript.spawn(player, kind, player.global_position + player.aim_dir * 30.0, _summon_power(), _mult("life_mult"), _summon_idx % 3)
+	m.set_meta("summoned", true)
+	var cap: int = _minion_cap() + int(_add("minions_add"))
+	var mine: Array = _my_minions(SUMMON_ORDER)
+	while mine.size() > cap:
+		var old: Node = mine.pop_front()
+		old.queue_free()
+	_ring_fx(player.global_position, 46.0, m.cfg["color"], 0.35)
+	Global.burst(player.global_position, m.cfg["color"], 10, 150.0, 1.2)
+	Global.sfx("barrage_cast", 1.1)
+
+func _minion_cap() -> int:
+	return int(player.PASSIVE_SUMMONER_MINIONS) if Global.current_class == "summoner" else 1
+
+func _legion() -> void:
+	var count: int = LEGION_COUNT + int(_add("minions_add"))
+	for i in count:
+		var ang: float = TAU * float(i) / float(count)
+		var m: Node = MinionScript.spawn(player, "mini", player.global_position + Vector2.from_angle(ang) * 26.0, _summon_power(), _mult("life_mult"), i)
+		m.set_meta("summoned", true)
+	var mine: Array = _my_minions(["mini"])
+	while mine.size() > count * 2:
+		var old: Node = mine.pop_front()
+		old.queue_free()
+	_ring_fx(player.global_position, 60.0, Color(1.0, 0.55, 0.4), 0.4)
+	Global.shake(0.15, 0.12)
+	Global.sfx("barrage_cast", 0.8)
 
 # ------------------------------------------------------------------ Rogue: Shadow Dash / Rogue+: Shadow Rush
 const SHADOW_DIST: float = 160.0

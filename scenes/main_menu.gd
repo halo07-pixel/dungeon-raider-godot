@@ -14,6 +14,7 @@ const SPRITE_SET: Dictionary = {
 	"brawler": "knight_m",
 	"mage": "wizard_m",
 	"rogue": "lizard_m",
+	"summoner": "necromancer",
 }
 
 var ui_layer: CanvasLayer
@@ -216,6 +217,7 @@ func _build_class_menu() -> void:
 	hbox.add_child(_build_class_option("knight_m", _class_card_text("brawler", "HP: 200\nWeapon: Longsword"), func(): _start_new_game("brawler"), Color(0.8, 0.3, 0.2)))
 	hbox.add_child(_build_class_option("wizard_m", _class_card_text("mage", "HP: 80\nWeapon: Arcane Staff"), func(): _start_new_game("mage"), Color(0.6, 0.35, 0.9)))
 	hbox.add_child(_build_class_option("lizard_m", _class_card_text("rogue", "HP: 90\nWeapon: Daggers"), func(): _start_new_game("rogue"), Color(0.3, 0.7, 0.3)))
+	hbox.add_child(_build_class_option("necromancer", _class_card_text("summoner", "HP: 85\nWeapon: Chakram"), func(): _start_new_game("summoner"), Color(0.75, 0.4, 0.85)))
 
 	_build_heat_panel(vbox)
 	var back_btn: Control = _create_btn("BACK", show_main_menu, Vector2(250, 60), Color(0.4, 0.4, 0.4))
@@ -301,7 +303,7 @@ func _build_class_option(prefix: String, label_text: String, action: Callable, c
 	col.add_theme_constant_override("separation", 10)
 	col.alignment = BoxContainer.ALIGNMENT_CENTER
 	col.add_child(_make_class_preview(prefix, Vector2(140, 150), 3.5))
-	col.add_child(_create_btn(label_text, action, Vector2(300, 170), color, 14))
+	col.add_child(_create_btn(label_text, action, Vector2(228, 170), color, 14))
 	return col
 
 # ==========================================
@@ -448,7 +450,7 @@ func _refresh_profile() -> void:
 	profile_box.add_child(_profile_label("Runs: %d   Wins: %d   Best floor: %d   Kills: %d   Secrets: %d" % [P["runs"], P["wins"], P["best_floor"], P["kills"], int(P.get("secrets", 0))], 12))
 	profile_box.add_child(HSeparator.new())
 
-	for cid in ["ranger", "brawler", "mage", "rogue"]:
+	for cid in ["ranger", "brawler", "mage", "rogue", "summoner"]:
 		var C: Dictionary = Global.MetaProgress.cls(P, cid)
 		var base: String = String(Global.classes[cid]["name"])
 		var shown: String = Global.MetaProgress.display_name(P, cid, base)

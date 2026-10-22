@@ -20,6 +20,11 @@ const EVOLUTIONS: Dictionary = {
 		 "desc": "[Q] Mark the ground at your cursor; meteors crash down there shortly after.",
 		 "req": {"type": "boss", "kind": "lord", "count": 2}},
 	],
+	"summoner": [
+		{"name": "Summoner+", "skill": "legion", "skill_name": "Legion",
+		 "desc": "[Q] Call 3 Spitelings that rush enemies and explode when their time runs out.",
+		 "req": {"type": "boss", "kind": "lord", "count": 2}},
+	],
 	"rogue": [
 		{"name": "Rogue+", "skill": "shadow_rush", "skill_name": "Shadow Rush",
 		 "desc": "[Q] Dash far through enemies, making them bleed. Your next 3 hits are guaranteed critical.",

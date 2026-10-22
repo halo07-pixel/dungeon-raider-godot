@@ -238,7 +238,9 @@ var classes: Dictionary = {
 	# Cây kiếng: máu thấp, sát thương lớn, né + định vị bằng kỹ năng lướt
 	"mage": {"name": "Mage", "max_hp": 80, "default_weapon": "staff", "skill": "gravity_well", "passive": {"name": "Arcane Mind", "desc": "Skills recharge 25% faster."}},
 	# Sát thủ: lướt xuyên quái gây sát thương, dao găm nhanh
-	"rogue": {"name": "Rogue", "max_hp": 90, "default_weapon": "daggers", "skill": "shadow_dash", "passive": {"name": "Assassin", "desc": "+15% critical chance."}}
+	"rogue": {"name": "Rogue", "max_hp": 90, "default_weapon": "daggers", "skill": "shadow_dash", "passive": {"name": "Assassin", "desc": "+15% critical chance."}},
+	# Triệu hồi sư: máu vừa, lính đánh thay mình; kỹ năng xoay vòng 3 loại lính
+	"summoner": {"name": "Summoner", "max_hp": 85, "default_weapon": "chakram", "skill": "summon", "passive": {"name": "Pack Leader", "desc": "Up to 2 summoned minions at once, which deal +30% damage. Skills recharge 25% faster."}}
 }
 var current_class: String = "brawler"
 

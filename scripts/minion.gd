@@ -17,6 +17,7 @@ const KINDS: Dictionary = {
 	"turret": {"name": "Arc Turret", "mode": "shoot", "stationary": true, "life": 10.0, "shot_cd": 0.4, "range": 380.0, "bullet_speed": 600.0, "dmg_k": 0.6, "color": Color(0.5, 1.0, 0.7), "size": 11.0},
 	"totem": {"name": "Mending Totem", "mode": "totem", "stationary": true, "life": 8.0, "pulse": 1.5, "heal": 4, "radius": 130.0, "dmg_k": 0.0, "color": Color(0.5, 1.0, 0.5), "size": 11.0},
 	"ward": {"name": "Ward Barrier", "mode": "guard", "stationary": true, "life": 6.0, "block_radius": 80.0, "dmg_k": 0.0, "color": Color(0.6, 0.8, 1.0), "size": 13.0},
+	"mini": {"name": "Spiteling", "mode": "chase", "speed": 215.0, "life": 8.0, "hit_cd": 0.5, "reach": 16.0, "dmg_k": 0.7, "color": Color(1.0, 0.55, 0.4), "size": 6.0, "explode_radius": 80.0, "explode_k": 3.5},
 	"blades": {"name": "Blade Dance", "mode": "orbit", "life": 6.0, "hit_cd": 0.45, "orbit": 72.0, "spin": 4.2, "count": 3, "dmg_k": 0.9, "color": Color(0.9, 0.95, 1.0), "size": 9.0},
 }
 
@@ -81,9 +82,29 @@ func _physics_process(delta: float) -> void:
 	queue_redraw()
 
 func _expire() -> void:
+	if cfg.has("explode_radius") and is_instance_valid(owner_player) and owner_player.alive:
+		_explode()
 	expired.emit(kind, global_position)
 	Global.burst(global_position, cfg["color"], 6, 90.0, 1.0)
 	queue_free()
+
+## Nổ khi hết hạn (Spiteling của Legion): sát thương diện rộng quanh vị trí lính.
+func _explode() -> void:
+	var r: float = float(cfg["explode_radius"])
+	var amount: int = maxi(1, int(float(dmg) * float(cfg["explode_k"])))
+	for grp in ["enemies", "boss"]:
+		for e in get_tree().get_nodes_in_group(grp):
+			if is_instance_valid(e) and e.alive and e.global_position.distance_to(global_position) <= r + (_target_radius(e) if grp == "boss" else 0.0):
+				_strike(e, amount, 260.0)
+	var fx := Node2D.new()
+	fx.set_script(load("res://scripts/skill_ring_fx.gd"))
+	fx.max_radius = r
+	fx.color = cfg["color"]
+	fx.duration = 0.3
+	Global.world.add_child(fx)
+	fx.global_position = global_position
+	Global.burst(global_position, cfg["color"], 14, 220.0, 1.6)
+	Global.sfx("shockwave", 1.4)
 
 func _think(delta: float) -> void:
 	match String(cfg["mode"]):
