@@ -66,6 +66,9 @@ const SPEAR_RARE_RANGE_MULT: float = 1.2
 const PASSIVE_RANGER_RANGED_DMG: float = 0.12   # Ranger: vũ khí tầm xa +12% sát thương
 const PASSIVE_BRAWLER_MELEE_DMG: float = 0.12   # Brawler: vũ khí cận chiến +12% sát thương
 const PASSIVE_BRAWLER_DAMAGE_TAKEN: float = 0.92 # Brawler: nhận sát thương x0.92
+const PASSIVE_SUMMONER_HASTE: float = 0.25     # Summoner: hồi chiêu kỹ năng nhanh hơn 25%
+const PASSIVE_SUMMONER_MINIONS: int = 2        # Summoner: số lính tự triệu hồi tối đa cùng lúc (Summon)
+const PASSIVE_SUMMONER_MINION_DMG: float = 0.30 # Summoner: lính +30% sát thương
 const PASSIVE_MAGE_HASTE: float = 0.25          # Mage: hồi chiêu kỹ năng nhanh hơn 25%
 const PASSIVE_ROGUE_CRIT: float = 0.15          # Rogue: +15% tỉ lệ chí mạng
 const SKILL_POWER_PER_ARCANA: float = 0.12
@@ -261,6 +264,7 @@ const SPRITE_SET: Dictionary = {
 	"brawler": "knight_m",
 	"mage": "wizard_m",
 	"rogue": "lizard_m",
+	"summoner": "necromancer", # chỉ có khung idle -> chạy/trúng đòn dùng lại khung idle
 }
 const SPRITE_SCALE: float = 2.0
 const SPRITE_OFFSET_Y: float = -11.0
@@ -339,6 +343,8 @@ func _add_sprite_anim(frames: SpriteFrames, prefix: String, anim: String, count:
 	frames.set_animation_loop(anim, loop)
 	for i in count:
 		var path: String = "res://assets/dungeon/%s_%s_anim_f%d.png" % [prefix, anim, i]
+		if anim != "idle" and not FileAccess.file_exists(path):
+			path = "res://assets/dungeon/%s_idle_anim_f%d.png" % [prefix, i] # bộ sprite thiếu khung chạy/trúng đòn (Necromancer)
 		var tex := Global.load_tex(path)
 		if tex:
 			frames.add_frame(anim, tex)
@@ -1223,6 +1229,8 @@ func skill_haste() -> float:
 	var h: float = SKILL_HASTE_PER_QUICK_CAST * float(Global.buff_stack("buff_skill_haste"))
 	if Global.current_class == "mage":
 		h += PASSIVE_MAGE_HASTE
+	elif Global.current_class == "summoner":
+		h += PASSIVE_SUMMONER_HASTE
 	if Global.buff_stack("buff_skill_overload") > 0:
 		h += OVERLOAD_HASTE
 	return maxf(-0.5, h)
@@ -1232,6 +1240,10 @@ func spellburst_chance() -> float:
 	return minf(0.75, SPELLBURST_CHANCE_PER_STACK * float(Global.buff_stack("buff_skill_burst")))
 
 ## ---- Nội tại class ----
+## Summoner (Pack Leader): tối đa PASSIVE_SUMMONER_MINIONS lính tự triệu hồi cùng lúc, lính +30% sát thương.
+func minion_dmg_mult() -> float:
+	return 1.0 + PASSIVE_SUMMONER_MINION_DMG if Global.current_class == "summoner" else 1.0
+
 ## Hệ số sát thương vũ khí theo nội tại (Ranger tầm xa, Brawler cận chiến).
 func _passive_dmg_mult() -> float:
 	var melee: bool = bool(weapon.get("is_melee", false))

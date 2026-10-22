@@ -126,14 +126,14 @@ func _enforce_cap(kind: String, cap: int) -> void:
 # ---------------------------------------------------------------- 8 Tome
 func _cast_arc_turret() -> void:
 	var pos: Vector2 = _cursor_point()
-	MinionScript.spawn(player, "turret", pos, power())
+	MinionScript.spawn(player, "turret", pos, power() * float(player.minion_dmg_mult()))
 	_enforce_cap("turret", TURRET_CAP)
 	_ring(pos, 30.0, Color(0.5, 1.0, 0.7), 0.3)
 	Global.sfx("pickup", 0.8)
 
 func _cast_spirit_pact() -> void:
 	for i in 2:
-		MinionScript.spawn(player, "spirit", player.global_position + Vector2.from_angle(randf() * TAU) * 24.0, power(), 10.0 / 12.0, i)
+		MinionScript.spawn(player, "spirit", player.global_position + Vector2.from_angle(randf() * TAU) * 24.0, power() * float(player.minion_dmg_mult()), 10.0 / 12.0, i)
 	_enforce_cap("spirit", 4)
 	_ring(player.global_position, 50.0, Color(0.55, 0.85, 1.0), 0.35)
 	Global.sfx("barrage_cast", 1.2)
@@ -162,7 +162,7 @@ func _cast_blade_dance() -> void:
 	for m in get_tree().get_nodes_in_group("minions"):
 		if is_instance_valid(m) and m.kind == "blades" and m.owner_player == player:
 			m.queue_free() # tung lại thì làm mới, không chồng lưỡi
-	MinionScript.spawn(player, "blades", player.global_position, power())
+	MinionScript.spawn(player, "blades", player.global_position, power() * float(player.minion_dmg_mult()))
 	Global.sfx("shadow_dash", 1.3)
 
 func _cast_mending_totem() -> void:

@@ -3,8 +3,8 @@ extends RefCounted
 ## Thuần dữ liệu + hàm static, không phụ thuộc scene/Global. Mỗi nâng cấp là một bộ "mods" do
 ## ClassSkill đọc khi dùng kỹ năng:
 ##   *_add  : cộng dồn (cooldown_add giây, duration_add giây, crit_add số đòn chắc chí mạng, volleys_add, bullets_add, stun_add giây,
-##            dist_add px lướt, slow_add giây làm chậm, meteors_add số thiên thạch)
-##   *_mult : nhân dồn (radius_mult, dmg_mult, attack_cd_mult)
+##            dist_add px lướt, slow_add giây làm chậm, meteors_add số thiên thạch, minions_add số lính thêm)
+##   *_mult : nhân dồn (radius_mult, dmg_mult, attack_cd_mult, life_mult thời gian tồn tại lính)
 ## Thêm nâng cấp mới = thêm 1 dòng vào UPGRADES[skill_id]; id phải duy nhất toàn bộ.
 
 const UPGRADES: Dictionary = {
@@ -30,6 +30,18 @@ const UPGRADES: Dictionary = {
 		{"id": "skup_met_wide", "name": "Wide Impact", "desc": "Meteor blast radius +30%.", "mods": {"radius_mult": 1.3}},
 		{"id": "skup_met_heavy", "name": "Heavy Meteors", "desc": "Meteor damage +40%.", "mods": {"dmg_mult": 1.4}},
 		{"id": "skup_met_recharge", "name": "Quick Storm", "desc": "Meteor Storm cooldown -2.5 seconds.", "mods": {"cooldown_add": -2.5}},
+	],
+	"summon": [
+		{"id": "skup_sm_pack", "name": "Bigger Pack", "desc": "Summon: 1 more minion at once.", "mods": {"minions_add": 1}},
+		{"id": "skup_sm_long", "name": "Lasting Bonds", "desc": "Summoned minions last 40% longer.", "mods": {"life_mult": 1.4}},
+		{"id": "skup_sm_strong", "name": "Empowered Minions", "desc": "Summoned minion damage +40%.", "mods": {"dmg_mult": 1.4}},
+		{"id": "skup_sm_recharge", "name": "Quick Summon", "desc": "Summon cooldown -1.5 seconds.", "mods": {"cooldown_add": -1.5}},
+	],
+	"legion": [
+		{"id": "skup_lg_more", "name": "Bigger Legion", "desc": "Legion calls 1 more Spiteling.", "mods": {"minions_add": 1}},
+		{"id": "skup_lg_blast", "name": "Volatile Spitelings", "desc": "Spiteling damage +40%, including their explosion.", "mods": {"dmg_mult": 1.4}},
+		{"id": "skup_lg_long", "name": "Patient Spitelings", "desc": "Spitelings last 40% longer.", "mods": {"life_mult": 1.4}},
+		{"id": "skup_lg_recharge", "name": "Quick Legion", "desc": "Legion cooldown -2 seconds.", "mods": {"cooldown_add": -2.0}},
 	],
 	"shadow_dash": [
 		{"id": "skup_sd_long", "name": "Long Dash", "desc": "Shadow Dash travels 60 px farther.", "mods": {"dist_add": 60.0}},
