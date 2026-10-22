@@ -8,6 +8,7 @@ signal weapons_changed
 
 const BULLET = preload("res://scenes/bullet.tscn")
 const ClassSkillScript = preload("res://scripts/class_skill.gd")
+const TomeSkillScript = preload("res://scripts/tome_skill.gd")
 const SPEED: float = 230.0
 const ROLL_SPEED: float = 560.0
 const KNOCK_DECAY: float = 1400.0
@@ -21,6 +22,7 @@ const SHIELD_REGEN_DELAY: float = 2.5
 const SHIELD_REGEN_RATE: float = 10.0
 var max_shield: int = 20
 var shield_nova_cd: float = 0.0
+var tome_skill: Node = null ## Kỹ năng phụ (Tome), null nếu chưa nhặt
 var class_skill: Node = null ## Kỹ năng class tiến hoá (null nếu chưa mở)
 var counter_timer: float = 0.0   # Phản Công: cửa sổ x2 sát thương sau khi bị đánh
 var swing_count: int = 0         # Lốc Xoáy
@@ -284,6 +286,8 @@ func _ready() -> void:
 
 	set_weapon_with_rarity(cls["default_weapon"], "common")
 	_attach_class_skill()
+	if TomeSkillScript.exists(Global.run_tome):
+		equip_tome(Global.run_tome)
 	dodge_timer.timeout.connect(_on_dodge_finished)
 
 	sprite.sprite_frames = _build_sprite_frames()
@@ -302,6 +306,23 @@ func _attach_class_skill() -> void:
 	add_child(class_skill)
 	class_skill.setup(self, sid)
 	class_skill.skill_used.connect(_on_skill_used)
+
+## Cầm Tome mới. Trả id Tome cũ bị thay ("" nếu ô trống) để nơi gọi thả xuống sàn.
+func equip_tome(id: String) -> String:
+	if not TomeSkillScript.exists(id):
+		return ""
+	var old: String = tome_skill.skill_id if tome_skill != null else ""
+	if tome_skill == null:
+		tome_skill = TomeSkillScript.new()
+		tome_skill.name = "TomeSkill"
+		add_child(tome_skill)
+		tome_skill.setup(self, id)
+		tome_skill.skill_used.connect(_on_skill_used)
+	else:
+		tome_skill.set_tome(id)
+		tome_skill.cooldown_left = tome_skill.cooldown_total # đổi Tome: phải chờ hồi chiêu, không đổi qua lại để tung liên tục
+	Global.run_tome = id
+	return old if old != id else ""
 
 func _build_sprite_frames() -> SpriteFrames:
 	var prefix: String = SPRITE_SET.get(Global.current_class, "knight_m")

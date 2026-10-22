@@ -21,6 +21,8 @@ signal player_damaged(amount: int, max_hp: int)
 signal player_hurt_by(source: String, amount: int) # nguồn: "enemy:kind", "boss:kind", "hazard:...", "trap:...", "dot:burn" ...
 ## Player đổi vũ khí lấy từ ô đang cầm (nhặt bằng E khi đủ ô) -> Dungeon nghe để đặt vũ khí cũ xuống sàn.
 signal weapon_drop_requested(inst: Dictionary, pos: Vector2)
+## Player đổi Tome tại chỗ: Tome cũ được thả xuống sàn (Dungeon nghe và tạo pickup).
+signal tome_drop_requested(tome_id: String, pos: Vector2)
 
 const TILE: int = 32
 
@@ -603,7 +605,20 @@ func _ready() -> void:
 ## Vàng đang bị Mimic cầm (đã trừ khỏi coins, trả lại khi Mimic chết/biến mất; Save & Quit cộng vào gold lưu).
 var stolen_gold_held: int = 0
 
+## Tome đang cầm trong ván (id trong TomeSkill.TOMES, "" = chưa có). Lưu trong saved_run.
+var run_tome: String = ""
+
+## Chọn ngẫu nhiên `count` Tome khác nhau, bỏ qua các id trong `exclude`.
+func random_tome_ids(count: int, exclude: Array = []) -> Array:
+	var pool: Array = []
+	for id in load("res://scripts/tome_skill.gd").ORDER: # load lúc chạy: tránh vòng preload với autoload
+		if not exclude.has(id):
+			pool.append(id)
+	pool.shuffle()
+	return pool.slice(0, mini(count, pool.size()))
+
 func reset_run() -> void:
+	run_tome = ""
 	floor_num = 1
 	in_council = false
 	weapon_pity = {"epic": 0, "legendary": 0}
@@ -1005,6 +1020,7 @@ func _setup_input() -> void:
 	_add_key("move_down", KEY_DOWN)
 	_add_key("dodge", KEY_SPACE)
 	_add_key("skill", KEY_Q)
+	_add_key("tome", KEY_F)
 	_add_key("interact", KEY_E)
 	_add_key("swap_weapon", KEY_TAB)
 	if not InputMap.has_action("swap_weapon"):
