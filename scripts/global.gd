@@ -237,14 +237,14 @@ func weapon_instance_summary(inst: Dictionary) -> String:
 	return "%s · DMG %d · %.2fs" % [kind, int(float(w["damage"]) * mult), float(w["cooldown"]) * float(mods["cd"])]
 
 var classes: Dictionary = {
-	"ranger": {"name": "Ranger", "max_hp": 100, "default_weapon": "pistol", "skill": "overdrive", "passive": {"name": "Marksman", "desc": "Ranged weapons deal +12% damage."}},
-	"brawler": {"name": "Brawler", "max_hp": 200, "default_weapon": "broadsword", "skill": "slam", "passive": {"name": "Bulwark", "desc": "Melee weapons deal +12% damage and you take 8% less damage."}},
+	"ranger": {"name": "Ranger", "max_hp": 100, "default_weapon": "pistol", "skill": "overdrive", "ultimate": "bullet_storm", "passive": {"name": "Marksman", "desc": "Ranged weapons deal +12% damage."}},
+	"brawler": {"name": "Brawler", "max_hp": 200, "default_weapon": "broadsword", "skill": "slam", "ultimate": "earthquake", "passive": {"name": "Bulwark", "desc": "Melee weapons deal +12% damage and you take 8% less damage."}},
 	# Cây kiếng: máu thấp, sát thương lớn, né + định vị bằng kỹ năng lướt
-	"mage": {"name": "Mage", "max_hp": 80, "default_weapon": "staff", "skill": "gravity_well", "passive": {"name": "Arcane Mind", "desc": "Skills recharge 25% faster."}},
+	"mage": {"name": "Mage", "max_hp": 80, "default_weapon": "staff", "skill": "gravity_well", "ultimate": "starfall", "passive": {"name": "Arcane Mind", "desc": "Skills recharge 25% faster."}},
 	# Sát thủ: lướt xuyên quái gây sát thương, dao găm nhanh
-	"rogue": {"name": "Rogue", "max_hp": 90, "default_weapon": "daggers", "skill": "shadow_dash", "passive": {"name": "Assassin", "desc": "+15% critical chance."}},
+	"rogue": {"name": "Rogue", "max_hp": 90, "default_weapon": "daggers", "skill": "shadow_dash", "ultimate": "blade_tempest", "passive": {"name": "Assassin", "desc": "+15% critical chance."}},
 	# Triệu hồi sư: máu vừa, lính đánh thay mình; kỹ năng xoay vòng 3 loại lính
-	"summoner": {"name": "Summoner", "max_hp": 85, "default_weapon": "chakram", "skill": "summon", "passive": {"name": "Pack Leader", "desc": "Up to 2 summoned minions at once, which deal +30% damage. Skills recharge 25% faster."}}
+	"summoner": {"name": "Summoner", "max_hp": 85, "default_weapon": "chakram", "skill": "summon", "ultimate": "horde", "passive": {"name": "Pack Leader", "desc": "Up to 2 summoned minions at once, which deal +30% damage. Skills recharge 25% faster."}}
 }
 var current_class: String = "brawler"
 
@@ -613,6 +613,8 @@ var stolen_gold_held: int = 0
 
 ## Tome đang cầm trong ván (id trong TomeSkill.TOMES, "" = chưa có). Lưu trong saved_run.
 var run_tome: String = ""
+## Thanh nộ Ultimate (0..100), giữ qua tầng và saved_run.
+var run_ult_meter: float = 0.0
 ## Sigil đang gắn: {"class": [id...], "tome": [id...]} (xem scripts/sigils.gd). Lưu trong saved_run.
 var run_sigils: Dictionary = {"class": [], "tome": []}
 
@@ -627,6 +629,7 @@ func random_tome_ids(count: int, exclude: Array = []) -> Array:
 
 func reset_run() -> void:
 	run_tome = ""
+	run_ult_meter = 0.0
 	run_sigils = {"class": [], "tome": []}
 	floor_num = 1
 	in_council = false
@@ -1033,6 +1036,7 @@ func _setup_input() -> void:
 	_add_key("dodge", KEY_SPACE)
 	_add_key("skill", KEY_Q)
 	_add_key("tome", KEY_F)
+	_add_key("ultimate", KEY_X)
 	_add_key("interact", KEY_E)
 	_add_key("swap_weapon", KEY_TAB)
 	if not InputMap.has_action("swap_weapon"):

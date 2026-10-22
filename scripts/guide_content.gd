@@ -20,6 +20,7 @@ const SkillTree = preload("res://scripts/skill_tree.gd")
 const SquadAdapt = preload("res://scripts/squad_adapt.gd")
 const TomeSkillScript = preload("res://scripts/tome_skill.gd")
 const SigilsScript = preload("res://scripts/sigils.gd")
+const UltimateScript = preload("res://scripts/ultimate.gd")
 
 const TAB_ORDER: Array = ["basics", "classes", "weapons", "buffs", "defense", "enemies", "events", "tips"]
 const TAB_TITLES: Dictionary = {
@@ -76,6 +77,7 @@ static func basics() -> String:
 	t += "Aim and attack: [b]Mouse[/b] (hold to keep attacking)\n"
 	t += "Dodge roll: %s (brief invulnerability, short cooldown)\n" % _key("dodge")
 	t += "Class skill: %s (every class starts with one; evolving your class unlocks a stronger one)\n" % _key("skill")
+	t += "Ultimate: %s (a powerful move unique to your class; the meter fills as you hit enemies, kill them and take damage)\n" % _key("ultimate")
 	t += "Tome skill: %s (a second skill from any class, found in a run; see CLASSES)\n" % _key("tome")
 	t += "After the boss on floors 5 and 10 you also pick 1 of 2 upgrades for your class skill (this run only).\n"
 	t += "Interact: %s (altars, chests, shrines, picking up weapons)\n" % _key("interact")
@@ -105,6 +107,9 @@ static func classes() -> String:
 		var base_sk: Dictionary = ClassSkillScript.SKILLS.get(String(c.get("skill", "")), {})
 		if not base_sk.is_empty():
 			t += "  Starting skill [b]%s[/b], cooldown %s s: %s\n" % [base_sk["name"], _num(float(base_sk["cooldown"])), String(base_sk["desc"]).replace("[Q]", Global.key_name_for_action("skill") + ":")]
+		var ult: Dictionary = UltimateScript.ULTIMATES.get(String(c.get("ultimate", "")), {})
+		if not ult.is_empty():
+			t += "  Ultimate [b]%s[/b]: %s\n" % [ult["name"], ult["desc"]]
 		var list: Array = MetaProgress.EVOLUTIONS.get(cid, [])
 		for evo in list:
 			var req: Dictionary = evo["req"]
