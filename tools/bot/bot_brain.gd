@@ -35,7 +35,8 @@ const HUNT_AFTER: float = 40.0              # chừng này giây không hạ đ�
 const HUNT_DURATION: float = 20.0
 const WEAPON_UPGRADE_RATIO: float = 1.12     # chỉ đổi khi vũ khí mới mạnh hơn chừng này
 const MELEE_BOT_FACTOR: float = 0.8         # bot đánh cận chiến kém hơn tầm xa nên trừ điểm
-const WEAPON_PICK_DIST: float = 34.0
+const WEAPON_PICK_DIST: float = 44.0
+const WEAPON_GIVEUP_SEC: float = 8.0 # đuổi theo một vũ khí quá lâu không nhặt được thì bỏ qua (tránh kẹt vòng lặp)
 const CHARGE_BOT_FACTOR: float = 0.4
 const SHORT_RANGE: float = 260.0
 const TIER_SCORE: Dictionary = {"common": 1.0, "rare": 2.0, "epic": 3.2, "skill": 4.0}
@@ -50,6 +51,9 @@ var stats: Dictionary = {"rolls": 0, "skills": 0, "buffs": [], "stuck_events": 0
 var trace: bool = false
 var immortal: bool = false   # chế độ đo: luôn hồi đầy máu để bot đi hết các tầng, vẫn ghi sát thương đã nhận
 var _goal_desc: String = ""
+var _wgoal_id: int = 0
+var _wgoal_t: float = 0.0
+var _wgoal_banned: Dictionary = {}
 var _trace_t: float = 0.0
 var _think_t: float = 0.0
 var _move: Vector2 = Vector2.ZERO
@@ -189,7 +193,7 @@ func _hazards() -> Array:
 func _pickups(kind: String) -> Array:
 	var out: Array = []
 	for n in G.world.get_children():
-		if is_instance_valid(n) and n is Area2D and n.get("kind") == kind and n.get("tick_interval") == null:
+		if is_instance_valid(n) and n is Area2D and n.get("kind") == kind and n.get("tick_interval") == null and not (kind != "portal" and _wgoal_banned.has(n.get_instance_id())):
 			out.append(n)
 	return out
 
@@ -410,11 +414,11 @@ func _navigate(pp: Vector2) -> Vector2:
 	var goal = null
 	if player.hp < player.max_hp * HEAL_SEEK_HP:
 		var h = _nearest(_pickups("heal"), pp)
-		if h != null and pp.distance_to(h.global_position) < HEAL_SEEK_RANGE:
+		if h != null and pp.distance_to(h.global_position) < HEAL_SEEK_RANGE and _chase_ok(h):
 			goal = h.global_position
 	if goal == null:
 		var c = _nearest(_pickups("coin"), pp)
-		if c != null and pp.distance_to(c.global_position) < PICKUP_RANGE:
+		if c != null and pp.distance_to(c.global_position) < PICKUP_RANGE and _chase_ok(c):
 			goal = c.global_position
 	if goal == null:
 		goal = _weapon_goal(pp)
@@ -442,13 +446,26 @@ func _navigate(pp: Vector2) -> Vector2:
 
 ## BFS trên đồ thị cửa của các phòng: ô phòng kế tiếp cần đi để tới phòng trùm (null nếu đã ở đó / không có).
 ## Điểm tới vũ khí rơi đáng đổi (rương kho báu / thưởng trùm); tới nơi thì nhặt luôn bằng cách gọi hàm nhặt của vật phẩm.
+## Theo đuổi một vật phẩm quá WEAPON_GIVEUP_SEC mà chưa nhặt được (nằm cạnh bẫy/tường) thì bỏ qua nó.
+func _chase_ok(n: Node) -> bool:
+	var id: int = n.get_instance_id()
+	if id != _wgoal_id:
+		_wgoal_id = id
+		_wgoal_t = 0.0
+	_wgoal_t += get_physics_process_delta_time()
+	if _wgoal_t > WEAPON_GIVEUP_SEC:
+		_wgoal_banned[id] = true
+		stats["pickup_giveups"] = int(stats.get("pickup_giveups", 0)) + 1
+		return false
+	return true
+
 func _weapon_goal(pp: Vector2):
 	var best = null
 	var best_gain: float = 0.0
 	var cur: float = _inst_score(player.weapon_inst) if not player.weapon_inst.is_empty() else 0.0
 	var free: bool = player.has_free_weapon_slot()
 	for w in get_tree().get_nodes_in_group("weapon_pickup"):
-		if not is_instance_valid(w) or pp.distance_to(w.global_position) > 900.0:
+		if not is_instance_valid(w) or pp.distance_to(w.global_position) > 900.0 or _wgoal_banned.has(w.get_instance_id()):
 			continue
 		var sc: float = _inst_score(w.weapon_inst)
 		var gain: float = sc / maxf(1.0, cur)
@@ -462,6 +479,15 @@ func _weapon_goal(pp: Vector2):
 		best._try_take()
 		stats["weapons"] = int(stats.get("weapons", 0)) + 1
 		_arrange_weapons()
+		return null
+	var bid: int = best.get_instance_id()
+	if bid != _wgoal_id:
+		_wgoal_id = bid
+		_wgoal_t = 0.0
+	_wgoal_t += get_physics_process_delta_time()
+	if _wgoal_t > WEAPON_GIVEUP_SEC:
+		_wgoal_banned[bid] = true
+		stats["weapon_giveups"] = int(stats.get("weapon_giveups", 0)) + 1
 		return null
 	return best.global_position
 

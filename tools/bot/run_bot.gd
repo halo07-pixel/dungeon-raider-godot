@@ -14,6 +14,7 @@ extends SceneTree
 ## Bot dùng file save riêng (user://bot_save.dat) nên không đụng save thật.
 
 const BotBrain = preload("res://tools/bot/bot_brain.gd")
+const STALL_SEC: float = 1200.0 # immortal: quá 20 phút mô phỏng không đổi tầng = kẹt, ép qua tầng
 
 var G
 var opts: Dictionary = {"runs": 3, "class": "ranger,brawler,mage,rogue", "heat": "", "speed": 6.0, "max-min": 25.0, "max-floor": 20, "seed": 0, "out": "", "trace": 0, "start-floor": 1, "buffs": 0, "immortal": 0}
@@ -64,7 +65,7 @@ func _main() -> void:
 			res["class"] = cfg["class"]
 			res["heat"] = ",".join(PackedStringArray(cfg["heat"]))
 			results.append(res)
-			print("run %-8s heat=%-3d floor=%2d %-9s t=%5.0fs kills=%3d rolls=%d hunts=%d stuck=%d wpn=%s killer=%s" % [res["class"], G.HeatScript.total(cfg["heat"]), res["floor"], res["end"], res["time"], res["kills"], res["rolls"], res["hunts"], res["stuck"], res["weapon"], res["killer"]])
+			print("run %-8s heat=%-3d floor=%2d %-9s t=%5.0fs kills=%3d rolls=%d hunts=%d stuck=%d wpn=%s killer=%s forced=%s" % [res["class"], G.HeatScript.total(cfg["heat"]), res["floor"], res["end"], res["time"], res["kills"], res["rolls"], res["hunts"], res["stuck"], res["weapon"], res["killer"], str(res.get("forced_floors", []))])
 	_report(configs)
 	if String(opts["out"]) != "":
 		var f := FileAccess.open(String(opts["out"]), FileAccess.WRITE)
@@ -105,6 +106,9 @@ func _play(cid: String, heat_ids: Array) -> Dictionary:
 	var end: String = "timeout"
 	var won: bool = false
 	var speed: float = float(opts["speed"])
+	var floor_seen: int = G.floor_num
+	var floor_since: float = 0.0
+	var forced: Array = []
 	while true:
 		await physics_frame
 		if not G._hitstop_active:
@@ -122,6 +126,14 @@ func _play(cid: String, heat_ids: Array) -> Dictionary:
 		if G.floor_num >= int(opts["max-floor"]):
 			end = "max-floor"
 			break
+		if G.floor_num != floor_seen:
+			floor_seen = G.floor_num
+			floor_since = brain.sim_time
+		elif brain.immortal and brain.sim_time - floor_since > STALL_SEC and not main._changing:
+			# bot kẹt (bẫy/tường/vật phẩm): ép qua tầng để vẫn có dữ liệu các tầng sau; ghi lại để báo cáo
+			forced.append(G.floor_num)
+			floor_since = brain.sim_time
+			main._on_portal_entered()
 		if brain.sim_time >= max_t:
 			break
 	var killer: String = main.telemetry.killer(G.run_stats) if main.has_method("get") else ""
@@ -132,7 +144,7 @@ func _play(cid: String, heat_ids: Array) -> Dictionary:
 		"killer": killer_name, "damage": int(summary["total_damage"]), "rolls": brain.stats["rolls"], "skills": brain.stats["skills"],
 		"stuck": brain.stats["stuck_events"], "hunts": int(brain.stats.get("hunts", 0)), "buffs": brain.stats["buffs"].size(), "weapons": int(brain.stats.get("weapons", 0)), "weapon": String(main.player.weapon.get("name", "?")) if is_instance_valid(main.player) else "?",
 		"top": main.telemetry.top_sources(G.run_stats),
-		"floors": _floor_table(brain, int(main.player.max_hp)),
+		"floors": _floor_table(brain, int(main.player.max_hp)), "forced_floors": forced,
 	}
 	Engine.time_scale = 1.0
 	paused = false

@@ -39,3 +39,10 @@ theo class + Heat.
 ## Hướng nâng cấp
 1. Ngắm đón đầu + né theo từng chiêu của trùm. 2. Dùng vật phẩm/vũ khí (Forge, rương, đổi vũ khí theo DPS).
 3. Chọn buff theo build. 4. Hồ sơ "khó": cho bot phản ứng nhanh/chậm để mô phỏng người mới và cao thủ.
+
+## v1.3 / v1.4 (nâng cấp để đi tới tầng 10)
+- Nhặt/đổi vũ khí theo điểm (`_weapon_goal`), ghé phòng kho báu, `--immortal 1` (hồi máu khi < 60% để đi tiếp; bảng theo từng tầng: thời gian, sát thương/max HP, nguồn sát thương).
+- Bỏ theo đuổi vật phẩm sau 8 giây mô phỏng (hết kẹt cạnh bẫy gai/tường).
+- Chế độ immortal: > 20 phút mô phỏng không đổi tầng thì ép qua tầng (`forced_floors` trong kết quả) – tầng bị ép KHÔNG tính vào thời gian/sát thương trung bình.
+- Kết quả mẫu: `tools/bot/results/immortal_floor1-10_summary.md` (4 class x 2 ván, seed 11).
+- Lưu ý: số liệu là xấp xỉ "kỹ năng cố định"; bot ăn sát thương nhiều hơn người; dùng để SO SÁNH giữa các tầng/nguồn, không phải độ khó tuyệt đối. Tầng 4–9 (đầm lầy, băng) bot hay kẹt nên mẫu ít.
