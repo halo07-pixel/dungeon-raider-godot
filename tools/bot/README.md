@@ -53,3 +53,9 @@ theo class + Heat.
 - Vũ khí tầm cực ngắn (Flamethrower ~99px): giảm khoảng giữ/bắn tối thiểu để bắn trúng.
 - Báo cáo mới `THỜI GIAN CLEAR TỚI MỐC NÂNG CẤP KỸ NĂNG` (mốc tầng 5 và 10, chỉ tính ván sạch).
 - Còn tồn tại: tầng 5–9 vẫn thường phải ép qua tầng; chưa đủ ván sạch để so class.
+
+## bench.gd – so sánh class trong tình huống cố định
+`godot --headless --path . --script tools/bot/bench.gd -- --runs 10 --class ranger,brawler,mage,rogue --scenarios warden,swarm,necro,lord --out out.json`
+- 4 tình huống cùng tầng/buff/cấp nâng cấp skill/seed cho mọi class: Warden (T1, skill lv0), Bầy 13 quái (T3, lv0), Necromancer (T6, lv1 sau mốc 5), Dungeon Lord (T10, lv2 sau mốc 10).
+- Chỉ số: tỉ lệ thắng, TTK, DPS hiệu dụng (HP mục tiêu đã trừ / thời gian), tiến độ %, thời gian tồn tại, sát thương nhận %, skill/phút, chỉ số quy về trung bình = 100.
+- Bot không bất tử; chỉ so sánh TƯƠNG ĐỐI giữa các class. "Sát thương nhận" chỉ tính phần trừ vào máu (giáp hấp thụ không tính).
