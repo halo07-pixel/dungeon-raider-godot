@@ -35,6 +35,12 @@ const SKILLS: Dictionary = {
 	# Summoner / Summoner+
 	"summon": {"name": "Summon", "cooldown": 6.0, "desc": "[Q] Call a minion that fights for you: Spirit (melee), Wisp (ranged), Guardian (blocks bullets), in turn. Up to 2 at once."},
 	"legion": {"name": "Legion", "cooldown": 12.0, "desc": "[Q] Call 3 Spitelings that rush enemies and explode when their time runs out."},
+	# Hướng tiến hoá B (MetaProgress.EVOLUTION_ALT)
+	"railshot": {"name": "Railshot", "cooldown": 8.0, "desc": "[Q] Fire a piercing beam that hits everything in a long line and makes enemies bleed."},
+	"charge": {"name": "Charge", "cooldown": 7.0, "desc": "[Q] Charge forward, ramming and knocking back enemies. Grants a shield."},
+	"blink_nova": {"name": "Blink Nova", "cooldown": 9.0, "desc": "[Q] Blink toward your cursor, with a blast where you leave and where you arrive."},
+	"smoke_veil": {"name": "Smoke Veil", "cooldown": 10.0, "desc": "[Q] Drop a smoke cloud that slows and cuts enemies. Your next hit is a guaranteed critical."},
+	"soul_detonation": {"name": "Soul Detonation", "cooldown": 14.0, "desc": "[Q] Detonate all your minions at once; each blast refunds some cooldown."},
 	"shadow_rush": {"name": "Shadow Rush", "cooldown": 8.0, "desc": "[Q] Dash far through enemies, making them bleed. Your next 3 hits are guaranteed critical."},
 }
 
@@ -139,6 +145,11 @@ func execute_free() -> void:
 		"shadow_rush": _shadow_dash(true)
 		"summon": _summon()
 		"legion": _legion()
+		"railshot": _railshot()
+		"charge": _charge()
+		"blink_nova": _blink_nova()
+		"smoke_veil": _smoke_veil()
+		"soul_detonation": _soul_detonation()
 
 ## Dọn hiệu ứng kéo dài khi Player chết / node bị gỡ để không để lại buff vĩnh viễn trên Player.
 func _exit_tree() -> void:
@@ -416,6 +427,127 @@ func _legion() -> void:
 	Global.shake(0.15, 0.12)
 	Global.sfx("barrage_cast", 0.8)
 
+# ------------------------------------------------------------------ Hướng B: Railshot / Charge / Blink Nova / Smoke Veil / Soul Detonation
+const RAIL_LENGTH: float = 620.0
+const RAIL_WIDTH: float = 16.0
+const RAIL_DMG_BASE: float = 42.0
+const RAIL_DMG_PER_FLOOR: float = 4.2
+const RAIL_COLOR: Color = Color(0.6, 0.95, 1.0)
+
+## Tia xuyên thẳng theo hướng ngắm: dừng ở tường, đánh mọi quái/boss trên đường, gây chảy máu.
+func _railshot() -> void:
+	var from: Vector2 = player.global_position
+	var q := PhysicsRayQueryParameters2D.create(from, from + player.aim_dir * (RAIL_LENGTH + _add("dist_add")), Global.L_WORLD)
+	var hit: Dictionary = player.get_world_2d().direct_space_state.intersect_ray(q)
+	var to: Vector2 = hit["position"] if not hit.is_empty() else from + player.aim_dir * (RAIL_LENGTH + _add("dist_add"))
+	var dmg: int = maxi(1, int((RAIL_DMG_BASE + RAIL_DMG_PER_FLOOR * float(Global.floor_num)) * _dmg_mult() * _mult("dmg_mult")))
+	_damage_line(from, to, dmg, true, RAIL_WIDTH * _mult("radius_mult"), 220.0)
+	_beam_fx(from, to, RAIL_COLOR, 6.0)
+	Global.shake(0.3, 0.2)
+	Global.sfx("barrage_cast", 0.7)
+
+func _beam_fx(a: Vector2, b: Vector2, color: Color, width: float) -> void:
+	var line := Line2D.new()
+	line.width = width
+	line.default_color = color
+	line.points = PackedVector2Array([a, b])
+	line.z_index = 5
+	Global.world.add_child(line)
+	var tw := line.create_tween()
+	tw.tween_property(line, "modulate:a", 0.0, 0.25)
+	tw.tween_callback(line.queue_free)
+
+const CHARGE_DIST: float = 260.0
+const CHARGE_WIDTH: float = 34.0
+const CHARGE_DMG_BASE: float = 28.0
+const CHARGE_DMG_PER_FLOOR: float = 2.8
+const CHARGE_KNOCK: float = 480.0
+const CHARGE_SHIELD: float = 40.0
+const CHARGE_IFRAMES: float = 0.5
+const CHARGE_COLOR: Color = Color(1.0, 0.75, 0.35)
+
+## Lao tới theo hướng ngắm, húc văng mọi thứ trên đường (kèm choáng nếu có nâng cấp) và nhận giáp.
+func _charge() -> void:
+	var from: Vector2 = player.global_position
+	var dest: Vector2 = _dash_destination(CHARGE_DIST + _add("dist_add"))
+	_relocate_player(dest, CHARGE_IFRAMES, CHARGE_COLOR)
+	var dmg: int = maxi(1, int((CHARGE_DMG_BASE + CHARGE_DMG_PER_FLOOR * float(Global.floor_num)) * _dmg_mult() * _mult("dmg_mult")))
+	_damage_line(from, dest, dmg, false, CHARGE_WIDTH, CHARGE_KNOCK, _add("stun_add"))
+	player.shield = minf(float(player.max_shield), player.shield + CHARGE_SHIELD)
+	_beam_fx(from, dest, Color(CHARGE_COLOR, 0.6), 18.0)
+	Global.shake(0.4, 0.25)
+	Global.sfx("shockwave", 1.1)
+
+const BLINK_MAX_DIST: float = 340.0
+const BLINK_RADIUS: float = 110.0
+const BLINK_DMG_BASE: float = 16.0
+const BLINK_DMG_PER_FLOOR: float = 1.6
+const BLINK_KNOCK: float = 320.0
+const BLINK_COLOR: Color = Color(0.7, 0.55, 1.0)
+
+## Dịch chuyển tới con trỏ (tối đa BLINK_MAX_DIST, dừng trước tường): nổ ở chỗ cũ rồi nổ ở chỗ mới.
+func _blink_nova() -> void:
+	var to_cursor: float = minf(player.global_position.distance_to(player.get_global_mouse_position()), BLINK_MAX_DIST + _add("dist_add"))
+	var dest: Vector2 = _dash_destination(maxf(to_cursor, 40.0))
+	_blast(BLINK_RADIUS, BLINK_DMG_BASE, BLINK_DMG_PER_FLOOR, BLINK_KNOCK, false, BLINK_COLOR, 12, 0.2)
+	_relocate_player(dest, 0.3, BLINK_COLOR)
+	_blast(BLINK_RADIUS, BLINK_DMG_BASE, BLINK_DMG_PER_FLOOR, BLINK_KNOCK, false, BLINK_COLOR, 12, 0.3)
+
+const SMOKE_RADIUS: float = 140.0
+const SMOKE_DURATION: float = 4.0
+const SMOKE_DMG_BASE: float = 5.0
+const SMOKE_DMG_PER_FLOOR: float = 0.5
+const SMOKE_CRIT_CHARGES: int = 1
+const SMOKE_IFRAMES: float = 0.8
+const SMOKE_COLOR: Color = Color(0.5, 0.65, 0.55)
+
+## Vùng khói tại chỗ đứng: làm chậm + cắt quái (không hút), Player bất tử ngắn và nhận đòn chí mạng.
+func _smoke_veil() -> void:
+	var well := Node2D.new()
+	well.set_script(GravityWell)
+	well.radius = SMOKE_RADIUS * _mult("radius_mult")
+	well.duration = (SMOKE_DURATION + _add("duration_add")) * _sigil("life")
+	well.tick_damage = maxi(1, int((SMOKE_DMG_BASE + SMOKE_DMG_PER_FLOOR * float(Global.floor_num)) * _dmg_mult() * _mult("dmg_mult")))
+	well.color = SMOKE_COLOR
+	well.pull_mult = 0.0
+	well.src = "class"
+	Global.world.add_child(well)
+	well.global_position = player.global_position
+	_ring_fx(player.global_position, well.radius, SMOKE_COLOR, 0.4)
+	if player.hurt_timer.time_left < SMOKE_IFRAMES:
+		player.hurt_timer.start(SMOKE_IFRAMES)
+	player.grant_skill_crits(SMOKE_CRIT_CHARGES + int(_add("crit_add")))
+	Global.burst(player.global_position, SMOKE_COLOR, 20, 160.0, 1.6)
+	Global.sfx("shadow_dash", 0.6)
+
+const DETONATE_RADIUS: float = 95.0
+const DETONATE_DMG_BASE: float = 24.0
+const DETONATE_DMG_PER_FLOOR: float = 2.4
+const DETONATE_REFUND: float = 1.5
+const DETONATE_COLOR: Color = Color(0.9, 0.5, 1.0)
+const DETONATE_MODES: Array = ["chase", "shoot", "guard"]
+
+## Mọi lính (Summon, Legion, Tome...) của Player phát nổ tại chỗ rồi biến mất; mỗi lính hoàn bớt hồi chiêu (tối đa nửa).
+func _soul_detonation() -> void:
+	var mine: Array = []
+	for m in get_tree().get_nodes_in_group("minions"):
+		if is_instance_valid(m) and not m.is_queued_for_deletion() and m.owner_player == player and DETONATE_MODES.has(String(m.cfg["mode"])):
+			mine.append(m)
+	if mine.is_empty():
+		cooldown_left = minf(cooldown_left, 1.0) # không có lính: gần như hoàn lại
+		Global.float_text(player.global_position + Vector2(0, -40), "NO MINIONS", Color(0.8, 0.8, 0.8), 14)
+		return
+	var dmg: int = maxi(1, int((DETONATE_DMG_BASE + DETONATE_DMG_PER_FLOOR * float(Global.floor_num)) * _summon_power()))
+	var radius: float = DETONATE_RADIUS * _mult("radius_mult")
+	for m in mine:
+		_damage_area(m.global_position, radius, dmg, 260.0, 0.0)
+		_ring_fx(m.global_position, radius, DETONATE_COLOR, 0.35)
+		Global.burst(m.global_position, DETONATE_COLOR, 12, 220.0, 1.6)
+		m.queue_free()
+		refund_cooldown(DETONATE_REFUND + _add("refund_add"))
+	Global.shake(0.4, 0.25)
+	Global.sfx("shockwave", 1.3)
+
 # ------------------------------------------------------------------ Rogue: Shadow Dash / Rogue+: Shadow Rush
 const SHADOW_DIST: float = 160.0
 const RUSH_DIST: float = 230.0
@@ -441,16 +573,18 @@ func _shadow_dash(rush: bool) -> void:
 	Global.shake(0.15, 0.1)
 
 ## Sát thương mọi quái/boss nằm trong SHADOW_WIDTH px quanh đoạn thẳng a->b (rush: kèm chảy máu).
-func _damage_line(a: Vector2, b: Vector2, dmg: int, bleed: bool) -> void:
+func _damage_line(a: Vector2, b: Vector2, dmg: int, bleed: bool, width: float = SHADOW_WIDTH, knock: float = SHADOW_KNOCK, stun: float = 0.0) -> void:
 	for e in get_tree().get_nodes_in_group("enemies"):
-		if is_instance_valid(e) and e.alive and _dist_to_segment(e.global_position, a, b) <= SHADOW_WIDTH + float(e.data.get("radius", 12.0)):
-			e.take_damage(dmg, a, SHADOW_KNOCK)
+		if is_instance_valid(e) and e.alive and _dist_to_segment(e.global_position, a, b) <= width + float(e.data.get("radius", 12.0)):
+			e.take_damage(dmg, a, knock)
+			if stun > 0.0 and e.alive and e.has_method("apply_status"):
+				e.apply_status("stun", stun)
 			if bleed and e.alive and e.has_method("apply_status"):
 				e.apply_status("bleed", 0.0)
 			Global.burst(e.global_position, SHADOW_COLOR, 6, 140.0, 1.2)
 			Global.on_secondary_hit(e, dmg, false, "class")
 	for bs in get_tree().get_nodes_in_group("boss"):
-		if is_instance_valid(bs) and bs.alive and _dist_to_segment(bs.global_position, a, b) <= SHADOW_WIDTH + 34.0:
+		if is_instance_valid(bs) and bs.alive and _dist_to_segment(bs.global_position, a, b) <= width + 34.0:
 			bs.take_damage(dmg, a, 0.0)
 			Global.on_secondary_hit(bs, dmg, false, "class")
 

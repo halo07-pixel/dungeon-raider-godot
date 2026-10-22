@@ -3,7 +3,7 @@ extends RefCounted
 ## Thuần dữ liệu + hàm static, không phụ thuộc scene/Global. Mỗi nâng cấp là một bộ "mods" do
 ## ClassSkill đọc khi dùng kỹ năng:
 ##   *_add  : cộng dồn (cooldown_add giây, duration_add giây, crit_add số đòn chắc chí mạng, volleys_add, bullets_add, stun_add giây,
-##            dist_add px lướt, slow_add giây làm chậm, meteors_add số thiên thạch, minions_add số lính thêm)
+##            dist_add px lướt, slow_add giây làm chậm, meteors_add số thiên thạch, minions_add số lính thêm, refund_add giây hoàn thêm mỗi lính)
 ##   *_mult : nhân dồn (radius_mult, dmg_mult, attack_cd_mult, life_mult thời gian tồn tại lính)
 ## Thêm nâng cấp mới = thêm 1 dòng vào UPGRADES[skill_id]; id phải duy nhất toàn bộ.
 
@@ -42,6 +42,36 @@ const UPGRADES: Dictionary = {
 		{"id": "skup_lg_blast", "name": "Volatile Spitelings", "desc": "Spiteling damage +40%, including their explosion.", "mods": {"dmg_mult": 1.4}},
 		{"id": "skup_lg_long", "name": "Patient Spitelings", "desc": "Spitelings last 40% longer.", "mods": {"life_mult": 1.4}},
 		{"id": "skup_lg_recharge", "name": "Quick Legion", "desc": "Legion cooldown -2 seconds.", "mods": {"cooldown_add": -2.0}},
+	],
+	"railshot": [
+		{"id": "skup_rs_long", "name": "Long Rail", "desc": "Railshot reaches 150 px farther.", "mods": {"dist_add": 150.0}},
+		{"id": "skup_rs_heavy", "name": "Heavy Rail", "desc": "Railshot damage +50%.", "mods": {"dmg_mult": 1.5}},
+		{"id": "skup_rs_wide", "name": "Wide Beam", "desc": "Railshot beam is 60% wider.", "mods": {"radius_mult": 1.6}},
+		{"id": "skup_rs_recharge", "name": "Quick Rail", "desc": "Railshot cooldown -2 seconds.", "mods": {"cooldown_add": -2.0}},
+	],
+	"charge": [
+		{"id": "skup_ch_long", "name": "Long Charge", "desc": "Charge travels 90 px farther.", "mods": {"dist_add": 90.0}},
+		{"id": "skup_ch_heavy", "name": "Heavy Charge", "desc": "Charge damage +50%.", "mods": {"dmg_mult": 1.5}},
+		{"id": "skup_ch_stun", "name": "Stunning Charge", "desc": "Charge stuns enemies for 1 second.", "mods": {"stun_add": 1.0}},
+		{"id": "skup_ch_recharge", "name": "Quick Charge", "desc": "Charge cooldown -1.5 seconds.", "mods": {"cooldown_add": -1.5}},
+	],
+	"blink_nova": [
+		{"id": "skup_bn_wide", "name": "Wide Nova", "desc": "Blink Nova blast radius +30%.", "mods": {"radius_mult": 1.3}},
+		{"id": "skup_bn_heavy", "name": "Heavy Nova", "desc": "Blink Nova damage +50%.", "mods": {"dmg_mult": 1.5}},
+		{"id": "skup_bn_long", "name": "Long Blink", "desc": "Blink travels 100 px farther.", "mods": {"dist_add": 100.0}},
+		{"id": "skup_bn_recharge", "name": "Quick Blink", "desc": "Blink Nova cooldown -2 seconds.", "mods": {"cooldown_add": -2.0}},
+	],
+	"smoke_veil": [
+		{"id": "skup_sv_wide", "name": "Wide Veil", "desc": "Smoke cloud radius +30%.", "mods": {"radius_mult": 1.3}},
+		{"id": "skup_sv_long", "name": "Lasting Veil", "desc": "Smoke cloud lasts 2 seconds longer.", "mods": {"duration_add": 2.0}},
+		{"id": "skup_sv_mark", "name": "Marked Prey", "desc": "Smoke Veil makes your next 2 hits critical.", "mods": {"crit_add": 1.0}},
+		{"id": "skup_sv_recharge", "name": "Quick Veil", "desc": "Smoke Veil cooldown -2 seconds.", "mods": {"cooldown_add": -2.0}},
+	],
+	"soul_detonation": [
+		{"id": "skup_sd2_volatile", "name": "Volatile Souls", "desc": "Soul Detonation damage +40%.", "mods": {"dmg_mult": 1.4}},
+		{"id": "skup_sd2_wide", "name": "Wide Blast", "desc": "Soul Detonation blast radius +30%.", "mods": {"radius_mult": 1.3}},
+		{"id": "skup_sd2_refund", "name": "Soul Siphon", "desc": "Each detonated minion refunds 1 more second of cooldown.", "mods": {"refund_add": 1.0}},
+		{"id": "skup_sd2_recharge", "name": "Quick Detonation", "desc": "Soul Detonation cooldown -2 seconds.", "mods": {"cooldown_add": -2.0}},
 	],
 	"shadow_dash": [
 		{"id": "skup_sd_long", "name": "Long Dash", "desc": "Shadow Dash travels 60 px farther.", "mods": {"dist_add": 60.0}},

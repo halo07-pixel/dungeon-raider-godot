@@ -32,11 +32,41 @@ const EVOLUTIONS: Dictionary = {
 	],
 }
 
+## Hướng tiến hoá B của mỗi class (cùng điều kiện mở khoá với EVOLUTIONS): khi tiến hoá chọn A hoặc B, đổi hướng tự do ở màn Profile.
+## Cùng cấu trúc với EVOLUTIONS (name, skill, skill_name, desc, req).
+const EVOLUTION_ALT: Dictionary = {
+	"ranger": [
+		{"name": "Deadeye", "skill": "railshot", "skill_name": "Railshot",
+		 "desc": "[Q] Fire a piercing beam that hits everything in a long line and makes enemies bleed.",
+		 "req": {"type": "boss", "kind": "lord", "count": 2}},
+	],
+	"brawler": [
+		{"name": "Juggernaut", "skill": "charge", "skill_name": "Charge",
+		 "desc": "[Q] Charge forward, ramming and knocking back enemies. Grants a shield.",
+		 "req": {"type": "boss", "kind": "lord", "count": 2}},
+	],
+	"mage": [
+		{"name": "Arcanist", "skill": "blink_nova", "skill_name": "Blink Nova",
+		 "desc": "[Q] Blink toward your cursor, with a blast where you leave and where you arrive.",
+		 "req": {"type": "boss", "kind": "lord", "count": 2}},
+	],
+	"rogue": [
+		{"name": "Shade", "skill": "smoke_veil", "skill_name": "Smoke Veil",
+		 "desc": "[Q] Drop a smoke cloud that slows and cuts enemies. Your next hit is a guaranteed critical.",
+		 "req": {"type": "boss", "kind": "lord", "count": 2}},
+	],
+	"summoner": [
+		{"name": "Soulbinder", "skill": "soul_detonation", "skill_name": "Soul Detonation",
+		 "desc": "[Q] Detonate all your minions at once; each blast refunds some cooldown.",
+		 "req": {"type": "boss", "kind": "lord", "count": 2}},
+	],
+}
+
 ## Số ván gần nhất giữ trong hồ sơ (thống kê cuối run).
 const HISTORY_MAX: int = 20
 
 static func new_class_entry() -> Dictionary:
-	return {"runs": 0, "best_floor": 0, "kills": 0, "bosses": {}, "tier": 0}
+	return {"runs": 0, "best_floor": 0, "kills": 0, "bosses": {}, "tier": 0, "branch": "a"}
 
 static func new_profile() -> Dictionary:
 	return {"runs": 0, "wins": 0, "best_floor": 0, "kills": 0, "secrets": 0, "bosses": {}, "classes": {}, "history": [], "council": 0}
@@ -59,6 +89,7 @@ static func merge_loaded(loaded) -> Dictionary:
 			if src is Dictionary:
 				for k in ["runs", "best_floor", "kills", "tier"]:
 					e[k] = int(src.get(k, 0))
+				e["branch"] = "b" if String(src.get("branch", "a")) == "b" else "a" # save cũ không có khoá này -> hướng A
 				var sb = src.get("bosses", {})
 				if sb is Dictionary:
 					for kind in sb: e["bosses"][String(kind)] = int(sb[kind])
@@ -138,20 +169,45 @@ static func can_evolve(p: Dictionary, cid: String) -> bool:
 	var pr: Array = progress(p, cid)
 	return pr[1] > 0 and pr[0] >= pr[1]
 
-static func evolve(p: Dictionary, cid: String) -> bool:
+## Tiến hoá lên bậc kế, chọn hướng "a" hoặc "b" (hướng B chỉ khi class có EVOLUTION_ALT).
+static func evolve(p: Dictionary, cid: String, branch: String = "a") -> bool:
 	if not can_evolve(p, cid):
 		return false
-	cls(p, cid)["tier"] += 1
+	var c: Dictionary = cls(p, cid)
+	c["tier"] += 1
+	c["branch"] = "b" if (branch == "b" and EVOLUTION_ALT.has(cid)) else "a"
 	return true
+
+## Hướng đang chọn của class ("a" nếu chưa tiến hoá hay save cũ).
+static func branch_of(p: Dictionary, cid: String) -> String:
+	return "b" if String(cls(p, cid).get("branch", "a")) == "b" else "a"
+
+## Đổi hướng (chỉ khi đã tiến hoá). Trả true nếu đổi được.
+static func set_branch(p: Dictionary, cid: String, branch: String) -> bool:
+	if tier_of(p, cid) <= 0 or not (branch == "a" or (branch == "b" and EVOLUTION_ALT.has(cid))):
+		return false
+	cls(p, cid)["branch"] = branch
+	return true
+
+## Bậc tiến hoá `t` (1-based) của class theo hướng `branch`; {} nếu không có.
+static func evolution_at(cid: String, t: int, branch: String) -> Dictionary:
+	var src: Dictionary = EVOLUTION_ALT if branch == "b" else EVOLUTIONS
+	var list: Array = src.get(cid, [])
+	if t < 1 or t > list.size():
+		return {}
+	return list[t - 1]
+
+## Bậc đã mở hiện tại theo hướng đang chọn ({} nếu chưa tiến hoá).
+static func current_evolution(p: Dictionary, cid: String) -> Dictionary:
+	var t: int = mini(tier_of(p, cid), EVOLUTIONS.get(cid, []).size())
+	return evolution_at(cid, t, branch_of(p, cid))
 
 ## Kỹ năng đang có của class ("" nếu chưa tiến hoá) — lấy từ bậc cao nhất đã mở.
 static func active_skill(p: Dictionary, cid: String) -> String:
-	var list: Array = EVOLUTIONS.get(cid, [])
-	var t: int = mini(tier_of(p, cid), list.size())
-	return String(list[t - 1]["skill"]) if t > 0 else ""
+	var cur: Dictionary = current_evolution(p, cid)
+	return String(cur["skill"]) if not cur.is_empty() else ""
 
 ## Tên hiển thị của class theo bậc ("Ranger" → "Ranger+").
 static func display_name(p: Dictionary, cid: String, base: String) -> String:
-	var list: Array = EVOLUTIONS.get(cid, [])
-	var t: int = mini(tier_of(p, cid), list.size())
-	return String(list[t - 1]["name"]) if t > 0 else base
+	var cur: Dictionary = current_evolution(p, cid)
+	return String(cur["name"]) if not cur.is_empty() else base
