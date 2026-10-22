@@ -119,8 +119,12 @@ static func classes() -> String:
 			else:
 				need = "reach floor %d" % int(req.get("floor", 0))
 			var sk: Dictionary = ClassSkillScript.SKILLS.get(String(evo["skill"]), {})
-			t += "  Evolves into [b]%s[/b] (%s).\n" % [evo["name"], need]
-			t += "  Skill [b]%s[/b], cooldown %s s: %s\n" % [evo["skill_name"], _num(float(sk.get("cooldown", 0.0))), String(evo["desc"]).replace("[Q]", Global.key_name_for_action("skill") + ":")]
+			t += "  Evolves into [b]%s[/b] (%s). Choose one of two paths; you can switch paths in PROFILE between runs.\n" % [evo["name"], need]
+			t += "  Path A: skill [b]%s[/b], cooldown %s s: %s\n" % [evo["skill_name"], _num(float(sk.get("cooldown", 0.0))), String(evo["desc"]).replace("[Q]", Global.key_name_for_action("skill") + ":")]
+			var alt: Dictionary = MetaProgress.evolution_at(cid, MetaProgress.EVOLUTIONS[cid].find(evo) + 1, "b")
+			if not alt.is_empty():
+				var sk2: Dictionary = ClassSkillScript.SKILLS.get(String(alt["skill"]), {})
+				t += "  Path B, [b]%s[/b]: skill [b]%s[/b], cooldown %s s: %s\n" % [alt["name"], alt["skill_name"], _num(float(sk2.get("cooldown", 0.0))), String(alt["desc"]).replace("[Q]", Global.key_name_for_action("skill") + ":")]
 		t += "\n"
 	t += "[b]Skill Power[/b] raises your skill's damage and effects; [b]Skill Haste[/b] shortens its cooldown. Both come from the Skill buffs "
 	t += "(Arcana, Quick Cast, Surge, Overflow, Echo, Spellburst, Overload) and from some passives, so you can build around your skill instead of your weapon.\n"

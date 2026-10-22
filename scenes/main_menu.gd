@@ -461,9 +461,9 @@ func _refresh_profile() -> void:
 		var evo: Dictionary = Global.MetaProgress.next_evolution(P, cid)
 		var skill_id: String = Global.MetaProgress.active_skill(P, cid)
 		if skill_id != "":
-			var tier_idx: int = Global.MetaProgress.tier_of(P, cid) - 1
-			var cur: Dictionary = Global.MetaProgress.EVOLUTIONS[cid][tier_idx]
+			var cur: Dictionary = Global.MetaProgress.current_evolution(P, cid)
 			profile_box.add_child(_profile_label("%s: %s" % [cur["skill_name"], cur["desc"]], 11, Color(0.6, 1.0, 0.6)))
+			_add_branch_switch(cid)
 		else:
 			var base_sk: Dictionary = ClassSkillScript.SKILLS.get(Global.class_skill_id_for(cid), {})
 			if not base_sk.is_empty():
@@ -474,9 +474,7 @@ func _refresh_profile() -> void:
 			var goal: String = ("Defeat Dungeon Lord" if req["type"] == "boss" else "Reach floor %d" % req["value"])
 			profile_box.add_child(_profile_label("Next: %s - %s  %d/%d" % [evo["name"], goal, pr[0], pr[1]], 11, Color(1.0, 0.85, 0.5)))
 			if Global.MetaProgress.can_evolve(P, cid):
-				var row = CenterContainer.new()
-				row.add_child(_create_btn("EVOLVE TO %s" % String(evo["name"]).to_upper(), func(): _evolve(cid), Vector2(420, 48), Color(0.8, 0.6, 0.1), 12))
-				profile_box.add_child(row)
+				_add_evolve_choice(cid)
 		profile_box.add_child(HSeparator.new())
 
 	var spacer = Control.new()
@@ -486,8 +484,47 @@ func _refresh_profile() -> void:
 	back.add_child(_create_btn("BACK", show_main_menu, Vector2(300, 60), Color(0.5, 0.5, 0.5)))
 	profile_box.add_child(back)
 
-func _evolve(cid: String) -> void:
-	if Global.MetaProgress.evolve(Global.profile, cid):
+## Tiến hoá: chọn 1 trong 2 hướng (A: kỹ năng cũ, B: kỹ năng mới) — xem MetaProgress.EVOLUTION_ALT.
+func _add_evolve_choice(cid: String) -> void:
+	var P: Dictionary = Global.profile
+	var t: int = Global.MetaProgress.tier_of(P, cid) + 1
+	var row := HBoxContainer.new()
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", 12)
+	for br in ["a", "b"]:
+		var evo: Dictionary = Global.MetaProgress.evolution_at(cid, t, br)
+		if evo.is_empty():
+			continue
+		var branch: String = br
+		row.add_child(_create_btn("EVOLVE: %s\n%s" % [String(evo["name"]).to_upper(), String(evo["skill_name"])], func(): _evolve(cid, branch), Vector2(300, 56), Color(0.8, 0.6, 0.1) if br == "a" else Color(0.55, 0.45, 0.9), 12))
+	profile_box.add_child(row)
+
+## Đã tiến hoá: hai nút đổi hướng (hướng đang chọn bị làm mờ). Đổi tự do giữa các ván.
+func _add_branch_switch(cid: String) -> void:
+	var P: Dictionary = Global.profile
+	if not Global.MetaProgress.EVOLUTION_ALT.has(cid):
+		return
+	var t: int = mini(Global.MetaProgress.tier_of(P, cid), Global.MetaProgress.EVOLUTIONS[cid].size())
+	var cur_branch: String = Global.MetaProgress.branch_of(P, cid)
+	var row := HBoxContainer.new()
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", 12)
+	for br in ["a", "b"]:
+		var evo: Dictionary = Global.MetaProgress.evolution_at(cid, t, br)
+		var branch: String = br
+		var btn: Control = _create_btn("%s: %s%s" % [br.to_upper(), String(evo["skill_name"]), "  (active)" if br == cur_branch else ""], func(): _switch_branch(cid, branch), Vector2(250, 36), Color(0.35, 0.35, 0.45) if br == cur_branch else Color(0.55, 0.45, 0.9), 11)
+		if br == cur_branch:
+			btn.modulate = Color(0.7, 0.7, 0.7)
+		row.add_child(btn)
+	profile_box.add_child(row)
+
+func _evolve(cid: String, branch: String = "a") -> void:
+	if Global.MetaProgress.evolve(Global.profile, cid, branch):
+		Global.save_game()
+		_refresh_profile()
+
+func _switch_branch(cid: String, branch: String) -> void:
+	if Global.MetaProgress.set_branch(Global.profile, cid, branch):
 		Global.save_game()
 		_refresh_profile()
 
