@@ -22,6 +22,7 @@ var info_label: Label
 var skill_label: Label
 var tome_label: Label
 var sigil_label: Label
+var ult_label: Label
 var weapon_bar: ProgressBar ## cung: mức căng dây; vũ khí khác: hồi đòn
 var weapon_bar_fill: StyleBoxFlat
 var weapon_labels: Array = [] ## 2 nhãn, mỗi nhãn một ô vũ khí (ô đang cầm sáng + có dấu ">")
@@ -66,6 +67,7 @@ func _process(_delta: float) -> void:
 	_update_skill_label(p)
 	_update_tome_label(p)
 	_update_sigil_label(p)
+	_update_ult_label(p)
 	_update_debug_label()
 
 ## Hai ô vũ khí: ô đang cầm có dấu ">" và sáng; ô kia mờ (đổi bằng phím swap_weapon). Màu chữ theo độ hiếm.
@@ -162,6 +164,25 @@ func _update_sigil_label(p) -> void:
 	sigil_label.visible = true
 	sigil_label.text = "Sigils  " + "  |  ".join(parts)
 	sigil_label.modulate = Color(0.7, 0.85, 1.0)
+
+## Ultimate: "[X] Bullet Storm  63%" rồi "READY!" nhấp nháy; đang tung thì hiện "ACTIVE".
+func _update_ult_label(p) -> void:
+	var u = p.get("ultimate")
+	if u == null or not is_instance_valid(u):
+		ult_label.visible = false
+		return
+	ult_label.visible = true
+	var key: String = Global.key_name_for_action("ultimate")
+	if u.active_left > 0.0:
+		ult_label.text = "[%s] %s  ACTIVE" % [key, u.ult_name]
+		ult_label.modulate = Color(1.0, 0.6, 0.2)
+	elif u.is_ready():
+		ult_label.text = "[%s] %s  READY!" % [key, u.ult_name]
+		var pulse: float = 0.75 + 0.25 * sin(float(Time.get_ticks_msec()) / 120.0)
+		ult_label.modulate = Color(1.0, 0.9, 0.3, pulse)
+	else:
+		ult_label.text = "[%s] %s  %d%%" % [key, u.ult_name, int(u.ratio() * 100.0)]
+		ult_label.modulate = Color(0.75, 0.75, 0.85)
 
 ## TẠM: debug overlay bắt bug "qua tầng mới spawn vào phòng quái thay vì phòng start"
 ## và bug "quái hết mà cổng không mở". Xoá khi tìm ra nguyên nhân.
@@ -370,6 +391,8 @@ func _build_ui() -> void:
 	tome_label.visible = false
 	sigil_label = _label(self, "", 13, Vector2(660.0, 98.0), Vector2(420.0, 22.0))
 	sigil_label.visible = false
+	ult_label = _label(self, "", 14, Vector2(660.0, 72.0), Vector2(420.0, 24.0))
+	ult_label.visible = false
 	for i in Global.MAX_WEAPON_SLOTS:
 		weapon_labels.append(_label(self, "", 14, Vector2(20.0, 122.0 + 20.0 * float(i)), Vector2(360.0, 22.0)))
 	weapon_bar = _bar(self, Vector2(20.0, 126.0 + 20.0 * float(Global.MAX_WEAPON_SLOTS)), Vector2(220.0, 6.0), Color(0.6, 0.6, 0.65))

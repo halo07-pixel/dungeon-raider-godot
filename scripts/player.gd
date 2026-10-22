@@ -11,6 +11,7 @@ const ClassSkillScript = preload("res://scripts/class_skill.gd")
 const TomeSkillScript = preload("res://scripts/tome_skill.gd")
 const SigilsScript = preload("res://scripts/sigils.gd")
 const SigilRunnerScript = preload("res://scripts/sigil_runner.gd")
+const UltimateScript = preload("res://scripts/ultimate.gd")
 const SPEED: float = 230.0
 const ROLL_SPEED: float = 560.0
 const KNOCK_DECAY: float = 1400.0
@@ -24,6 +25,7 @@ const SHIELD_REGEN_DELAY: float = 2.5
 const SHIELD_REGEN_RATE: float = 10.0
 var max_shield: int = 20
 var shield_nova_cd: float = 0.0
+var ultimate: Node = null ## Chiêu cuối của class (thanh nộ)
 var sigil_runner: Node = null ## Chạy hiệu ứng Sigil theo sự kiện kỹ năng
 var tome_skill: Node = null ## Kỹ năng phụ (Tome), null nếu chưa nhặt
 var class_skill: Node = null ## Kỹ năng class tiến hoá (null nếu chưa mở)
@@ -299,6 +301,12 @@ func _ready() -> void:
 	sigil_runner.setup(self)
 	if class_skill != null:
 		class_skill.skill_used.connect(sigil_runner.on_cast.bind("class"))
+	var uid: String = UltimateScript.id_for_class(Global.current_class)
+	if UltimateScript.exists(uid):
+		ultimate = UltimateScript.new()
+		ultimate.name = "Ultimate"
+		add_child(ultimate)
+		ultimate.setup(self, uid)
 	if TomeSkillScript.exists(Global.run_tome):
 		equip_tome(Global.run_tome)
 	dodge_timer.timeout.connect(_on_dodge_finished)
