@@ -81,6 +81,9 @@ const HOMING_TURN_RATE: float = 2.2 # rad/s - bẻ hướng từ từ, không ph
 
 @onready var life_timer: Timer = $Life
 
+## Đạn của kỹ năng (Barrage, lính bắn...): "class"/"tome" để Sigil nhận ra đòn trúng. "" = đạn vũ khí thường.
+var skill_src: String = ""
+
 func setup(p_from_player: bool, p_dir: Vector2, p_dmg: int, p_speed: float, p_life: float, p_color: Color, p_rad: float, p_pierce: bool = false, p_effect: String = "") -> void:
 	from_player = p_from_player
 	dir = p_dir.normalized()
@@ -257,6 +260,8 @@ func _on_body_entered(body: Node) -> void:
 			# ÁP DỤNG BUFF (tầm xa — sát thương tầm xa "đổ bộ" ở đây, không phải trong player.gd._shoot()):
 			# Phá Giáp / Hút Máu
 			Global.on_player_hit(body, hit_dmg, is_crit)
+			if skill_src != "":
+				Global.skill_hit_landed.emit(skill_src, body, hit_dmg)
 			if Global.buff_stack("buff_sunder") > 0 and body.has_method("apply_sunder"):
 				body.apply_sunder()
 

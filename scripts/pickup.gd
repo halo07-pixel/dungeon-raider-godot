@@ -7,6 +7,8 @@ const WeaponInstance = preload("res://scripts/weapon_instance.gd")
 const WeaponInfo = preload("res://scripts/weapon_info.gd")
 ## Tome: pickup "tome" (extra = id Tome) cũng nhặt bằng E; đã có Tome thì đổi, Tome cũ rơi xuống chỗ này.
 const TomeSkillScript = preload("res://scripts/tome_skill.gd")
+## Sigil: pickup "sigil" (extra = id). E gắn vào kỹ năng class (hết ô thì sang Tome); Shift+E ưu tiên Tome.
+const SigilsScript = preload("res://scripts/sigils.gd")
 
 ## Sau khi xuất hiện, vũ khí chưa nhặt được trong khoảng này (giây) — tránh nhặt nhầm ngay vũ khí vừa thả.
 const WEAPON_PICKUP_LOCK: float = 0.4
@@ -54,6 +56,10 @@ func _ready() -> void:
 		body_exited.connect(_on_body_exited)
 	if kind == "tome":
 		add_to_group("tome_pickup")
+		_lock = WEAPON_PICKUP_LOCK
+		body_exited.connect(_on_body_exited)
+	if kind == "sigil":
+		add_to_group("sigil_pickup")
 		_lock = WEAPON_PICKUP_LOCK
 		body_exited.connect(_on_body_exited)
 	if kind == "portal" or kind == "council_portal":
@@ -113,10 +119,14 @@ func _process(delta: float) -> void:
 		_lock = maxf(0.0, _lock - delta)
 		if _near and _lock <= 0.0 and Input.is_action_just_pressed("interact"):
 			_try_take_tome()
+	elif kind == "sigil":
+		_lock = maxf(0.0, _lock - delta)
+		if _near and _lock <= 0.0 and Input.is_action_just_pressed("interact"):
+			_try_take_sigil()
 	queue_redraw()
 
 func _on_body_exited(body: Node) -> void:
-	if (kind == "weapon" or kind == "tome") and body.is_in_group("player"):
+	if (kind == "weapon" or kind == "tome" or kind == "sigil") and body.is_in_group("player"):
 		_near = false
 
 ## Vũ khí chỉ nhặt được khi đây là vũ khí GẦN Player nhất trong số các vũ khí đang trong tầm (tránh nhặt nhầm khi có 2 món).
@@ -152,6 +162,35 @@ func _try_take_tome() -> void:
 				other.queue_free()
 	queue_free()
 
+func _try_take_sigil() -> void:
+	var player: Node = Global.player
+	if not is_instance_valid(player) or not player.alive or not player.has_method("socket_sigil"):
+		return
+	if _taken_frame == Engine.get_process_frames():
+		return
+	for other in get_tree().get_nodes_in_group("sigil_pickup"):
+		if other != self and other._near and other._lock <= 0.0 and other.global_position.distance_squared_to(player.global_position) < global_position.distance_squared_to(player.global_position):
+			return
+	var prefer: String = "tome" if Input.is_key_pressed(KEY_SHIFT) else "class"
+	var res: Dictionary = player.socket_sigil(extra, prefer)
+	if res.is_empty():
+		Global.message.emit("Can't socket %s (already socketed)" % SigilsScript.display_name(extra), Color(0.9, 0.5, 0.5))
+		return
+	_taken_frame = Engine.get_process_frames()
+	var where: String = "class skill" if String(res["target"]) == "class" else "Tome"
+	var disp: String = String(res["displaced"])
+	if disp != "":
+		Global.sigil_drop_requested.emit(disp, global_position)
+		Global.message.emit("%s -> %s (replaced %s)" % [SigilsScript.display_name(extra), where, SigilsScript.display_name(disp)], SigilsScript.RARITY_COLOR[SigilsScript.rarity_of(extra)])
+	else:
+		Global.message.emit("%s -> %s" % [SigilsScript.display_name(extra), where], SigilsScript.RARITY_COLOR[SigilsScript.rarity_of(extra)])
+	if choice_group != 0:
+		for other in get_tree().get_nodes_in_group("sigil_pickup"):
+			if other != self and other.choice_group == choice_group:
+				Global.burst(other.global_position, Color(0.8, 0.8, 0.9), 6, 70.0, 0.8)
+				other.queue_free()
+	queue_free()
+
 func _try_take() -> void:
 	var player: Node = Global.player
 	if not is_instance_valid(player) or not player.alive or not player.has_method("equip_weapon"):
@@ -173,7 +212,7 @@ func _try_take() -> void:
 func _on_body_entered(body: Node) -> void:
 	if not body.is_in_group("player"):
 		return
-	if kind == "weapon" or kind == "tome":
+	if kind == "weapon" or kind == "tome" or kind == "sigil":
 		_near = true
 		return
 	match kind:
@@ -267,6 +306,24 @@ func _draw() -> void:
 			draw_string(ThemeDB.fallback_font, Vector2(-100.0, bob - 22.0), display_name, HORIZONTAL_ALIGNMENT_CENTER, 200.0, 14, r_color)
 			if _near:
 				_draw_compare_card()
+		"sigil":
+			var sg: Dictionary = SigilsScript.info(extra)
+			var sc: Color = SigilsScript.RARITY_COLOR.get(String(sg.get("rarity", "common")), Color.WHITE)
+			var cy: float = bob
+			draw_circle(Vector2(0.0, cy), 15.0, Color(0.06, 0.06, 0.1))
+			draw_colored_polygon(PackedVector2Array([Vector2(0, cy - 11), Vector2(9, cy), Vector2(0, cy + 11), Vector2(-9, cy)]), sc)
+			draw_colored_polygon(PackedVector2Array([Vector2(0, cy - 5), Vector2(4, cy), Vector2(0, cy + 5), Vector2(-4, cy)]), Color(0.06, 0.06, 0.1))
+			draw_string(ThemeDB.fallback_font, Vector2(-100.0, cy - 24.0), String(sg.get("name", "Sigil")), HORIZONTAL_ALIGNMENT_CENTER, 200.0, 14, sc)
+			if _near:
+				var sl: Array = _wrap("%s (%s)  %s" % [String(sg.get("name", "")), SigilsScript.RARITY_NAME.get(String(sg.get("rarity", "common")), ""), String(sg.get("desc", ""))], CARD_WRAP_CHARS)
+				var sh: float = 18.0 + 15.0 * float(sl.size())
+				draw_rect(Rect2(Vector2(-140.0, -50.0 - sh), Vector2(280.0, sh)), Color(0.05, 0.04, 0.1, 0.92))
+				draw_rect(Rect2(Vector2(-140.0, -50.0 - sh), Vector2(280.0, sh)), sc, false, 1.5)
+				var sy: float = -50.0 - sh + 16.0
+				for ln in sl:
+					draw_string(ThemeDB.fallback_font, Vector2(-134.0, sy), String(ln), HORIZONTAL_ALIGNMENT_LEFT, 270.0, 12, Color(0.92, 0.9, 1.0))
+					sy += 15.0
+				draw_string(ThemeDB.fallback_font, Vector2(-134.0, -52.0), "[E] socket in Q skill   [Shift+E] socket in Tome", HORIZONTAL_ALIGNMENT_LEFT, 270.0, 11, Color(1.0, 0.9, 0.5))
 		"tome":
 			var info: Dictionary = TomeSkillScript.TOMES.get(extra, {})
 			var tc := Color(0.75, 0.55, 1.0)

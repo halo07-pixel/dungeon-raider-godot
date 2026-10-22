@@ -38,12 +38,15 @@ var _spin: float = 0.0
 var _pulse_t: float = 0.0
 var _blade_hit: Dictionary = {} # enemy instance id -> giây chờ trước lần đánh kế
 var _slot: int = 0
+## Nguồn đòn cho Sigil: "class" (Summoner) hoặc "tome".
+var src: String = ""
 var _target_cache: Node = null
 var _retarget: float = 0.0
 
 ## Tạo lính tại `pos`. `power` = hệ số sát thương (mặc định 1). `life_mult` kéo dài/rút ngắn thời gian tồn tại.
-static func spawn(p_player: Node, p_kind: String, pos: Vector2, power: float = 1.0, life_mult: float = 1.0, slot: int = 0) -> Node:
+static func spawn(p_player: Node, p_kind: String, pos: Vector2, power: float = 1.0, life_mult: float = 1.0, slot: int = 0, p_src: String = "") -> Node:
 	var m = new()
+	m.src = p_src
 	m.setup(p_player, p_kind, power, life_mult, slot)
 	Global.world.add_child(m)
 	m.global_position = pos
@@ -171,6 +174,7 @@ func _think_shoot(_delta: float) -> void:
 		var dir: Vector2 = (tgt.global_position - global_position).normalized()
 		var b = BULLET.instantiate()
 		b.setup(true, dir, dmg, float(cfg["bullet_speed"]), 0.9, cfg["color"], 4.5)
+		b.skill_src = src
 		Global.world.add_child(b)
 		b.global_position = global_position + dir * 12.0
 
@@ -222,7 +226,7 @@ func _target_radius(e: Node) -> float:
 func _strike(e: Node, amount: int, knock: float) -> void:
 	e.take_damage(amount, global_position, knock if not e.is_in_group("boss") else 0.0)
 	Global.burst(e.global_position, cfg["color"], 4, 100.0, 1.0)
-	Global.on_secondary_hit(e, amount, false)
+	Global.on_secondary_hit(e, amount, false, src)
 
 # ---------------------------------------------------------------- Vẽ (bằng code)
 func _draw() -> void:

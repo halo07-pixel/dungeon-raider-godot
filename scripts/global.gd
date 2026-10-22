@@ -23,6 +23,10 @@ signal player_hurt_by(source: String, amount: int) # nguồn: "enemy:kind", "bos
 signal weapon_drop_requested(inst: Dictionary, pos: Vector2)
 ## Player đổi Tome tại chỗ: Tome cũ được thả xuống sàn (Dungeon nghe và tạo pickup).
 signal tome_drop_requested(tome_id: String, pos: Vector2)
+## Sigil bị thay ra khỏi ô gắn: Dungeon thả xuống sàn.
+signal sigil_drop_requested(sigil_id: String, pos: Vector2)
+## Đòn do kỹ năng class ("class") hoặc Tome ("tome") gây ra (kể cả lính/vùng của kỹ năng đó) — SigilRunner nghe.
+signal skill_hit_landed(src: String, target: Node, dmg: int)
 
 const TILE: int = 32
 
@@ -609,6 +613,8 @@ var stolen_gold_held: int = 0
 
 ## Tome đang cầm trong ván (id trong TomeSkill.TOMES, "" = chưa có). Lưu trong saved_run.
 var run_tome: String = ""
+## Sigil đang gắn: {"class": [id...], "tome": [id...]} (xem scripts/sigils.gd). Lưu trong saved_run.
+var run_sigils: Dictionary = {"class": [], "tome": []}
 
 ## Chọn ngẫu nhiên `count` Tome khác nhau, bỏ qua các id trong `exclude`.
 func random_tome_ids(count: int, exclude: Array = []) -> Array:
@@ -621,6 +627,7 @@ func random_tome_ids(count: int, exclude: Array = []) -> Array:
 
 func reset_run() -> void:
 	run_tome = ""
+	run_sigils = {"class": [], "tome": []}
 	floor_num = 1
 	in_council = false
 	weapon_pity = {"epic": 0, "legendary": 0}
@@ -953,10 +960,13 @@ func on_player_hit(target: Node, dmg: int, is_crit: bool) -> void:
 
 ## Nguồn sát thương PHỤ (Lăn Chém / Sét Lan / Giáp Phản Chấn...): áp dụng cùng bộ hiệu ứng như một đòn
 ## đánh trúng thường — nguyên tố (Thiêu Đốt/Độc/Băng/Chớp Giật) và Phá Giáp.
-func on_secondary_hit(target: Node, dmg: int, is_crit: bool = false) -> void:
+## `src`: "class" / "tome" nếu đòn thuộc kỹ năng đó (kích hoạt Sigil), "" nếu là hiệu ứng phụ khác.
+func on_secondary_hit(target: Node, dmg: int, is_crit: bool = false, src: String = "") -> void:
 	if not is_instance_valid(target):
 		return
 	on_player_hit(target, dmg, is_crit)
+	if src != "":
+		skill_hit_landed.emit(src, target, dmg)
 	if buff_stack("buff_sunder") > 0 and target.has_method("apply_sunder"):
 		target.apply_sunder()
 
@@ -1203,6 +1213,7 @@ const MetaProgress = preload("res://scripts/meta_progress.gd")
 const SkillUpgrades = preload("res://scripts/skill_upgrades.gd")
 const HeatScript = preload("res://scripts/heat.gd")
 const SkillTree = preload("res://scripts/skill_tree.gd")
+const SigilsScript = preload("res://scripts/sigils.gd")
 var profile: Dictionary = MetaProgress.new_profile()
 var upgrades: Dictionary = {
 	"hp_boost": 0, "start_coin": 0, "mastery": 0, "revive": 0,

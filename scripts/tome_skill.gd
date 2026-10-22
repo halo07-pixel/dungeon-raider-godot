@@ -6,6 +6,7 @@ extends Node
 const MinionScript = preload("res://scripts/minion.gd")
 const GravityWell = preload("res://scripts/gravity_well.gd")
 const RingFx = preload("res://scripts/skill_ring_fx.gd")
+const Sigils = preload("res://scripts/sigils.gd")
 
 signal skill_used(skill_id: String)
 signal skill_ready(skill_id: String)
@@ -67,7 +68,7 @@ func set_tome(id: String) -> void:
 
 func _effective_cooldown() -> float:
 	var haste: float = float(player.skill_haste()) if is_instance_valid(player) else 0.0
-	return maxf(1.0, base_cooldown * Global.SkillTree.skill_cooldown_mult(Global.upgrades) / (1.0 + haste))
+	return maxf(1.0, base_cooldown * Global.SkillTree.skill_cooldown_mult(Global.upgrades) * _sigil("cd") / (1.0 + haste))
 
 func is_ready() -> bool:
 	return cooldown_left <= 0.0
@@ -80,22 +81,41 @@ func _physics_process(delta: float) -> void:
 	if is_instance_valid(player) and player.alive and Input.is_action_just_pressed("tome"):
 		try_activate()
 
+## Giá trị gộp của các Sigil đang gắn vào Tome (xem sigils.gd).
+func _sigil(key: String) -> float:
+	return Sigils.total(Global.run_sigils.get("tome", []), key)
+
+## Hoàn bớt hồi chiêu (Sigil Harvest); tổng hoàn mỗi lần tung tối đa nửa thời gian hồi.
+var _refunded: float = 0.0
+func refund_cooldown(seconds: float) -> void:
+	if cooldown_left <= 0.0:
+		return
+	var room: float = maxf(0.0, cooldown_total * 0.5 - _refunded)
+	var give: float = minf(seconds, room)
+	_refunded += give
+	cooldown_left = maxf(0.0, cooldown_left - give)
+
 func try_activate() -> bool:
 	if skill_id == "" or not is_ready() or not is_instance_valid(player) or not player.alive or player.rolling:
 		return false
 	cooldown_total = _effective_cooldown()
 	cooldown_left = cooldown_total
+	_refunded = 0.0
 	if randf() < float(player.spellburst_chance()):
 		cooldown_left = 0.0
 		Global.float_text(player.global_position + Vector2(0, -40), "SPELLBURST", Color(0.8, 0.6, 1.0), 18)
 	skill_used.emit(skill_id)
-	call("_cast_" + skill_id)
+	execute_free()
 	return true
+
+## Chạy hiệu ứng Tome KHÔNG tốn hồi chiêu, không phát skill_used (tung lại của Sigil Echo).
+func execute_free() -> void:
+	call("_cast_" + skill_id)
 
 # ---------------------------------------------------------------- Dùng chung
 ## Hệ số sức mạnh Tome: giống kỹ năng class (damage phụ + Skill Power + honed technique).
 func power() -> float:
-	return float(player._secondary_dmg_mult()) * (1.0 + float(player.skill_power())) * Global.SkillTree.skill_damage_mult(Global.upgrades)
+	return float(player._secondary_dmg_mult()) * (1.0 + float(player.skill_power())) * Global.SkillTree.skill_damage_mult(Global.upgrades) * _sigil("dmg")
 
 func _dmg(base: float, per_floor: float) -> int:
 	return maxi(1, int((base + per_floor * float(Global.floor_num)) * power()))
@@ -126,14 +146,14 @@ func _enforce_cap(kind: String, cap: int) -> void:
 # ---------------------------------------------------------------- 8 Tome
 func _cast_arc_turret() -> void:
 	var pos: Vector2 = _cursor_point()
-	MinionScript.spawn(player, "turret", pos, power() * float(player.minion_dmg_mult()))
+	MinionScript.spawn(player, "turret", pos, power() * float(player.minion_dmg_mult()), _sigil("life"), 0, "tome")
 	_enforce_cap("turret", TURRET_CAP)
 	_ring(pos, 30.0, Color(0.5, 1.0, 0.7), 0.3)
 	Global.sfx("pickup", 0.8)
 
 func _cast_spirit_pact() -> void:
 	for i in 2:
-		MinionScript.spawn(player, "spirit", player.global_position + Vector2.from_angle(randf() * TAU) * 24.0, power() * float(player.minion_dmg_mult()), 10.0 / 12.0, i)
+		MinionScript.spawn(player, "spirit", player.global_position + Vector2.from_angle(randf() * TAU) * 24.0, power() * float(player.minion_dmg_mult()), 10.0 / 12.0 * _sigil("life"), i, "tome")
 	_enforce_cap("spirit", 4)
 	_ring(player.global_position, 50.0, Color(0.55, 0.85, 1.0), 0.35)
 	Global.sfx("barrage_cast", 1.2)
@@ -143,17 +163,17 @@ func _cast_frost_nova() -> void:
 	var d: int = _dmg(NOVA_DMG_BASE, NOVA_DMG_PER_FLOOR)
 	var col := Color(0.6, 0.9, 1.0)
 	for e in get_tree().get_nodes_in_group("enemies"):
-		if is_instance_valid(e) and e.alive and e.global_position.distance_to(origin) <= NOVA_RADIUS:
+		if is_instance_valid(e) and e.alive and e.global_position.distance_to(origin) <= NOVA_RADIUS * _sigil("radius"):
 			e.take_damage(d, origin, 120.0)
 			if e.alive and e.has_method("apply_status"):
 				e.apply_status("stun", NOVA_STUN)
 				e.apply_status("slow", NOVA_SLOW)
-			Global.on_secondary_hit(e, d, false)
+			Global.on_secondary_hit(e, d, false, "tome")
 	for b in get_tree().get_nodes_in_group("boss"):
-		if is_instance_valid(b) and b.alive and b.global_position.distance_to(origin) <= NOVA_RADIUS + 20.0:
+		if is_instance_valid(b) and b.alive and b.global_position.distance_to(origin) <= NOVA_RADIUS * _sigil("radius") + 20.0:
 			b.take_damage(d, origin, 0.0)
-			Global.on_secondary_hit(b, d, false)
-	_ring(origin, NOVA_RADIUS, col, 0.45)
+			Global.on_secondary_hit(b, d, false, "tome")
+	_ring(origin, NOVA_RADIUS * _sigil("radius"), col, 0.45)
 	Global.burst(origin, col, 22, 280.0, 1.8)
 	Global.shake(0.25, 0.2)
 	Global.sfx("shockwave", 1.2)
@@ -162,11 +182,11 @@ func _cast_blade_dance() -> void:
 	for m in get_tree().get_nodes_in_group("minions"):
 		if is_instance_valid(m) and m.kind == "blades" and m.owner_player == player:
 			m.queue_free() # tung lại thì làm mới, không chồng lưỡi
-	MinionScript.spawn(player, "blades", player.global_position, power() * float(player.minion_dmg_mult()))
+	MinionScript.spawn(player, "blades", player.global_position, power() * float(player.minion_dmg_mult()), _sigil("life"), 0, "tome")
 	Global.sfx("shadow_dash", 1.3)
 
 func _cast_mending_totem() -> void:
-	MinionScript.spawn(player, "totem", player.global_position, power())
+	MinionScript.spawn(player, "totem", player.global_position, power(), _sigil("life"), 0, "tome")
 	_enforce_cap("totem", 1)
 	_ring(player.global_position, 130.0, Color(0.5, 1.0, 0.5), 0.4)
 	Global.sfx("pickup", 1.3)
@@ -175,16 +195,17 @@ func _cast_black_hole() -> void:
 	var pos: Vector2 = _cursor_point(380.0)
 	var hole := Node2D.new()
 	hole.set_script(GravityWell)
-	hole.radius = HOLE_RADIUS
-	hole.duration = HOLE_DURATION
+	hole.radius = HOLE_RADIUS * _sigil("radius")
+	hole.duration = HOLE_DURATION * _sigil("life")
+	hole.src = "tome"
 	hole.tick_damage = _dmg(HOLE_TICK_BASE, 0.5)
 	hole.color = Color(0.45, 0.2, 0.8)
 	hole.pull_mult = 1.8
 	hole.end_dmg = _dmg(HOLE_END_BASE, HOLE_END_PER_FLOOR)
-	hole.end_radius = HOLE_RADIUS * 1.1
+	hole.end_radius = hole.radius * 1.1
 	Global.world.add_child(hole)
 	hole.global_position = pos
-	_ring(pos, HOLE_RADIUS, hole.color, 0.4)
+	_ring(pos, hole.radius, hole.color, 0.4)
 	Global.sfx("phase_step", 0.7)
 
 func _cast_storm_bolt() -> void:
@@ -215,7 +236,7 @@ func _cast_storm_bolt() -> void:
 		hit.append(cur)
 		var amount: int = maxi(1, int(d))
 		cur.take_damage(amount, from, 0.0)
-		Global.on_secondary_hit(cur, amount, false)
+		Global.on_secondary_hit(cur, amount, false, "tome")
 		_bolt_fx(from, cur.global_position)
 		d *= BOLT_FALLOFF
 		from = cur.global_position
@@ -254,7 +275,7 @@ func _bolt_fx(a: Vector2, b: Vector2) -> void:
 
 func _cast_ward_barrier() -> void:
 	var pos: Vector2 = _cursor_point()
-	MinionScript.spawn(player, "ward", pos, 1.0)
+	MinionScript.spawn(player, "ward", pos, 1.0, _sigil("life"), 0, "tome")
 	_enforce_cap("ward", 1)
 	_ring(pos, 80.0, Color(0.6, 0.8, 1.0), 0.4)
 	Global.sfx("pickup", 0.7)

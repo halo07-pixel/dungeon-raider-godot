@@ -19,6 +19,8 @@ const IceTileScript = preload("res://scripts/ice_tile.gd")
 const BOSS_WEAPON_REWARD_EVERY: int = 5
 ## Cứ mỗi N tầng, Boss rơi thêm 1 Tome (ngoài phòng kho báu).
 const BOSS_TOME_REWARD_EVERY: int = 3
+## Cứ mỗi N tầng, Boss để lại 3 Sigil (chọn 1).
+const BOSS_SIGIL_REWARD_EVERY: int = 2
 const LordArenaRuneScript = preload("res://scripts/lord_arena_rune.gd")
 const AffixScript = preload("res://scripts/enemy_affix.gd")
 const EventRooms = preload("res://scripts/event_rooms.gd")
@@ -121,6 +123,7 @@ func _ready() -> void:
 	Global.world = entities
 	Global.weapon_drop_requested.connect(_on_weapon_drop_requested)
 	Global.tome_drop_requested.connect(_on_tome_drop_requested)
+	Global.sigil_drop_requested.connect(_on_sigil_drop_requested)
 
 
 ## Chỉ dựng lại atlas tileset khi ĐỔI biome (giữa các tầng cùng biome thì giữ nguyên,
@@ -1018,6 +1021,9 @@ func _room_cleared(cell: Vector2i) -> void:
 		elif Global.floor_num % BOSS_WEAPON_REWARD_EVERY == 0:
 			_spawn_pickup("weapon", _roll_weapon_drop(Global.roll_weapon_rarity_pity(Global.floor_num, "rare")), room_center(cell) + Vector2(-72.0, 0.0))
 			Global.message.emit("The boss dropped a weapon!", Color(1.0, 0.85, 0.3))
+		if Global.floor_num % BOSS_SIGIL_REWARD_EVERY == 0 and not Global.in_council:
+			_spawn_sigil_choice(room_center(cell) + Vector2(0.0, -96.0), 3)
+			Global.message.emit("The boss left a cache of Sigils! Choose 1", Color(0.5, 0.8, 1.0))
 		if Global.floor_num % BOSS_TOME_REWARD_EVERY == 0 and not Global.in_council:
 			_spawn_tome_choice(room_center(cell) + Vector2(72.0, 0.0), 1)
 			Global.message.emit("The boss dropped a Tome!", Color(0.8, 0.6, 1.0))
@@ -1074,6 +1080,17 @@ func _spawn_tome_choice(center: Vector2, count: int) -> void:
 	var ids: Array = Global.random_tome_ids(count, held)
 	for i in ids.size():
 		_spawn_pickup("tome", String(ids[i]), center + Vector2((float(i) - float(ids.size() - 1) * 0.5) * WEAPON_CHOICE_SPACING, 0.0), _choice_seq)
+
+## Sigil: `count` Sigil khác nhau (không trùng Sigil đang gắn) xếp hàng ngang, chọn 1.
+func _spawn_sigil_choice(center: Vector2, count: int) -> void:
+	_choice_seq += 1
+	var socketed: Array = Global.SigilsScript.all_socketed(Global.run_sigils)
+	var ids: Array = Global.SigilsScript.roll_choices(count, Global.floor_num, socketed)
+	for i in ids.size():
+		_spawn_pickup("sigil", String(ids[i]), center + Vector2((float(i) - float(ids.size() - 1) * 0.5) * WEAPON_CHOICE_SPACING, 0.0), _choice_seq)
+
+func _on_sigil_drop_requested(sigil_id: String, pos: Vector2) -> void:
+	_spawn_pickup("sigil", sigil_id, pos)
 
 func _on_tome_drop_requested(tome_id: String, pos: Vector2) -> void:
 	_spawn_pickup("tome", tome_id, pos)

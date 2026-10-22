@@ -9,6 +9,8 @@ signal weapons_changed
 const BULLET = preload("res://scenes/bullet.tscn")
 const ClassSkillScript = preload("res://scripts/class_skill.gd")
 const TomeSkillScript = preload("res://scripts/tome_skill.gd")
+const SigilsScript = preload("res://scripts/sigils.gd")
+const SigilRunnerScript = preload("res://scripts/sigil_runner.gd")
 const SPEED: float = 230.0
 const ROLL_SPEED: float = 560.0
 const KNOCK_DECAY: float = 1400.0
@@ -22,6 +24,7 @@ const SHIELD_REGEN_DELAY: float = 2.5
 const SHIELD_REGEN_RATE: float = 10.0
 var max_shield: int = 20
 var shield_nova_cd: float = 0.0
+var sigil_runner: Node = null ## Chạy hiệu ứng Sigil theo sự kiện kỹ năng
 var tome_skill: Node = null ## Kỹ năng phụ (Tome), null nếu chưa nhặt
 var class_skill: Node = null ## Kỹ năng class tiến hoá (null nếu chưa mở)
 var counter_timer: float = 0.0   # Phản Công: cửa sổ x2 sát thương sau khi bị đánh
@@ -290,6 +293,12 @@ func _ready() -> void:
 
 	set_weapon_with_rarity(cls["default_weapon"], "common")
 	_attach_class_skill()
+	sigil_runner = SigilRunnerScript.new()
+	sigil_runner.name = "SigilRunner"
+	add_child(sigil_runner)
+	sigil_runner.setup(self)
+	if class_skill != null:
+		class_skill.skill_used.connect(sigil_runner.on_cast.bind("class"))
 	if TomeSkillScript.exists(Global.run_tome):
 		equip_tome(Global.run_tome)
 	dodge_timer.timeout.connect(_on_dodge_finished)
@@ -322,11 +331,28 @@ func equip_tome(id: String) -> String:
 		add_child(tome_skill)
 		tome_skill.setup(self, id)
 		tome_skill.skill_used.connect(_on_skill_used)
+		tome_skill.skill_used.connect(sigil_runner.on_cast.bind("tome"))
 	else:
 		tome_skill.set_tome(id)
 		tome_skill.cooldown_left = tome_skill.cooldown_total # đổi Tome: phải chờ hồi chiêu, không đổi qua lại để tung liên tục
 	Global.run_tome = id
 	return old if old != id else ""
+
+## Class đã tiến hoá (có thêm ô Sigil thứ 3 cho kỹ năng class).
+func class_evolved() -> bool:
+	return Global.MetaProgress.tier_of(Global.profile, Global.current_class) > 0
+
+## Gắn Sigil vào kỹ năng (ưu tiên `prefer`: "class" hoặc "tome"). Trả {"target","displaced"} hoặc {} nếu không gắn được.
+func socket_sigil(id: String, prefer: String = "class") -> Dictionary:
+	var avail: Array = []
+	if class_skill != null:
+		avail.append("class")
+	if tome_skill != null:
+		avail.append("tome")
+	var res: Dictionary = SigilsScript.socket(Global.run_sigils, id, prefer, class_evolved(), avail)
+	if not res.is_empty():
+		Global.sfx("pickup", 1.4)
+	return res
 
 func _build_sprite_frames() -> SpriteFrames:
 	var prefix: String = SPRITE_SET.get(Global.current_class, "knight_m")

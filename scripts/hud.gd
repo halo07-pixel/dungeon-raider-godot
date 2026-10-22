@@ -21,6 +21,7 @@ var _boss_phases: int = 3
 var info_label: Label
 var skill_label: Label
 var tome_label: Label
+var sigil_label: Label
 var weapon_bar: ProgressBar ## cung: mức căng dây; vũ khí khác: hồi đòn
 var weapon_bar_fill: StyleBoxFlat
 var weapon_labels: Array = [] ## 2 nhãn, mỗi nhãn một ô vũ khí (ô đang cầm sáng + có dấu ">")
@@ -64,6 +65,7 @@ func _process(_delta: float) -> void:
 	_update_weapon_bar(p)
 	_update_skill_label(p)
 	_update_tome_label(p)
+	_update_sigil_label(p)
 	_update_debug_label()
 
 ## Hai ô vũ khí: ô đang cầm có dấu ">" và sáng; ô kia mờ (đổi bằng phím swap_weapon). Màu chữ theo độ hiếm.
@@ -144,6 +146,22 @@ func _update_tome_label(p) -> void:
 	else:
 		tome_label.text = "[%s] %s  %.1fs" % [key, tk.skill_name, tk.cooldown_left]
 		tome_label.modulate = Color(0.65, 0.6, 0.7)
+
+## Sigil đang gắn: "Sigils  Q: Might, Ember | F: Rime". Ẩn khi chưa gắn Sigil nào.
+func _update_sigil_label(p) -> void:
+	var cls: Array = Global.run_sigils.get("class", [])
+	var tm: Array = Global.run_sigils.get("tome", [])
+	if cls.is_empty() and tm.is_empty():
+		sigil_label.visible = false
+		return
+	var parts: PackedStringArray = []
+	if not cls.is_empty():
+		parts.append("Q: " + ", ".join(PackedStringArray(cls.map(func(id): return Global.SigilsScript.display_name(String(id)).replace("Rune of ", "").replace(" Sigil", "")))))
+	if not tm.is_empty():
+		parts.append("F: " + ", ".join(PackedStringArray(tm.map(func(id): return Global.SigilsScript.display_name(String(id)).replace("Rune of ", "").replace(" Sigil", "")))))
+	sigil_label.visible = true
+	sigil_label.text = "Sigils  " + "  |  ".join(parts)
+	sigil_label.modulate = Color(0.7, 0.85, 1.0)
 
 ## TẠM: debug overlay bắt bug "qua tầng mới spawn vào phòng quái thay vì phòng start"
 ## và bug "quái hết mà cổng không mở". Xoá khi tìm ra nguyên nhân.
@@ -350,6 +368,8 @@ func _build_ui() -> void:
 	skill_label.visible = false
 	tome_label = _label(self, "", 14, Vector2(340.0, 98.0), Vector2(300.0, 22.0))
 	tome_label.visible = false
+	sigil_label = _label(self, "", 13, Vector2(660.0, 98.0), Vector2(420.0, 22.0))
+	sigil_label.visible = false
 	for i in Global.MAX_WEAPON_SLOTS:
 		weapon_labels.append(_label(self, "", 14, Vector2(20.0, 122.0 + 20.0 * float(i)), Vector2(360.0, 22.0)))
 	weapon_bar = _bar(self, Vector2(20.0, 126.0 + 20.0 * float(Global.MAX_WEAPON_SLOTS)), Vector2(220.0, 6.0), Color(0.6, 0.6, 0.65))
