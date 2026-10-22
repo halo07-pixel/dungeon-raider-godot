@@ -245,6 +245,9 @@ func _init() -> void:
 	ck(is_instance_valid(blades) and not blades.is_queued_for_deletion(), "blades (orbit) not detonated")
 	ck(cs.cooldown_left >= cs.cooldown_total * 0.5 - 0.01 and cs.cooldown_left < cs.cooldown_total, "refunded, never more than half (%.2f/%.2f)" % [cs.cooldown_left, cs.cooldown_total])
 	# ---- màn Profile dựng được ở cả 2 hướng ----
+	# Màn Profile gọi save_game(): ghi ra file tạm, KHÔNG đụng save thật (các test khác đọc hồ sơ mặc định).
+	var real_save_path: String = G.save_path
+	G.save_path = "user://class_branches_test_tmp.dat"
 	G.profile = MP.merge_loaded({"classes": {"ranger": {"runs": 1, "best_floor": 3, "kills": 5, "bosses": {"lord": 2}, "tier": 0}, "mage": {"tier": 1, "branch": "b"}, "summoner": {"tier": 1, "branch": "a"}}})
 	var menu = load("res://scenes/main_menu.tscn").instantiate()
 	root.add_child(menu)
@@ -266,5 +269,7 @@ func _init() -> void:
 	ck(MP.active_skill(G.profile, "ranger") == "railshot", "menu evolve picks branch b")
 	menu._switch_branch("mage", "a")
 	ck(MP.active_skill(G.profile, "mage") == "meteor_storm", "menu switch branch")
+	G.save_path = real_save_path
+	DirAccess.remove_absolute(ProjectSettings.globalize_path("user://class_branches_test_tmp.dat"))
 	print("class_branches_test: ", "PASS" if fails == 0 else "FAIL (%d)" % fails)
 	quit(1 if fails > 0 else 0)
