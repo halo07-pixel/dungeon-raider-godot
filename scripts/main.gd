@@ -221,6 +221,7 @@ func _next_floor() -> void:
 	var heal_frac: float = Global.HeatScript.FLOOR_HEAL_FRACTION_SCARCE if Global.heat_on("scarce") else Global.HeatScript.FLOOR_HEAL_FRACTION
 	player.heal(int(float(player.max_hp) * heal_frac))
 	Global.message.emit(_floor_label(Global.floor_num), Color(1.0, 0.85, 0.2) if Global.floor_num > 10 else Color.WHITE)
+	_autosave_run()
 	_changing = false
 
 
@@ -292,6 +293,16 @@ func _build_saved_run() -> Dictionary:
 		"gold": Global.coins + Global.stolen_gold_held, # xu đang cầm (trước đây không lưu nên Continue mất sạch xu)
 		"stats": Global.run_stats.duplicate() if Global.get("run_stats") else {}
 	}
+
+## Lưu ván đang chơi (đầu mỗi tầng và khi đóng cửa sổ) để crash/bấm X không làm mất ván. Không lưu khi đã chết hoặc ở màn thắng.
+func _autosave_run() -> void:
+	if is_instance_valid(player) and player.alive and not is_game_over and not is_victory_screen:
+		Global.saved_run = _build_saved_run()
+		Global.save_game()
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_CLOSE_REQUEST:
+		_autosave_run()
 
 func _save_and_quit() -> void:
 	if is_instance_valid(player) and player.alive:

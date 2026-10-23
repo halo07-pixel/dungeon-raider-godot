@@ -1302,46 +1302,73 @@ func class_skill_id_for(cid: String) -> String:
 		return evolved
 	return String(classes.get(cid, {}).get("skill", ""))
 
+## Ghi file an toàn: ghi ra file tạm, kiểm tra lỗi, giữ bản .bak của lần lưu trước rồi mới đổi tên đè lên file thật.
+## (Trước đây mở thẳng file thật ở chế độ WRITE: tắt máy/crash giữa lúc ghi làm mất sạch tiến độ.)
 func save_game() -> void:
-	var file = FileAccess.open(save_path, FileAccess.WRITE)
-	if file != null:
-		var data = {
-			"purple_gems": purple_gems,
-			"upgrades": upgrades,
-			"saved_run": saved_run, # Lưu thêm ván đang chơi
-			"settings": settings,
-			"profile": profile,
-			"elite_q_table": elite_q_table,
-			"heat": selected_heat_ids()
-		}
-		file.store_var(data)
-		file.close()
+	var data: Dictionary = {
+		"purple_gems": purple_gems,
+		"upgrades": upgrades,
+		"saved_run": saved_run, # Lưu thêm ván đang chơi
+		"settings": settings,
+		"profile": profile,
+		"elite_q_table": elite_q_table,
+		"heat": selected_heat_ids()
+	}
+	var tmp_path: String = save_path + ".tmp"
+	var file := FileAccess.open(tmp_path, FileAccess.WRITE)
+	if file == null:
+		return
+	file.store_var(data)
+	var ok: bool = file.get_error() == OK
+	file.close()
+	if not ok:
+		DirAccess.remove_absolute(tmp_path) # ghi lỗi: giữ nguyên file save cũ
+		return
+	var dir := DirAccess.open(save_path.get_base_dir())
+	if dir == null:
+		return
+	if FileAccess.file_exists(save_path):
+		dir.copy(save_path, save_path + ".bak") # đường dẫn đầy đủ: tên tương đối bị hiểu theo thư mục chạy, không theo user://
+	dir.rename(tmp_path, save_path)
+
+## Đọc một file save; trả về Dictionary hoặc null nếu thiếu/hỏng/không phải Dictionary.
+func _read_save(path: String):
+	if not FileAccess.file_exists(path):
+		return null
+	var file := FileAccess.open(path, FileAccess.READ)
+	if file == null:
+		return null
+	var data = file.get_var()
+	file.close()
+	return data if data is Dictionary else null
 
 func load_game() -> void:
-	if FileAccess.file_exists(save_path):
-		var file = FileAccess.open(save_path, FileAccess.READ)
-		if file != null:
-			var data = file.get_var()
-			if data != null:
-				purple_gems = data.get("purple_gems", 0)
-				saved_run = data.get("saved_run", {})
-				# Player._ready chạy TRƯỚC main._ready: phải đặt đúng class của ván đang lưu ngay lúc nạp,
-				# nếu không "Continue" sau khi mở lại game dựng nhầm sprite/máu/kỹ năng của class mặc định.
-				if not saved_run.is_empty() and classes.has(String(saved_run.get("class", ""))):
-					current_class = String(saved_run["class"])
-				var loaded_upgrades = data.get("upgrades", {})
-				for k in loaded_upgrades.keys():
-					if upgrades.has(k): upgrades[k] = loaded_upgrades[k]
-				var loaded_settings = data.get("settings", {})
-				for k in loaded_settings.keys():
-					settings[k] = loaded_settings[k]
-				profile = MetaProgress.merge_loaded(data.get("profile", {}))
-				elite_q_table = _migrate_q_table(data.get("elite_q_table", {}))
-				heat_selected.clear()
-				var hs = data.get("heat", [])
-				if hs is Array:
-					for id in HeatScript.sanitize(hs):
-						heat_selected[id] = true
-			file.close()
-	else:
-		save_game()
+	var data = _read_save(save_path)
+	if data == null:
+		data = _read_save(save_path + ".bak") # file chính hỏng/mất: thử bản lưu trước
+	if data == null:
+		save_game() # chưa có save nào (lần chạy đầu)
+		return
+	purple_gems = int(data.get("purple_gems", 0))
+	var run = data.get("saved_run", {})
+	saved_run = run if run is Dictionary else {}
+	# Player._ready chạy TRƯỚC main._ready: phải đặt đúng class của ván đang lưu ngay lúc nạp,
+	# nếu không "Continue" sau khi mở lại game dựng nhầm sprite/máu/kỹ năng của class mặc định.
+	if not saved_run.is_empty() and classes.has(String(saved_run.get("class", ""))):
+		current_class = String(saved_run["class"])
+	var loaded_upgrades = data.get("upgrades", {})
+	if loaded_upgrades is Dictionary:
+		for k in loaded_upgrades.keys():
+			if upgrades.has(k) and (loaded_upgrades[k] is int or loaded_upgrades[k] is float):
+				upgrades[k] = int(loaded_upgrades[k])
+	var loaded_settings = data.get("settings", {})
+	if loaded_settings is Dictionary:
+		for k in loaded_settings.keys():
+			settings[k] = loaded_settings[k]
+	profile = MetaProgress.merge_loaded(data.get("profile", {}))
+	elite_q_table = _migrate_q_table(data.get("elite_q_table", {}))
+	heat_selected.clear()
+	var hs = data.get("heat", [])
+	if hs is Array:
+		for id in HeatScript.sanitize(hs):
+			heat_selected[id] = true
