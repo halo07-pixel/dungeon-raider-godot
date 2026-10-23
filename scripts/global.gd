@@ -110,10 +110,10 @@ const L_PICKUP: int = 32
 var rarities: Dictionary = {
 	"common": {"name": "Common", "mult": 1.0, "lifesteal": 0.0, "color": Color(0.8, 0.8, 0.8), "weight": 50},
 	"rare": {"name": "Rare", "mult": 1.25, "lifesteal": 0.0, "color": Color(0.2, 0.8, 0.3), "weight": 30},
-	"epic": {"name": "Epic", "mult": 1.5, "lifesteal": 0.05, "color": Color(0.6, 0.2, 0.8), "weight": 15},
-	"legendary": {"name": "Legendary", "mult": 2.0, "lifesteal": 0.10, "color": Color(1.0, 0.8, 0.1), "weight": 5},
+	"epic": {"name": "Epic", "mult": 1.5, "lifesteal": 0.03, "color": Color(0.6, 0.2, 0.8), "weight": 12},
+	"legendary": {"name": "Legendary", "mult": 1.75, "lifesteal": 0.05, "color": Color(1.0, 0.8, 0.1), "weight": 3},
 	# Mythic: chỉ rơi từ tầng MYTHIC_MIN_FLOOR (weight 0 = không có trong bảng gốc), hoặc ghép 2 Legendary cùng loại ở Forge.
-	"mythic": {"name": "Mythic", "mult": 2.2, "lifesteal": 0.15, "color": Color(1.0, 0.25, 0.35), "weight": 0}
+	"mythic": {"name": "Mythic", "mult": 1.9, "lifesteal": 0.08, "color": Color(1.0, 0.25, 0.35), "weight": 0}
 }
 
 var weapons: Dictionary = {
@@ -149,18 +149,18 @@ var weapons: Dictionary = {
 const MAX_WEAPON_SLOTS: int = 2
 ## Độ hiếm vũ khí rơi từ rương/boss dịch dần lên theo tầng: mỗi tầng sau tầng 1 cộng thêm
 ## trọng số cho rare/epic/legendary (trừ từ common), dừng ở WEAPON_RARITY_MAX_FLOORS tầng.
-const WEAPON_RARITY_FLOOR_BONUS: Dictionary = {"rare": 1.0, "epic": 1.0, "legendary": 0.5}
+const WEAPON_RARITY_FLOOR_BONUS: Dictionary = {"rare": 1.0, "epic": 0.7, "legendary": 0.3}
 const WEAPON_RARITY_MAX_FLOORS: int = 12
 const WEAPON_RARITY_ORDER: Array = ["common", "rare", "epic", "legendary", "mythic"]
 ## Mythic chỉ xuất hiện từ tầng này; mỗi tầng sau đó cộng MYTHIC_WEIGHT_PER_FLOOR trọng số (tối đa MYTHIC_WEIGHT_CAP).
 const MYTHIC_MIN_FLOOR: int = 8
-const MYTHIC_WEIGHT_PER_FLOOR: float = 0.5
-const MYTHIC_WEIGHT_CAP: float = 3.0
+const MYTHIC_WEIGHT_PER_FLOOR: float = 0.3
+const MYTHIC_WEIGHT_CAP: float = 2.0
 
 ## Bảo hiểm xui (pity) cho vũ khí rơi từ rương/boss: sau PITY_EPIC lần liên tiếp không ra Epic+ thì lần kế tiếp tối thiểu Epic;
 ## sau PITY_LEGENDARY lần không ra Legendary+ thì lần kế tối thiểu Legendary. Đếm theo ván (reset_run, lưu trong save).
-const PITY_EPIC: int = 4
-const PITY_LEGENDARY: int = 12
+const PITY_EPIC: int = 5
+const PITY_LEGENDARY: int = 16
 var weapon_pity: Dictionary = {"epic": 0, "legendary": 0}
 ## Phế Liệu (chỉ trong ván): nhận khi phân rã vũ khí ở Lò Rèn, dùng để reroll dòng phụ / ghép Mythic.
 var scrap: int = 0
@@ -330,6 +330,10 @@ const HP_SCALE_PER_FLOOR: float = 5 / 9.0
 ## K=30: giáp 10 (quái tầng 10) giảm 25%, giáp 19 (Dungeon Lord) giảm ~39%, mọi vũ khí như nhau.
 const ARMOR_K: float = 30.0
 const MELEE_LIFESTEAL_MULT: float = 0.5
+## Trần hút máu: tổng hồi từ hút máu/Siphon tối đa % máu tối đa mỗi giây (thùng token, cho dồn tối đa LEECH_BURST_SECS giây); đánh boss chỉ hồi LEECH_BOSS_MULT.
+const LEECH_CAP_PCT_PER_SEC: float = 0.035
+const LEECH_BURST_SECS: float = 2.0
+const LEECH_BOSS_MULT: float = 0.5
 func hp_scale_for_floor(for_floor_num: int) -> float:
 	return 1.0 + HP_SCALE_PER_FLOOR * float(maxi(0, for_floor_num - 1))
 func armor_reduction(armor: float) -> float:
@@ -338,8 +342,8 @@ func armor_reduction(armor: float) -> float:
 
 func armored_damage(amount: int, armor: float) -> int:
 	return maxi(1, roundi(float(amount) * (1.0 - armor_reduction(armor))))
-const ENEMY_DMG_PER_FLOOR: float = 0.1
-const ENEMY_DMG_MULT_CAP: float = 2.5
+const ENEMY_DMG_PER_FLOOR: float = 0.12
+const ENEMY_DMG_MULT_CAP: float = 3.0
 func enemy_dmg_mult_for_floor(for_floor_num: int) -> float:
 	var m: float = minf(ENEMY_DMG_MULT_CAP, 1.0 + ENEMY_DMG_PER_FLOOR * float(maxi(0, for_floor_num - 1)))
 	if heat_on("glass"):

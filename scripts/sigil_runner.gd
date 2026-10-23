@@ -71,7 +71,7 @@ func _on_hit(src: String, target: Node, dmg: int) -> void:
 	var heal: float = total(src, "heal")
 	if heal > 0.0 and _siphon_t <= 0.0 and player.alive:
 		_siphon_t = SIPHON_INTERVAL
-		player.heal(int(heal))
+		player.leech(int(heal))
 	if total(src, "sunder") > 0.0 and target.has_method("apply_sunder") and bool(target.get("alive")):
 		target.apply_sunder()
 	var chain: float = total(src, "chain")

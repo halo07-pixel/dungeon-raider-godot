@@ -1047,6 +1047,7 @@ func _swing() -> void:
 	
 	var hit_something = false
 	var total_heal = 0
+	var leech_heal = 0 # phần hút máu: qua trần leech(); scythe (đổi máu) vẫn hồi thẳng
 	var rad_angle = deg_to_rad(aoe_angle)
 	
 	# CƠ CHẾ DAO GĂM: CHÉM XÓA ĐẠN QUÁI (chỉ Dao Găm)
@@ -1086,7 +1087,7 @@ func _swing() -> void:
 					Global.burst(e_center, Color(1.0, 0.95, 0.7), 5, 150.0, 1.2) # tia lửa chỗ trúng
 					if apply_bleed and e.has_method("apply_status"): e.apply_status("bleed", 0.0)
 					if apply_stun and e.has_method("apply_status"): e.apply_status("stun", stun_duration)
-					if lifesteal > 0.0: total_heal += maxi(1, int(float(hit_dmg) * lifesteal))
+					if lifesteal > 0.0: leech_heal += maxi(1, int(float(hit_dmg) * lifesteal))
 					# ÁP DỤNG BUFF: Phá Giáp / Lưỡi Rỉ Máu / Đạn Băng
 					if Global.buff_stack("buff_sunder") > 0 and e.has_method("apply_sunder"): e.apply_sunder()
 					if e.has_method("apply_status"):
@@ -1112,7 +1113,7 @@ func _swing() -> void:
 					if scythe_heal_pct > 0.0:
 						total_heal += maxi(1, int(float(boss_dmg) * scythe_heal_pct * 0.5)) # boss: hồi một nửa như hút máu thường
 					Global.burst(b_center, Color(1.0, 0.95, 0.7), 5, 150.0, 1.2) # tia lửa chỗ trúng
-					if lifesteal > 0.0: total_heal += maxi(1, int(float(dmg) * lifesteal * 0.5))
+					if lifesteal > 0.0: leech_heal += maxi(1, int(float(dmg) * lifesteal * Global.LEECH_BOSS_MULT))
 					if Global.buff_stack("buff_sunder") > 0 and b.has_method("apply_sunder"): b.apply_sunder()
 
 	# Buff Kiếm Khí: mỗi đòn chém phóng thêm luồng kiếm khí xuyên
@@ -1139,6 +1140,7 @@ func _swing() -> void:
 
 	if hit_something: Global.hitstop(0.04)
 	if total_heal > 0: heal(total_heal)
+	if leech_heal > 0: leech(leech_heal)
 	if Global.buff_stack("buff_momentum") > 0:
 		momentum_stacks = mini(momentum_stacks + 1, MOMENTUM_MAX_STACKS)
 		momentum_timer = MOMENTUM_WINDOW
@@ -1458,7 +1460,7 @@ func _on_hit_landed_affix(target: Node, dmg: int, _is_crit: bool) -> void:
 		var h: int = int(_steal_acc)
 		if h > 0:
 			_steal_acc -= float(h)
-			heal(h)
+			leech(h, bool(target.is_in_group("boss")))
 
 ## Buff riêng vũ khí phản ứng khi hạ gục: Capacitor (Railgun) cắt hồi đòn, Reap (Lưỡi Liềm) cộng stack tốc độ.
 ## player_hit_landed phát SAU take_damage nên target.alive == false nghĩa là đòn này vừa hạ gục.
@@ -1604,6 +1606,24 @@ func _trigger_revive() -> void:
 ## khác với global_position (gốc chân, dùng cho AI/di chuyển).
 func hurt_center() -> Vector2:
 	return $Body.global_position
+
+## Hồi máu từ hút máu: thùng token chống bất tử (trần Global.LEECH_CAP_PCT_PER_SEC máu tối đa/giây). Hồi chủ động (bình máu, NPC) vẫn dùng heal().
+var _leech_budget: float = 0.0
+var _leech_t: float = -1.0
+func leech(amount: int, vs_boss: bool = false) -> void:
+	var now: float = float(Time.get_ticks_msec()) / 1000.0
+	var rate: float = float(max_hp) * Global.LEECH_CAP_PCT_PER_SEC
+	if _leech_t < 0.0:
+		_leech_budget = rate # lần đầu: cho 1 giây
+	else:
+		_leech_budget = minf(rate * Global.LEECH_BURST_SECS, _leech_budget + (now - _leech_t) * rate)
+	_leech_t = now
+	var want: float = float(amount) * (Global.LEECH_BOSS_MULT if vs_boss else 1.0)
+	var got: int = int(minf(want, _leech_budget))
+	if got <= 0:
+		return
+	_leech_budget -= float(got)
+	heal(got)
 
 func heal(amount: int) -> void:
 	if hp >= max_hp: return

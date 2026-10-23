@@ -18,7 +18,7 @@ const AFFIXES: Dictionary = {
 	"heavy": {"name": "Heavy", "kind": "both", "mods": {"dmg": 1.2, "cd": 1.15}, "desc": "+20% damage, 15% slower"},
 	"swift": {"name": "Swift", "kind": "both", "mods": {"cd": 0.85}, "desc": "15% faster attacks"},
 	"keen": {"name": "Keen", "kind": "both", "mods": {"crit": 0.12}, "desc": "+12% crit chance"},
-	"vampiric": {"name": "Vampiric", "kind": "both", "mods": {"steal": 0.04}, "desc": "+4% lifesteal"},
+	"vampiric": {"name": "Vampiric", "kind": "both", "mods": {"steal": 0.025}, "desc": "+2.5% lifesteal"},
 	"piercing": {"name": "Piercing", "kind": "ranged", "mods": {"pierce": 1}, "desc": "shots pierce 1 more enemy"},
 	"reaching": {"name": "Reaching", "kind": "both", "mods": {"reach": 1.2}, "desc": "+20% reach"},
 	"burning": {"name": "Burning", "kind": "both", "mods": {"burn": 0.25}, "desc": "25% chance to ignite"},

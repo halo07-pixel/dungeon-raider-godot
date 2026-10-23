@@ -31,12 +31,12 @@ const AFFIXES: Dictionary = {
 	"blink": {"label": "Blink", "color": Color(0.4, 0.9, 0.95), "min_floor": 6,
 		"kinds": ["slime", "brute", "chort", "masked_orc", "frost_zombie", "frost_big_zombie"]},
 }
-const CHANCE_BASE: float = 0.05   # tỉ lệ ở tầng 2
-const CHANCE_PER_FLOOR: float = 0.02
-const CHANCE_MAX: float = 0.22
+const CHANCE_BASE: float = 0.08   # tỉ lệ ở tầng 2
+const CHANCE_PER_FLOOR: float = 0.03
+const CHANCE_MAX: float = 0.35
 const HELL_MIN_FLOOR: int = 11    # Chương Địa Ngục: quái có affix nhiều hơn
-const HELL_CHANCE: float = 0.32
-const MAX_PER_ROOM: int = 2
+const HELL_CHANCE: float = 0.45
+const MAX_PER_ROOM: int = 3
 
 const VOLATILE_RADIUS: float = 58.0
 const VOLATILE_DAMAGE: int = 14
