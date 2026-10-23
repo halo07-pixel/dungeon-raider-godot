@@ -73,7 +73,7 @@ const PASSIVE_BRAWLER_MELEE_DMG: float = 0.12   # Brawler: vũ khí cận chiế
 const PASSIVE_BRAWLER_DAMAGE_TAKEN: float = 0.92 # Brawler: nhận sát thương x0.92
 const PASSIVE_SUMMONER_HASTE: float = 0.25     # Summoner: hồi chiêu kỹ năng nhanh hơn 25%
 const PASSIVE_SUMMONER_MINIONS: int = 2        # Summoner: số lính tự triệu hồi tối đa cùng lúc (Summon)
-const PASSIVE_SUMMONER_MINION_DMG: float = 0.30 # Summoner: lính +30% sát thương
+const PASSIVE_SUMMONER_MINION_DMG: float = 0.20 # Summoner: lính +20% sát thương
 const PASSIVE_MAGE_HASTE: float = 0.25          # Mage: hồi chiêu kỹ năng nhanh hơn 25%
 const PASSIVE_ROGUE_CRIT: float = 0.15          # Rogue: +15% tỉ lệ chí mạng
 const SKILL_POWER_PER_ARCANA: float = 0.12
@@ -1276,7 +1276,7 @@ func spellburst_chance() -> float:
 	return minf(0.75, SPELLBURST_CHANCE_PER_STACK * float(Global.buff_stack("buff_skill_burst")))
 
 ## ---- Nội tại class ----
-## Summoner (Pack Leader): tối đa PASSIVE_SUMMONER_MINIONS lính tự triệu hồi cùng lúc, lính +30% sát thương.
+## Summoner (Pack Leader): tối đa PASSIVE_SUMMONER_MINIONS lính tự triệu hồi cùng lúc, lính +20% sát thương.
 func minion_dmg_mult() -> float:
 	return 1.0 + PASSIVE_SUMMONER_MINION_DMG if Global.current_class == "summoner" else 1.0
 

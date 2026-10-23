@@ -99,7 +99,7 @@ func _init() -> void:
 	ck(p.weapon_id == "chakram", "starts with chakram")
 	ck(p.class_skill != null and p.class_skill.skill_id == "summon", "class skill is summon")
 	ck(absf(p.skill_haste() - 0.25) < 0.001, "summoner haste passive")
-	ck(absf(p.minion_dmg_mult() - 1.3) < 0.001, "minion damage +30%")
+	ck(absf(p.minion_dmg_mult() - 1.2) < 0.001, "minion damage +20%")
 	ck(p.sprite.sprite_frames.get_frame_count("idle") == 4 and p.sprite.sprite_frames.get_frame_count("run") == 4 and p.sprite.sprite_frames.get_frame_count("hit") >= 1, "sprite frames idle/run/hit built")
 	G.current_class = "mage"
 	ck(absf(p.minion_dmg_mult() - 1.0) < 0.001, "other classes: no minion bonus")
