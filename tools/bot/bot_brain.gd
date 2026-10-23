@@ -9,6 +9,11 @@ const THINK_INTERVAL: float = 0.1          # giây mô phỏng giữa hai lần 
 const RANGED_KEEP_DIST: float = 230.0
 const RANGED_TOO_CLOSE: float = 150.0
 const KITER_CHASE_DIST: float = 150.0
+const LEAD_MAX_T: float = 0.6
+const LEAD_FACTOR: float = 0.0           # <1: bot không đón đầu hoàn hảo
+const BULLET_LOOKAHEAD: float = 0.55      # giây: tính điểm gần nhất của đạn địch trong khoảng này
+const BULLET_HIT_RADIUS: float = 26.0
+const TRAP_AVOID_DIST: float = 48.0
 const BOSS_KEEP_DIST: float = 300.0
 const MELEE_ENGAGE_PAD: float = 12.0
 const HAZARD_MARGIN: float = 46.0          # thêm vào bán kính vùng nguy hiểm khi tránh
@@ -20,13 +25,21 @@ const SKILL_RADIUS: float = 260.0
 const WALL_PUSH_DIST: float = 70.0
 const REPEL_DIST: float = 170.0            # đẩy khỏi MỌI quái gần hơn mức này (không chỉ quái gần nhất)
 const REPEL_WEIGHT: float = 1.5
+const TELEGRAPH_AVOID_DIST: float = 230.0   # trùm đang báo trước đòn: lùi ra khỏi tầm này
 const CONTACT_ROLL_DIST: float = 58.0      # quái chạm sát thì lăn thoát
 const PICKUP_RANGE: float = 170.0
 const HEAL_SEEK_RANGE: float = 520.0
 const HEAL_SEEK_HP: float = 0.7
 const STUCK_SECONDS: float = 2.0
+const SWARM_SIZE: int = 8
 const HUNT_AFTER: float = 40.0              # chừng này giây không hạ được con nào thì chuyển sang "săn": lao thẳng theo đường tới quái
 const HUNT_DURATION: float = 20.0
+const WEAPON_UPGRADE_RATIO: float = 1.12     # chỉ đổi khi vũ khí mới mạnh hơn chừng này
+const MELEE_BOT_FACTOR: float = 0.8         # bot đánh cận chiến kém hơn tầm xa nên trừ điểm
+const WEAPON_PICK_DIST: float = 44.0
+const WEAPON_GIVEUP_SEC: float = 8.0 # đuổi theo một vũ khí quá lâu không nhặt được thì bỏ qua (tránh kẹt vòng lặp)
+const CHARGE_BOT_FACTOR: float = 0.4
+const SHORT_RANGE: float = 260.0
 const TIER_SCORE: Dictionary = {"common": 1.0, "rare": 2.0, "epic": 3.2, "skill": 4.0}
 
 var G: Node # autoload Global (lấy bằng đường cây vì script chạy ở chế độ --script không biết tên autoload lúc biên dịch)
@@ -34,10 +47,16 @@ var main: Node
 var player: CharacterBody2D
 var dungeon: Node
 var sim_time: float = 0.0
-var stats: Dictionary = {"rolls": 0, "skills": 0, "buffs": [], "stuck_events": 0, "rooms_cleared": 0, "think": 0, "shoot_ticks": 0, "hazard_ticks": 0, "nolos_ticks": 0}
+var stats: Dictionary = {"rolls": 0, "skills": 0, "buffs": [], "stuck_events": 0, "floor_src": {}, "rooms_cleared": 0, "think": 0, "shoot_ticks": 0, "hazard_ticks": 0, "nolos_ticks": 0}
 
 var trace: bool = false
+var immortal: bool = false   # chế độ đo: luôn hồi đầy máu để bot đi hết các tầng, vẫn ghi sát thương đã nhận
 var _goal_desc: String = ""
+var _goal_pos = null
+var _goal_is_portal: bool = false
+var _wgoal_id: int = 0
+var _wgoal_t: float = 0.0
+var _wgoal_banned: Dictionary = {}
 var _trace_t: float = 0.0
 var _think_t: float = 0.0
 var _move: Vector2 = Vector2.ZERO
@@ -63,7 +82,15 @@ func setup(p_main: Node) -> void:
 	dungeon = p_main.dungeon
 	process_mode = Node.PROCESS_MODE_PAUSABLE
 	G.buff_choice_requested.connect(_on_buff_choice)
+	G.player_hurt_by.connect(_on_hurt_by)
 	_last_pos = player.global_position
+
+func _on_hurt_by(source: String, amount: int) -> void:
+	var f: int = int(G.floor_num)
+	var fs: Dictionary = stats["floor_src"]
+	if not fs.has(f):
+		fs[f] = {}
+	fs[f][source] = int(fs[f].get(source, 0)) + amount
 
 func _exit_tree() -> void:
 	_release_all()
@@ -75,6 +102,8 @@ func _physics_process(delta: float) -> void:
 		_release_all()
 		return
 	sim_time += delta
+	if immortal and player.hp < player.max_hp * 0.6:
+		player.hp = player.max_hp # hồi đầy (không qua heal() nên không phát hiệu ứng/âm)
 	if trace:
 		_trace_t -= delta
 		if _trace_t <= 0.0:
@@ -116,6 +145,10 @@ func _nearest(list: Array, from: Vector2):
 
 ## Mục tiêu: gần nhất trong số quái đang THẤY được (tia nhìn không bị tường chắn); không ai thấy thì gần nhất.
 func _pick_target(list: Array, pp: Vector2):
+	if list.size() > SWARM_SIZE: # boss triệu hồi bầy (Necromancer): đánh thẳng boss thay vì sa lầy với lính
+		for e in list:
+			if e.get("tele_mode") != null and _los(pp, e.global_position):
+				return e
 	var best = null
 	var bd: float = INF
 	for e in list:
@@ -125,9 +158,35 @@ func _pick_target(list: Array, pp: Vector2):
 			best = e
 	return best if best != null else _nearest(list, pp)
 
+## Điểm ngắm có đón đầu: vị trí mục tiêu cộng vận tốc nhân thời gian đạn bay (tối đa LEAD_MAX_T giây).
+func _lead_point(pp: Vector2, t) -> Vector2:
+	var tp: Vector2 = t.global_position
+	if bool(player.weapon.get("is_melee", false)):
+		return tp
+	var v = t.get("velocity")
+	var bspeed: float = float(player.weapon.get("speed", 600.0))
+	if not (v is Vector2) or bspeed < 50.0:
+		return tp
+	var flight: float = minf(LEAD_MAX_T, pp.distance_to(tp) / bspeed)
+	return tp + (v as Vector2) * flight * LEAD_FACTOR
+
 func _is_kiter(e) -> bool:
 	var d = e.get("data")
 	return d is Dictionary and (bool(d.get("kiter", false)) or bool(d.get("shooter", false)))
+
+## Bẫy/ô nguy hiểm trên sàn (gai, lava, độc, băng): nhận diện bằng đường dẫn script.
+func _floor_traps() -> Array:
+	var out: Array = []
+	for n in G.world.get_children():
+		if not is_instance_valid(n) or not (n is Area2D):
+			continue
+		var sc = n.get_script()
+		if sc == null:
+			continue
+		var path: String = String(sc.resource_path)
+		if path.ends_with("spike_trap.gd") or path.ends_with("lava_tile.gd") or path.ends_with("poison_tile.gd") or path.ends_with("ice_tile.gd"):
+			out.append(n)
+	return out
 
 func _hazards() -> Array:
 	var out: Array = []
@@ -141,7 +200,7 @@ func _hazards() -> Array:
 func _pickups(kind: String) -> Array:
 	var out: Array = []
 	for n in G.world.get_children():
-		if is_instance_valid(n) and n is Area2D and n.get("kind") == kind and n.get("tick_interval") == null:
+		if is_instance_valid(n) and n is Area2D and n.get("kind") == kind and n.get("tick_interval") == null and not (kind != "portal" and _wgoal_banned.has(n.get_instance_id())):
 			out.append(n)
 	return out
 
@@ -166,6 +225,17 @@ func _think(dt: float) -> void:
 			steer += off.normalized() * (1.6 + (r - d) / r) if d > 1.0 else Vector2.RIGHT
 	if in_hazard:
 		stats["hazard_ticks"] += 1
+	# cổng/portal nằm cạnh ô độc/băng/gai: tới sát cổng thì bỏ né bẫy để bước vào (trước đây bot dội ra mãi)
+	var near_portal: bool = _goal_is_portal and _goal_pos != null and pp.distance_to(_goal_pos) < 120.0
+	for tr in _floor_traps():
+		if near_portal:
+			break
+		var toff: Vector2 = pp - tr.global_position
+		var td: float = toff.length()
+		if td < TRAP_AVOID_DIST and td > 1.0:
+			steer += toff.normalized() * (TRAP_AVOID_DIST - td) / TRAP_AVOID_DIST * 2.2
+	var bullet_steer: Vector2 = _bullet_sidestep(pp)
+	steer += bullet_steer
 	# 2) lăn né đạn địch / vùng nguy hiểm (không hoàn hảo)
 	if _dodge_gap <= 0.0 and player.dodge_cooldown.is_stopped() and not player.rolling:
 		var threat: Vector2 = Vector2.ZERO
@@ -194,6 +264,7 @@ func _think(dt: float) -> void:
 		_hunt_until = sim_time + HUNT_DURATION
 		_last_progress = sim_time
 		stats["hunts"] = int(stats.get("hunts", 0)) + 1
+	var boss_steer: Vector2 = _boss_defense(pp)
 	if target != null and sim_time < _hunt_until:
 		# săn: bỏ luật giữ khoảng cách, đi thẳng theo đường tới mục tiêu và bắn khi thấy
 		player.ai_aim_point = target.global_position
@@ -206,7 +277,7 @@ func _think(dt: float) -> void:
 		var to_t: Vector2 = target.global_position - pp
 		var dist: float = to_t.length()
 		var dir_t: Vector2 = to_t.normalized() if dist > 1.0 else Vector2.RIGHT
-		player.ai_aim_point = target.global_position
+		player.ai_aim_point = _lead_point(pp, target)
 		if not _los(pp, target.global_position):
 			# bị tường chắn: đi theo đường tìm được tới mục tiêu thay vì xoay vòng vô ích
 			steer += _path_dir(pp, target.global_position) * 1.2
@@ -218,6 +289,7 @@ func _think(dt: float) -> void:
 			_shoot = dist < reach + 25.0
 		else:
 			var keep: float = BOSS_KEEP_DIST if is_boss else RANGED_KEEP_DIST
+			keep = minf(keep, maxf(55.0, _weapon_range(player.weapon) * 0.7)) # không đứng xa hơn tầm bắn của vũ khí đang cầm
 			if _is_kiter(target):
 				keep = KITER_CHASE_DIST # cung thủ/pháp sư hay lùi: phải áp sát chứ không đứng chờ
 			var perp: Vector2 = Vector2(-dir_t.y, dir_t.x) * (1.0 if int(sim_time / 2.0) % 2 == 0 else -1.0)
@@ -227,10 +299,11 @@ func _think(dt: float) -> void:
 				steer += dir_t * 0.9
 			else:
 				steer += perp * 0.7
-			_shoot = dist < 560.0
+			_shoot = dist < maxf(60.0, minf(560.0, _weapon_range(player.weapon) * 0.95))
 		steer += _repel(enemies, pp, target)
 		_maybe_skill(enemies, pp, target)
 		steer += _wall_push(pp)
+		steer += boss_steer
 	else:
 		steer += _navigate(pp)
 	if _shoot:
@@ -274,6 +347,57 @@ func _repel(enemies: Array, pp: Vector2, target) -> Vector2:
 			_dodge_gap = DODGE_MIN_GAP
 	return push * REPEL_WEIGHT
 
+## Phòng thủ trước trùm dựa trên trạng thái trùm công bố (charging / tele_mode): nghiêng người khỏi đường lao,
+## và lùi ra khỏi tầm đòn đang báo trước (slam/ring/...). Lăn né khi đòn sắp trúng.
+## Với từng đạn địch: tính điểm gần Player nhất trong BULLET_LOOKAHEAD giây; nếu sẽ trúng thì nghiêng người sang
+## phía vuông góc với đường đạn (không cần lăn). Đạn xa hoặc bay lệch thì bỏ qua.
+func _bullet_sidestep(pp: Vector2) -> Vector2:
+	var steer: Vector2 = Vector2.ZERO
+	for b in get_tree().get_nodes_in_group("enemy_bullets"):
+		if not is_instance_valid(b):
+			continue
+		var v: Vector2 = b.dir * float(b.speed)
+		var rel: Vector2 = pp - b.global_position
+		var vv: float = v.length_squared()
+		if vv < 1.0:
+			continue
+		var t_cp: float = clampf(rel.dot(v) / vv, 0.0, BULLET_LOOKAHEAD)
+		var closest: Vector2 = b.global_position + v * t_cp
+		var miss: Vector2 = pp - closest
+		if miss.length() < BULLET_HIT_RADIUS + float(b.radius):
+			var side: Vector2 = Vector2(-b.dir.y, b.dir.x)
+			if side.dot(miss) < 0.0:
+				side = -side
+			steer += side * (1.6 - t_cp)
+	return steer
+
+func _boss_defense(pp: Vector2) -> Vector2:
+	var steer: Vector2 = Vector2.ZERO
+	for b in get_tree().get_nodes_in_group("boss"):
+		if not is_instance_valid(b) or not b.alive or not b.active:
+			continue
+		var to_p: Vector2 = pp - b.global_position
+		var dist: float = to_p.length()
+		if bool(b.charging):
+			var cd: Vector2 = b.charge_dir
+			var along: float = cd.dot(to_p)
+			var lateral: Vector2 = to_p - cd * along
+			if along > -50.0 and lateral.length() < 120.0 and dist < 320.0:
+				var side: Vector2 = lateral.normalized() if lateral.length() > 8.0 else Vector2(-cd.y, cd.x)
+				steer += side * 2.2
+				if _dodge_gap <= 0.0 and player.dodge_cooldown.is_stopped() and not player.rolling and lateral.length() < 90.0 and dist < 200.0:
+					player._start_roll(side.normalized())
+					stats["rolls"] += 1
+					_dodge_gap = DODGE_MIN_GAP
+		elif String(b.tele_mode) != "" and dist < TELEGRAPH_AVOID_DIST:
+			var away: Vector2 = to_p.normalized() if dist > 1.0 else Vector2.RIGHT
+			steer += away * (1.8 + (TELEGRAPH_AVOID_DIST - dist) / TELEGRAPH_AVOID_DIST)
+			if float(b.tele_t) > 0.55 and dist < 170.0 and _dodge_gap <= 0.0 and player.dodge_cooldown.is_stopped() and not player.rolling:
+				player._start_roll(away)
+				stats["rolls"] += 1
+				_dodge_gap = DODGE_MIN_GAP
+	return steer
+
 func _maybe_skill(enemies: Array, pp: Vector2, target) -> void:
 	var cs = player.class_skill
 	if cs == null or not cs.has_method("is_ready") or not cs.is_ready():
@@ -301,19 +425,31 @@ func _navigate(pp: Vector2) -> Vector2:
 	var goal = null
 	if player.hp < player.max_hp * HEAL_SEEK_HP:
 		var h = _nearest(_pickups("heal"), pp)
-		if h != null and pp.distance_to(h.global_position) < HEAL_SEEK_RANGE:
+		if h != null and pp.distance_to(h.global_position) < HEAL_SEEK_RANGE and _chase_ok(h):
 			goal = h.global_position
 	if goal == null:
 		var c = _nearest(_pickups("coin"), pp)
-		if c != null and pp.distance_to(c.global_position) < PICKUP_RANGE:
+		if c != null and pp.distance_to(c.global_position) < PICKUP_RANGE and _chase_ok(c):
 			goal = c.global_position
+	if goal == null:
+		goal = _weapon_goal(pp)
+	_goal_is_portal = false
 	if goal == null:
 		var portal = _nearest(_pickups("portal"), pp)
 		if portal != null:
 			goal = portal.global_position
+			_goal_is_portal = true
 	if goal == null:
-		goal = dungeon.room_center(dungeon.boss_cell)
+		var tc = _unvisited_treasure()
+		goal = dungeon.room_center(tc) if tc != null else dungeon.room_center(dungeon.boss_cell)
+	_goal_pos = goal
 	var path: PackedVector2Array = dungeon.find_path(pp, goal)
+	if path.size() < 2:
+		# không có đường theo lưới: đi theo đồ thị phòng tới phòng kế trên đường tới trùm
+		var nxt = _next_cell_toward_boss()
+		if nxt != null:
+			goal = dungeon.room_center(nxt)
+			path = dungeon.find_path(pp, goal)
 	_goal_desc = "goal=(%d,%d) path=%d" % [goal.x, goal.y, path.size()]
 	if path.size() >= 2:
 		var i: int = 1
@@ -321,6 +457,115 @@ func _navigate(pp: Vector2) -> Vector2:
 			i += 1
 		return (path[i] - pp).normalized()
 	return (goal - pp).normalized()
+
+## BFS trên đồ thị cửa của các phòng: ô phòng kế tiếp cần đi để tới phòng trùm (null nếu đã ở đó / không có).
+## Điểm tới vũ khí rơi đáng đổi (rương kho báu / thưởng trùm); tới nơi thì nhặt luôn bằng cách gọi hàm nhặt của vật phẩm.
+## Theo đuổi một vật phẩm quá WEAPON_GIVEUP_SEC mà chưa nhặt được (nằm cạnh bẫy/tường) thì bỏ qua nó.
+func _chase_ok(n: Node) -> bool:
+	var id: int = n.get_instance_id()
+	if id != _wgoal_id:
+		_wgoal_id = id
+		_wgoal_t = 0.0
+	_wgoal_t += get_physics_process_delta_time()
+	if _wgoal_t > WEAPON_GIVEUP_SEC:
+		_wgoal_banned[id] = true
+		stats["pickup_giveups"] = int(stats.get("pickup_giveups", 0)) + 1
+		return false
+	return true
+
+func _weapon_goal(pp: Vector2):
+	var best = null
+	var best_gain: float = 0.0
+	var cur: float = _inst_score(player.weapon_inst) if not player.weapon_inst.is_empty() else 0.0
+	var free: bool = player.has_free_weapon_slot()
+	for w in get_tree().get_nodes_in_group("weapon_pickup"):
+		if not is_instance_valid(w) or pp.distance_to(w.global_position) > 900.0 or _wgoal_banned.has(w.get_instance_id()):
+			continue
+		var sc: float = _inst_score(w.weapon_inst)
+		var gain: float = sc / maxf(1.0, cur)
+		if (free or gain >= WEAPON_UPGRADE_RATIO) and gain > best_gain:
+			best_gain = gain
+			best = w
+	if best == null:
+		return null
+	if pp.distance_to(best.global_position) < WEAPON_PICK_DIST and float(best._lock) <= 0.0:
+		var name_before: String = String(player.weapon.get("name", "?"))
+		best._try_take()
+		stats["weapons"] = int(stats.get("weapons", 0)) + 1
+		_arrange_weapons()
+		return null
+	var bid: int = best.get_instance_id()
+	if bid != _wgoal_id:
+		_wgoal_id = bid
+		_wgoal_t = 0.0
+	_wgoal_t += get_physics_process_delta_time()
+	if _wgoal_t > WEAPON_GIVEUP_SEC:
+		_wgoal_banned[bid] = true
+		stats["weapon_giveups"] = int(stats.get("weapon_giveups", 0)) + 1
+		return null
+	return best.global_position
+
+func _unvisited_treasure():
+	for c in dungeon.rooms:
+		var r: Dictionary = dungeon.rooms[c]
+		if String(r["type"]) == "treasure" and not bool(r["visited"]):
+			return c
+	return null
+
+## Điểm vũ khí ~ DPS lý thuyết: sát thương x số viên / hồi đòn x hệ số độ hiếm x cấp; cận chiến bị trừ nhẹ (bot cận chiến dở hơn).
+func _inst_score(inst: Dictionary) -> float:
+	if inst.is_empty():
+		return 0.0
+	var w: Dictionary = G.weapons.get(String(inst.get("id", "")), {})
+	if w.is_empty():
+		return 0.0
+	var dmg: float = float(w.get("damage", 10.0)) * maxf(1.0, float(w.get("pellets", 1)))
+	var cd: float = maxf(0.08, float(w.get("cooldown", 0.5)))
+	var rar: float = float(G.rarities.get(String(inst.get("rarity", "common")), {}).get("mult", 1.0))
+	var sc: float = dmg / cd * rar * (1.0 + 0.08 * float(inst.get("level", 0)))
+	if bool(w.get("is_melee", false)):
+		sc *= MELEE_BOT_FACTOR
+	else:
+		if w.has("charge_time") or bool(w.get("boomerang", false)):
+			sc *= CHARGE_BOT_FACTOR # bot chưa biết nạp/giữ đòn: vũ khí nạp lực hay boomerang bị trừ nặng
+		if _weapon_range(w) < SHORT_RANGE:
+			sc *= 0.6 # tầm ngắn đòi áp sát, bot kite xa nên không hợp
+	return sc
+
+## Tầm bắn hiệu dụng của vũ khí tầm xa (tốc độ đạn x thời gian sống).
+func _weapon_range(w: Dictionary) -> float:
+	return float(w.get("speed", 600.0)) * float(w.get("life", 1.0))
+
+## Giữ vũ khí mạnh hơn ở ô đang cầm.
+func _arrange_weapons() -> void:
+	var other: Dictionary = player.weapon_slots[1 - player.active_slot]
+	if other.is_empty():
+		return
+	if _inst_score(other) > _inst_score(player.weapon_inst) * WEAPON_UPGRADE_RATIO:
+		player.swap_weapon()
+
+func _next_cell_toward_boss():
+	var start: Vector2i = dungeon.current_cell
+	var goal: Vector2i = dungeon.boss_cell
+	if start == goal or not dungeon.rooms.has(start):
+		return null
+	var prev: Dictionary = {start: start}
+	var queue: Array = [start]
+	while not queue.is_empty():
+		var c: Vector2i = queue.pop_front()
+		if c == goal:
+			break
+		for d in dungeon.rooms[c]["doors"]:
+			var n: Vector2i = c + d
+			if dungeon.rooms.has(n) and not prev.has(n):
+				prev[n] = c
+				queue.append(n)
+	if not prev.has(goal):
+		return null
+	var c2: Vector2i = goal
+	while prev[c2] != start:
+		c2 = prev[c2]
+	return c2
 
 func _anti_stuck(steer: Vector2, pp: Vector2, dt: float, navigating: bool) -> Vector2:
 	if _jiggle_t > 0.0:
