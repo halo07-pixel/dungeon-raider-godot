@@ -117,7 +117,7 @@ var rarities: Dictionary = {
 }
 
 var weapons: Dictionary = {
-	"pistol": {"name": "Pistol", "damage": 10, "cooldown": 0.30, "speed": 640.0, "pellets": 1, "spread": 3.0, "pierce": false, "life": 1.1, "recoil": 45.0, "radius": 5.0, "color": Color(1.0, 0.9, 0.4), "sfx": "shoot", "is_melee": false},
+	"pistol": {"name": "Pistol", "damage": 12, "cooldown": 0.30, "speed": 640.0, "pellets": 1, "spread": 3.0, "pierce": false, "life": 1.1, "recoil": 45.0, "radius": 5.0, "color": Color(1.0, 0.9, 0.4), "sfx": "shoot", "is_melee": false},
 	"smg": {"name": "SMG", "damage": 5, "cooldown": 0.085, "speed": 700.0, "pellets": 1, "spread": 9.0, "pierce": false, "life": 1.0, "recoil": 18.0, "radius": 4.0, "color": Color(1.0, 0.65, 0.25), "sfx": "shoot", "is_melee": false},
 	"shotgun": {"name": "Shotgun", "damage": 7, "cooldown": 0.75, "speed": 560.0, "pellets": 6, "spread": 36.0, "pierce": false, "life": 0.45, "recoil": 150.0, "radius": 4.0, "color": Color(1.0, 0.5, 0.3), "sfx": "shotgun", "is_melee": false},
 	# --- Vũ khí tầm xa có cơ chế riêng (xem Player._shoot/_tick_charge và Bullet) ---
@@ -126,7 +126,7 @@ var weapons: Dictionary = {
 	# Railgun: bắn chậm, tia xuyên MỌI quái trên đường thẳng (beam = đạn xuyên vô hạn kèm vệt tia dài).
 	"railgun": {"name": "Railgun", "damage": 55, "cooldown": 1.6, "speed": 1500.0, "pellets": 1, "spread": 0.0, "pierce": false, "life": 0.6, "recoil": 220.0, "radius": 6.0, "color": Color(0.4, 0.9, 1.0), "sfx": "laser", "is_melee": false, "beam": true},
 	# Arcane Staff: quả cầu nổ diện rộng (blast_radius px) khi chạm quái/tường/hết tầm; sát thương nổ áp cho mọi quái trong vùng.
-	"staff": {"name": "Arcane Staff", "damage": 22, "cooldown": 0.75, "speed": 430.0, "pellets": 1, "spread": 2.0, "pierce": false, "life": 1.1, "recoil": 40.0, "radius": 7.0, "color": Color(0.7, 0.45, 1.0), "sfx": "laser", "is_melee": false, "blast_radius": 64.0},
+	"staff": {"name": "Arcane Staff", "damage": 28, "cooldown": 0.75, "speed": 430.0, "pellets": 1, "spread": 2.0, "pierce": false, "life": 1.1, "recoil": 40.0, "radius": 7.0, "color": Color(0.7, 0.45, 1.0), "sfx": "laser", "is_melee": false, "blast_radius": 64.0},
 	# --- Đợt 2: cơ chế riêng (xem Player._shoot và Bullet) ---
 	# Crossbow: nỏ nặng. Quái bị bắn ngay SÁT TƯỜNG (trong tầm ghim) bị ghim: choáng + sát thương cộng thêm.
 	"crossbow": {"name": "Crossbow", "damage": 34, "cooldown": 0.85, "speed": 900.0, "pellets": 1, "spread": 0.0, "pierce": false, "life": 0.9, "recoil": 60.0, "radius": 5.0, "color": Color(0.85, 0.8, 0.65), "sfx": "shoot", "is_melee": false, "pin": true},
@@ -136,8 +136,8 @@ var weapons: Dictionary = {
 	"chakram": {"name": "Chakram", "damage": 20, "cooldown": 0.6, "speed": 560.0, "pellets": 1, "spread": 0.0, "pierce": false, "life": 2.4, "recoil": 0.0, "radius": 9.0, "color": Color(0.8, 0.9, 1.0), "sfx": "dodge", "is_melee": false, "boomerang": true, "out_time": 0.55},
 	"laser": {"name": "Laser Gun", "damage": 16, "cooldown": 0.50, "speed": 1100.0, "pellets": 1, "spread": 0.0, "pierce": false, "pierce_count": 2, "life": 0.9, "recoil": 60.0, "radius": 4.0, "color": Color(0.4, 1.0, 1.0), "sfx": "laser", "is_melee": false},
 
-	"broadsword": {"name": "Longsword", "damage": 25, "cooldown": 0.45, "is_melee": true, "range": 55.0, "cleave_angle": 180.0, "knock": 280.0, "color": Color(0.9, 0.9, 0.9), "sfx": "dodge"},
-	"daggers": {"name": "Daggers", "damage": 14, "cooldown": 0.22, "is_melee": true, "range": 40.0, "cleave_angle": 80.0, "knock": 120.0, "color": Color(0.6, 0.9, 0.6), "sfx": "dodge"},
+	"broadsword": {"name": "Longsword", "damage": 21, "cooldown": 0.45, "is_melee": true, "range": 55.0, "cleave_angle": 180.0, "knock": 280.0, "color": Color(0.9, 0.9, 0.9), "sfx": "dodge"},
+	"daggers": {"name": "Daggers", "damage": 11, "cooldown": 0.24, "is_melee": true, "range": 40.0, "cleave_angle": 80.0, "knock": 120.0, "color": Color(0.6, 0.9, 0.6), "sfx": "dodge"},
 	# Spear: đâm hẹp, tầm xa. Quái đứng TRƯỚC NHẤT trong đường đâm ăn đủ sát thương, quái phía sau ăn một phần.
 	"spear": {"name": "Spear", "damage": 30, "cooldown": 0.55, "is_melee": true, "range": 95.0, "cleave_angle": 28.0, "knock": 200.0, "color": Color(0.8, 0.9, 1.0), "sfx": "dodge", "thrust": true},
 	# Scythe: quét 360 độ, chậm. Bậc Epic/Legendary phải ĐỔI MÁU mỗi nhát vung, bù lại hút máu mạnh khi trúng quái.
