@@ -1,4 +1,5 @@
 extends Area2D
+const HEAL_PCT: float = 0.22
 ## Vật phẩm / cổng: kind = coin | heal | weapon | portal. Xu/bình máu/cổng nhặt bằng signal body_entered;
 ## VŨ KHÍ thì KHÔNG tự nhặt: đứng gần và bấm "interact" (E). Còn ô trống thì vào ô trống, đủ ô thì đổi với
 ## vũ khí đang cầm và vũ khí cũ được thả xuống chỗ này (qua Global.weapon_drop_requested).
@@ -219,7 +220,7 @@ func _on_body_entered(body: Node) -> void:
 		"coin":
 			Global.add_coin()
 		"heal":
-			body.heal(20)
+			body.heal(maxi(20, int(float(body.max_hp) * HEAL_PCT))) # theo % máu tối đa: mọi class hồi ngang nhau
 		"portal":
 			Global.portal_entered.emit()
 		"council_portal":

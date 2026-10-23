@@ -25,6 +25,8 @@ const HellSkillsScript = preload("res://scripts/hell_skills.gd")
 ## bắn thay vì luôn theo nhịp cố định như quái thường.
 const ELITE_CHANCE: float = 0.15
 const ELITE_HP_MULT: float = 1.4
+const ELITE_CHANCE_PER_FLOOR: float = 0.02 # cộng thêm mỗi tầng sau tầng 3
+const ELITE_CHANCE_MAX: float = 0.35
 var is_elite: bool = false
 var q_agent: Node = null
 var affix_id: String = "" ## Biến thể (volatile/summoner/warden); "" = quái thường
@@ -135,7 +137,7 @@ func hurt_center() -> Vector2:
 func setup(p_kind: String, hp_mult: float = 1.0, allow_affix: bool = false) -> void:
 	kind = p_kind
 	data = Global.enemies[p_kind]
-	if _is_shooter() and randf() < ELITE_CHANCE:
+	if _is_shooter() and randf() < minf(ELITE_CHANCE_MAX, ELITE_CHANCE + ELITE_CHANCE_PER_FLOOR * float(maxi(0, Global.floor_num - 3))):
 		is_elite = true
 		hp_mult *= ELITE_HP_MULT
 	elif allow_affix:

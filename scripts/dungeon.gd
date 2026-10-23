@@ -710,7 +710,7 @@ func _pick_kind_ice() -> String:
 
 
 func _wave_size() -> int:
-	return mini(3 + Global.floor_num + randi_range(0, 2), 10)
+	return mini(3 + Global.floor_num + Global.floor_num / 4 + randi_range(0, 2), 12)
 
 
 func _spawn_wave(cell: Vector2i, count_override: int = -1) -> void:
@@ -1041,7 +1041,7 @@ func _room_cleared(cell: Vector2i) -> void:
 		Global.message.emit("Trial cleared! Take the reward or gamble", Color(1.0, 0.85, 0.3))
 	else:
 		Global.message.emit("Room cleared!", Color(0.6, 1.0, 0.6))
-		var heal_chance: float = 0.35 * (Global.HeatScript.HEAL_DROP_MULT if Global.heat_on("scarce") else 1.0)
+		var heal_chance: float = 0.25 * (Global.HeatScript.HEAL_DROP_MULT if Global.heat_on("scarce") else 1.0)
 		if randf() < heal_chance:
 			_spawn_pickup("heal", "", room_center(cell))
 

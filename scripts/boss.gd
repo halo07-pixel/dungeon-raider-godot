@@ -58,7 +58,7 @@ const BOSS_DATA: Dictionary = {
 	},
 	"lord": {
 		"name": "Dungeon Lord", "sprite": "big_demon",
-		"scale": 3.2, "offset_y": -20.0, "base_hp": 1500.0,
+		"scale": 3.2, "offset_y": -20.0, "base_hp": 1950.0,
 		"body_mult": 1.25, "has_run": false, "phases": 4,
 	},
 }
@@ -98,6 +98,11 @@ var blink_cd: float = 0.0 # riêng Necromancer: hồi chiêu dịch chuyển né
 ## đuổi theo nhanh hơn, ưu tiên các đòn nguy hiểm nhất. Bù lại cho việc đòn to-xác mà
 ## thiếu áp lực thời gian khiến người chơi kiting thoải mái ở pha cuối.
 var frost_enraged: bool = false
+## Enrage chung (trừ Frost đã có bản riêng ở 25%): dưới ENRAGE_RATIO máu ra đòn nhanh hơn; Dungeon Lord còn gọi thêm quái.
+const ENRAGE_RATIO: float = 0.30
+const ENRAGE_COOLDOWN_MULT: float = 0.75
+const LORD_ENRAGE_ADDS: int = 3
+var enraged: bool = false
 ## Đòn được chốt cho lượt đánh KẾ TIẾP (combo), "" = chọn bình thường. Ví dụ Mặt Băng -> Frost Charge.
 var queued_attack: String = ""
 
@@ -312,6 +317,8 @@ func _cooldown() -> float:
 	var base: float = COOLDOWN_TABLE[mini(phase - 1, COOLDOWN_TABLE.size() - 1)]
 	if kind == "frost" and frost_enraged:
 		base *= 0.6
+	if enraged:
+		base *= ENRAGE_COOLDOWN_MULT
 	return base
 
 
@@ -1193,12 +1200,23 @@ func take_damage(amount: int, _from_pos: Vector2 = Vector2.ZERO, _knock: float =
 	if new_phase > phase:
 		phase = new_phase
 		pending_roar = true
+	if kind != "frost" and not enraged and ratio <= ENRAGE_RATIO:
+		_enrage()
 	if kind == "frost" and not frost_enraged and ratio <= 0.25:
 		frost_enraged = true
 		Global.message.emit("%s enrages" % BOSS_NAME, Color(0.4, 0.9, 1.0))
 		Global.shake(0.6, 0.4)
 	if council == null:
 		Global.boss_hp_changed.emit(hp, max_hp, phase, BOSS_NAME)
+
+
+func _enrage() -> void:
+	enraged = true
+	Global.message.emit("%s enrages" % BOSS_NAME, Color(1.0, 0.35, 0.25))
+	Global.shake(0.6, 0.4)
+	if kind == "lord":
+		for i in LORD_ENRAGE_ADDS:
+			summon_requested.emit("brute", global_position + Vector2.from_angle(TAU * float(i) / float(LORD_ENRAGE_ADDS)) * 110.0)
 
 
 ## Chia đều ngưỡng % máu theo số pha của từng loại boss (3 pha: 66/33, 4 pha: 75/50/25).
