@@ -133,7 +133,7 @@ var weapons: Dictionary = {
 	# Flamethrower: phun lửa tầm ngắn liên tục, xuyên mọi quái, gây cháy.
 	"flamethrower": {"name": "Flamethrower", "damage": 4, "cooldown": 0.07, "speed": 380.0, "pellets": 1, "spread": 12.0, "pierce": false, "life": 0.26, "recoil": 8.0, "radius": 6.0, "color": Color(1.0, 0.55, 0.15), "sfx": "", "is_melee": false, "flame": true},
 	# Chakram: ném đĩa bay ra rồi quay về tay (chạm quái cả lượt đi lẫn lượt về). Chưa về thì chưa ném được đĩa mới.
-	"chakram": {"name": "Chakram", "damage": 20, "cooldown": 0.6, "speed": 560.0, "pellets": 1, "spread": 0.0, "pierce": false, "life": 2.4, "recoil": 0.0, "radius": 9.0, "color": Color(0.8, 0.9, 1.0), "sfx": "dodge", "is_melee": false, "boomerang": true, "out_time": 0.55},
+	"chakram": {"name": "Chakram", "damage": 24, "cooldown": 0.6, "speed": 560.0, "pellets": 1, "spread": 0.0, "pierce": false, "life": 2.4, "recoil": 0.0, "radius": 9.0, "color": Color(0.8, 0.9, 1.0), "sfx": "dodge", "is_melee": false, "boomerang": true, "out_time": 0.55},
 	"laser": {"name": "Laser Gun", "damage": 16, "cooldown": 0.50, "speed": 1100.0, "pellets": 1, "spread": 0.0, "pierce": false, "pierce_count": 2, "life": 0.9, "recoil": 60.0, "radius": 4.0, "color": Color(0.4, 1.0, 1.0), "sfx": "laser", "is_melee": false},
 
 	"broadsword": {"name": "Longsword", "damage": 21, "cooldown": 0.45, "is_melee": true, "range": 55.0, "cleave_angle": 180.0, "knock": 280.0, "color": Color(0.9, 0.9, 0.9), "sfx": "dodge"},
@@ -244,7 +244,7 @@ var classes: Dictionary = {
 	# Sát thủ: lướt xuyên quái gây sát thương, dao găm nhanh
 	"rogue": {"name": "Rogue", "max_hp": 90, "default_weapon": "daggers", "skill": "shadow_dash", "ultimate": "blade_tempest", "passive": {"name": "Assassin", "desc": "+15% critical chance."}},
 	# Triệu hồi sư: máu vừa, lính đánh thay mình; kỹ năng xoay vòng 3 loại lính
-	"summoner": {"name": "Summoner", "max_hp": 85, "default_weapon": "chakram", "skill": "summon", "ultimate": "horde", "passive": {"name": "Pack Leader", "desc": "Up to 2 summoned minions at once, which deal +30% damage. Skills recharge 25% faster."}}
+	"summoner": {"name": "Summoner", "max_hp": 85, "default_weapon": "chakram", "skill": "summon", "ultimate": "horde", "passive": {"name": "Pack Leader", "desc": "Up to 2 summoned minions at once, which deal +20% damage. Skills recharge 25% faster."}}
 }
 var current_class: String = "brawler"
 

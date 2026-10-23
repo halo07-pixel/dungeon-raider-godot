@@ -231,7 +231,7 @@ func _star_land(pos: Vector2) -> void:
 	await get_tree().create_timer(FALL_DELAY).timeout
 	if not is_instance_valid(player) or not player.alive or not is_inside_tree():
 		return
-	_damage_area(pos, FALL_RADIUS, _dmg(34.0, 3.4), 280.0)
+	_damage_area(pos, FALL_RADIUS, _dmg(46.0, 4.2), 280.0)
 	_ring(pos, FALL_RADIUS, FALL_COLOR, 0.35)
 	Global.burst(pos, FALL_COLOR, 16, 240.0, 1.8)
 	Global.shake(0.3, 0.2)

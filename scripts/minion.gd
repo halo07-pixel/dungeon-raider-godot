@@ -23,7 +23,7 @@ const KINDS: Dictionary = {
 
 ## Sát thương lính cơ bản: BASE + PER_FLOOR * tầng, nhân dmg_k của loại và hệ số `power` (Skill Power...).
 const BASE_DMG: float = 8.0
-const DMG_PER_FLOOR: float = 0.9
+const DMG_PER_FLOOR: float = 0.45
 const FOLLOW_DIST: float = 70.0
 const WARN_SECONDS: float = 2.0 # nhấp nháy báo sắp biến mất
 

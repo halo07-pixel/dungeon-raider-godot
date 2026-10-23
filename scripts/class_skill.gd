@@ -170,7 +170,7 @@ func _dmg_mult() -> float:
 const OVERLOAD_RADIUS_MULT: float = 1.2
 
 const BARRAGE_VOLLEYS: int = 3
-const BARRAGE_BULLETS: int = 9
+const BARRAGE_BULLETS: int = 5
 const BARRAGE_FAN_DEG: float = 72.0
 const BARRAGE_GAP: float = 0.12
 
@@ -188,7 +188,7 @@ func _barrage() -> void:
 		await get_tree().create_timer(BARRAGE_GAP).timeout
 
 func _fire_volley(pitch: float = 1.0, bullets: int = BARRAGE_BULLETS) -> void:
-	var dmg: int = maxi(1, int((8.0 + 1.2 * float(Global.floor_num)) * _dmg_mult() * _mult("dmg_mult")))
+	var dmg: int = maxi(1, int((8.0 + 0.8 * float(Global.floor_num)) * _dmg_mult() * _mult("dmg_mult")))
 	var base: float = player.aim_dir.angle()
 	var fan: float = deg_to_rad(BARRAGE_FAN_DEG)
 	for i in bullets:
@@ -480,8 +480,8 @@ func _charge() -> void:
 
 const BLINK_MAX_DIST: float = 340.0
 const BLINK_RADIUS: float = 110.0
-const BLINK_DMG_BASE: float = 16.0
-const BLINK_DMG_PER_FLOOR: float = 1.6
+const BLINK_DMG_BASE: float = 34.0
+const BLINK_DMG_PER_FLOOR: float = 3.4
 const BLINK_KNOCK: float = 320.0
 const BLINK_COLOR: Color = Color(0.7, 0.55, 1.0)
 

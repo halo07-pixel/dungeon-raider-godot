@@ -14,7 +14,7 @@ const CRIT_MULT: float = 2.0
 const PELLET_HIT: float = 0.5 # shotgun: tỉ lệ đạn ghém trúng ở tầm trung
 const BOSS_FLOORS: Array = [1, 3, 4, 6, 7, 9, 10]
 # --- giả định cho Ultimate / Summoner / kỹ năng tiến hoá (đọc từ scripts/ultimate.gd, minion.gd, class_skill.gd; đổi ở đây nếu game đổi)
-const SUMMON_POWER: float = 1.3 # nội tại Pack Leader +30% sát thương lính
+const SUMMON_POWER: float = 1.2 # nội tại Pack Leader +20% sát thương lính
 const MINION_UPTIME: float = 0.85 # tỉ lệ thời gian đủ 2 lính (hồi 6s/1.25, sống 12s)
 const SUMMONER_CD: float = 1.25 # Summoner hồi kỹ năng nhanh hơn 25%
 const ULT_HORDE_POWER: float = 1.5
@@ -114,24 +114,24 @@ func _d(x: float, armor: float) -> float:
 
 ## DPS của 1 spirit (cận chiến) + 1 wisp (bắn). Sát thương gốc 8+0.9F, nhân dmg_k và power.
 func _minion_dps(floor_n: int, armor: float, power: float) -> float:
-	var base: float = (8.0 + 0.9 * float(floor_n)) * power
+	var base: float = (8.0 + 0.45 * float(floor_n)) * power
 	return _d(base * 1.0, armor) / 0.55 + _d(base * 0.8, armor) / 0.85
 
 ## Bonus DPS của kỹ năng tiến hoá. ab = "A" hoặc "B". Thay kỹ năng khởi đầu (trừ Summoner: cộng thêm lên lính).
 func evolved_bonus(cid: String, ab: String, wid: String, rarity: String, f: int, armor: float, acc: float) -> float:
 	var F: float = float(f)
 	match cid + ab:
-		"rangerA": return 27.0 * _d(8.0 + 1.2 * F, armor) / 7.0 * acc # Barrage 3x9 đạn
+		"rangerA": return 15.0 * _d(8.0 + 0.8 * F, armor) / 7.0 * acc # Barrage 3x5 đạn
 		"rangerB": return _d(42.0 + 4.2 * F, armor) / 8.0 * acc # Railshot
 		"brawlerA": return _d(30.0 + 3.0 * F, armor) / 9.0 * acc # Shockwave
 		"brawlerB": return _d(28.0 + 2.8 * F, armor) / 7.0 * acc # Charge
 		"mageA": return 3.0 * _d(26.0 + 2.5 * F, armor) / (10.0 / (1.0 + MAGE_HASTE)) * acc # Meteor Storm
-		"mageB": return _d(16.0 + 1.6 * F, armor) / (9.0 / (1.0 + MAGE_HASTE)) * acc # Blink Nova
+		"mageB": return _d(34.0 + 3.4 * F, armor) / (9.0 / (1.0 + MAGE_HASTE)) * acc # Blink Nova
 		"rogueA": # Shadow Rush: 3 đòn chắc chắn chí mạng x1.5 mỗi 8s (cộng thêm so với đòn thường)
 			var h: float = _hit(cid, G.weapons[wid], float(G.rarities[rarity]["mult"]), armor)
 			return 3.0 * h * (1.5 * CRIT_MULT - 1.0) / 8.0 * acc
 		"rogueB": return 8.0 * _d(5.0 + 0.5 * F, armor) / 10.0 * acc # Smoke Veil: 4s, GIẢ ĐỊNH 1 nhịp/0.5s
-		"summonerA": return 3.0 * _d((8.0 + 0.9 * F) * 0.7 * SUMMON_POWER, armor) / (12.0 / SUMMONER_CD) * acc # Legion: 3 Spiteling nổ mỗi 12s
+		"summonerA": return 3.0 * _d((8.0 + 0.45 * F) * 0.7 * SUMMON_POWER, armor) / (12.0 / SUMMONER_CD) * acc # Legion: 3 Spiteling nổ mỗi 12s
 		"summonerB": return _d(24.0 + 2.4 * F, armor) / (14.0 / SUMMONER_CD) * acc # Soul Detonation
 	return 0.0
 
@@ -141,13 +141,13 @@ func ult_per_cast(cid: String, f: int, armor: float, acc: float) -> float:
 	match cid:
 		"ranger": return 16.0 * 12.0 * BOSS_HIT[cid] * _d(floorf(6.0 + 0.8 * F), armor) # Bullet Storm
 		"brawler": return 3.0 * BOSS_HIT[cid] * _d(floorf(34.0 + 3.5 * F), armor) # Earthquake
-		"mage": return 12.0 * BOSS_HIT[cid] * _d(floorf(34.0 + 3.4 * F), armor) # Starfall
+		"mage": return 12.0 * BOSS_HIT[cid] * _d(floorf(46.0 + 4.2 * F), armor) # Starfall
 		"rogue": return 15.0 * BOSS_HIT[cid] * _d(floorf(floorf(11.0 + 1.2 * F) * 1.5), armor) # Blade Tempest
 		"summoner": return _minion_dps_horde(f, armor) * ULT_HORDE_LIFE * acc # Horde
 	return 0.0
 
 func _minion_dps_horde(f: int, armor: float) -> float:
-	var base: float = (8.0 + 0.9 * float(f)) * SUMMON_POWER * ULT_HORDE_POWER
+	var base: float = (8.0 + 0.45 * float(f)) * SUMMON_POWER * ULT_HORDE_POWER
 	return 3.0 * _d(base, armor) / 0.55 + 2.0 * _d(base * 0.8, armor) / 0.85 # 3 spirit + 2 wisp (guardian không gây sát thương)
 
 ## DPS trung bình của Ultimate = sát thương mỗi lần xả x tốc độ nạp (điểm/s) / 100.
