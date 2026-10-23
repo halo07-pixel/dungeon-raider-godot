@@ -52,45 +52,57 @@ Mỗi biến thể: vũ khí + kỹ năng (khởi đầu hoặc tiến hoá A/B)
 
 | Tầng | Biến thể | ranger | brawler | mage | rogue | summoner | lệch max |
 |---|---|---|---|---|---|---|---|
-| 1 | Khởi đầu+Ult | 106 | 103 | 82 | 108 | 101 | 26 |
-| 1 | A+Ult | 109 | 100 | 81 | 109 | 101 | 28 |
-| 1 | B+Ult | 95 | 108 | 77 | 112 | 108 | 35 |
-| 3 | Khởi đầu+Ult | 106 | 101 | 82 | 106 | 106 | 24 |
-| 3 | A+Ult | 113 | 97 | 81 | 105 | 104 | 32 |
-| 3 | B+Ult | 96 | 106 | 77 | 109 | 112 | 35 |
-| 4 | Khởi đầu+Ult | 108 | 98 | 80 | 106 | 108 | 28 |
-| 4 | A+Ult | 115 | 94 | 80 | 105 | 106 | 35 |
-| 4 | B+Ult | 98 | 103 | 75 | 109 | 115 | 40 |
-| 6 | Khởi đầu+Ult | 106 | 96 | 83 | 105 | 110 | 27 |
-| 6 | A+Ult | 119 | 91 | 80 | 102 | 107 | 39 |
-| 6 | B+Ult | 98 | 101 | 75 | 109 | 117 | 42 |
-| 7 | Khởi đầu+Ult | 107 | 97 | 78 | 106 | 113 | 35 |
-| 7 | A+Ult | 119 | 92 | 78 | 102 | 109 | 41 |
-| 7 | B+Ult | 98 | 101 | 72 | 110 | 119 | 47 |
-| 9 | Khởi đầu+Ult | 103 | 91 | 81 | 111 | 113 | 32 |
-| 9 | A+Ult | 118 | 87 | 79 | 106 | 109 | 39 |
-| 9 | B+Ult | 97 | 96 | 73 | 115 | 120 | 47 |
-| 10 | Khởi đầu+Ult | 98 | 96 | 81 | 106 | 119 | 38 |
-| 10 | A+Ult | 116 | 90 | 80 | 100 | 114 | 36 |
-| 10 | B+Ult | 93 | 100 | 73 | 109 | 125 | 52 |
+| 1 | Khởi đầu+Ult | 107 | 104 | 83 | 109 | 97 | 26 |
+| 1 | A+Ult | 110 | 101 | 82 | 110 | 97 | 28 |
+| 1 | B+Ult | 96 | 110 | 78 | 113 | 104 | 35 |
+| 3 | Khởi đầu+Ult | 107 | 103 | 83 | 107 | 100 | 24 |
+| 3 | A+Ult | 115 | 98 | 82 | 106 | 98 | 33 |
+| 3 | B+Ult | 97 | 108 | 78 | 111 | 106 | 33 |
+| 4 | Khởi đầu+Ult | 109 | 99 | 81 | 108 | 103 | 28 |
+| 4 | A+Ult | 116 | 95 | 81 | 106 | 101 | 35 |
+| 4 | B+Ult | 99 | 104 | 76 | 111 | 110 | 35 |
+| 6 | Khởi đầu+Ult | 108 | 97 | 84 | 107 | 105 | 24 |
+| 6 | A+Ult | 121 | 92 | 81 | 104 | 102 | 40 |
+| 6 | B+Ult | 99 | 102 | 76 | 110 | 112 | 36 |
+| 7 | Khởi đầu+Ult | 108 | 98 | 79 | 107 | 108 | 29 |
+| 7 | A+Ult | 120 | 93 | 79 | 103 | 104 | 41 |
+| 7 | B+Ult | 99 | 102 | 73 | 111 | 114 | 41 |
+| 9 | Khởi đầu+Ult | 105 | 93 | 82 | 113 | 108 | 31 |
+| 9 | A+Ult | 120 | 88 | 80 | 108 | 104 | 40 |
+| 9 | B+Ult | 98 | 97 | 74 | 116 | 115 | 42 |
+| 10 | Khởi đầu+Ult | 100 | 97 | 83 | 108 | 113 | 30 |
+| 10 | A+Ult | 118 | 92 | 81 | 102 | 108 | 37 |
+| 10 | B+Ult | 95 | 102 | 74 | 111 | 119 | 45 |
 
 - ranger Khởi đầu+Ult: vũ khí 25.0 + kỹ năng 8.3 + ult 5.5 = 38.8 dps
 - brawler Khởi đầu+Ult: vũ khí 30.0 + kỹ năng 2.4 + ult 2.7 = 35.0 dps
 - mage Khởi đầu+Ult: vũ khí 21.0 + kỹ năng 7.5 + ult 1.6 = 30.1 dps
 - rogue Khởi đầu+Ult: vũ khí 28.8 + kỹ năng 3.0 + ult 6.7 = 38.4 dps
-- summoner Khởi đầu+Ult: vũ khí 11.2 + kỹ năng 17.6 + ult 11.2 = 40.1 dps
+- summoner Khởi đầu+Ult: vũ khí 11.2 + kỹ năng 17.6 + ult 8.9 = 37.8 dps
 - ranger A+Ult: vũ khí 25.0 + kỹ năng 16.1 + ult 5.5 = 46.6 dps
 - brawler A+Ult: vũ khí 30.0 + kỹ năng 3.0 + ult 2.7 = 35.7 dps
 - mage A+Ult: vũ khí 21.0 + kỹ năng 8.7 + ult 1.6 = 31.3 dps
 - rogue A+Ult: vũ khí 28.8 + kỹ năng 4.5 + ult 6.7 = 39.9 dps
-- summoner A+Ult: vũ khí 11.2 + kỹ năng 19.2 + ult 11.2 = 41.7 dps
+- summoner A+Ult: vũ khí 11.2 + kỹ năng 19.2 + ult 8.9 = 39.4 dps
 - ranger B+Ult: vũ khí 25.0 + kỹ năng 4.7 + ult 5.5 = 35.2 dps
 - brawler B+Ult: vũ khí 30.0 + kỹ năng 3.6 + ult 2.7 = 36.3 dps
 - mage B+Ult: vũ khí 21.0 + kỹ năng 4.3 + ult 1.6 = 26.9 dps
 - rogue B+Ult: vũ khí 28.8 + kỹ năng 3.6 + ult 6.7 = 39.0 dps
-- summoner B+Ult: vũ khí 11.2 + kỹ năng 19.5 + ult 11.2 = 42.0 dps
+- summoner B+Ult: vũ khí 11.2 + kỹ năng 19.5 + ult 8.9 = 39.7 dps
 
-## 6. Ghi chú đọc số liệu
+## 6. Bầy quái (3 mục tiêu, giáp 0): vũ khí khởi đầu + kỹ năng khởi đầu + Ult, chỉ số trung bình = 100
+
+| Tầng | ranger | brawler | mage | rogue | summoner | lệch max |
+|---|---|---|---|---|---|---|
+| 1 | 106 | 90 | 114 | 86 | 103 | 28 |
+| 3 | 114 | 86 | 112 | 83 | 104 | 31 |
+| 4 | 118 | 85 | 110 | 82 | 106 | 36 |
+| 6 | 118 | 82 | 112 | 81 | 107 | 37 |
+| 7 | 122 | 80 | 110 | 79 | 108 | 43 |
+| 9 | 128 | 78 | 109 | 77 | 109 | 51 |
+| 10 | 130 | 76 | 109 | 76 | 109 | 54 |
+
+## 7. Ghi chú đọc số liệu
 - Giáp boss giảm theo phần trăm (K=30); đạn nhỏ (SMG, Flamethrower) bị phạt như mọi vũ khí nhưng làm tròn tối thiểu 1 sát thương/đòn.
 - Mục tiêu dự án: mọi class trong ±8% so với trung bình (cột lệch max ≤ 16). Class chênh quá ~25% so với trung bình ở nhiều tầng liên tiếp đáng cân nhắc chỉnh; dưới ~15% coi như cân bằng.
 - Giả định Ultimate/tiến hoá (đổi ở hằng số đầu file): nạp ult = min(6, đòn/s x 0.7) + 0.4 (hạ quái) + 0.6 (nhận 1% máu/s); tỉ lệ ult trúng boss BOSS_HIT (Bullet Storm 13%, Starfall 15%, Blade Tempest 70%, Earthquake 100%); Summoner tiến hoá cộng thêm lên lính; Smoke Veil 1 nhịp/0.5s; Shadow Rush ước lượng. Chưa kiểm chứng bằng chơi thật.

@@ -262,7 +262,7 @@ func _tick_blade_tempest(_delta: float) -> void:
 
 # ---------------------------------------------------------------- Summoner: Summon Horde
 const HORDE_KINDS: Array = ["spirit", "spirit", "spirit", "wisp", "wisp", "guardian"]
-const HORDE_POWER: float = 1.5
+const HORDE_POWER: float = 1.2
 
 func _start_horde() -> void:
 	active_left = 0.1
