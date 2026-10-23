@@ -45,5 +45,8 @@ Cuối mỗi lần làm: nói ngắn gọn đã đổi file nào, điều gì ch
 - Merge dùng `--no-ff`; push lớn: `git -c http.postBuffer=524288000 push`.
 - File `.uid` trùng y hệt gộp được; xung đột thật thì dừng và báo.
 
-## 6. Công cụ Ponytail (nếu đã cài plugin)
-`/ponytail-review` trước khi báo "đã push nhánh"; `/ponytail-audit` định kỳ cho cả repo; `/ponytail-debt` để xem các `# shortcut:`.
+## 6. Kỷ luật kiểu Ponytail (không cần cài plugin)
+Chủ dự án không dùng Claude Code cục bộ, nên agent tự làm theo `skills/*/SKILL.md` của repo `halo07-pixel/ponytail`:
+- **Review** (`ponytail-review`): trước khi báo "đã push nhánh", đọc cả code mà thay đổi chạm tới (không chỉ diff), tìm lỗi, bảo mật, chỗ gọi hàm bị vỡ.
+- **Audit** (`ponytail-audit`): định kỳ cho cả repo, xếp hạng điều cần sửa trước, lưu vào `docs/`.
+- **Nợ kỹ thuật** (`ponytail-debt`): gom mọi `# shortcut:` thành một bảng khi được hỏi.
