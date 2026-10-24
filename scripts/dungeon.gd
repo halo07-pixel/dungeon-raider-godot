@@ -744,11 +744,21 @@ func _on_affix_split(owner_enemy: Node, cell: Vector2i) -> void:
 	if not is_instance_valid(owner_enemy):
 		return
 	var r: Rect2 = _room_rect(cell, 3)
+	var spots: Array = []
 	for i in AffixScript.SPLIT_COUNT:
 		var off := Vector2.from_angle(TAU * float(i) / float(AffixScript.SPLIT_COUNT) + randf() * 0.6) * 26.0
 		var p: Vector2 = owner_enemy.global_position + off
-		p = Vector2(clampf(p.x, r.position.x, r.end.x), clampf(p.y, r.position.y, r.end.y))
-		var c = _spawn_enemy(owner_enemy.kind, p, cell, false, AffixScript.SPLIT_HP_FRACTION)
+		spots.append(Vector2(clampf(p.x, r.position.x, r.end.x), clampf(p.y, r.position.y, r.end.y)))
+	# Quái chết ngay trong callback vật lý (đòn trúng/khiên vỡ) nên không thêm node va chạm ngay được: hoãn tới cuối khung.
+	# Cộng bộ đếm NGAY để phòng chưa bị tính là đã dọn khi _on_enemy_died trừ con vừa chết.
+	alive_enemies += spots.size()
+	_spawn_split_children.call_deferred(String(owner_enemy.kind), spots, cell)
+
+
+func _spawn_split_children(kind: String, spots: Array, cell: Vector2i) -> void:
+	alive_enemies -= spots.size() # _spawn_enemy tự cộng lại từng con
+	for p in spots:
+		var c = _spawn_enemy(kind, p, cell, false, AffixScript.SPLIT_HP_FRACTION)
 		c.set_meta("split_child", true)
 
 

@@ -1,5 +1,5 @@
 extends SceneTree
-## take_damage có 3 chữ ký khác nhau (player 6 tham số, enemy 4, boss 3). Mọi kiểu gọi đang dùng trong code phải chạy được trên đúng loại mục tiêu.
+## take_damage có 3 chữ ký khác nhau (player 6 tham số, enemy 4, boss 4). Mọi kiểu gọi đang dùng trong code phải chạy được trên đúng loại mục tiêu.
 ## Lỗi thật từng xảy ra: thêm tham số `source` làm đạn của Player gọi enemy.take_damage với quá nhiều tham số -> hết gây sát thương.
 ## Chạy: godot --headless --path . -s tools/tests/take_damage_signature_test.gd
 var fails: int = 0
@@ -36,7 +36,7 @@ func _init() -> void:
 		e.queue_free()
 
 	# --- Boss: (amount) / (amount, from) / (amount, from, knock) ---
-	var shapes_boss: Array = [[10], [10, Vector2.ZERO], [10, Vector2.ZERO, 0.0]]
+	var shapes_boss: Array = [[10], [10, Vector2.ZERO], [10, Vector2.ZERO, 0.0], [10, Vector2.ZERO, 0.0, true]]
 	for i in shapes_boss.size():
 		var b = load("res://scenes/boss.tscn").instantiate()
 		b.setup(1.0, "warden")

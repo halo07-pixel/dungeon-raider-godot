@@ -42,6 +42,13 @@ var _slot: int = 0
 var src: String = ""
 var _target_cache: Node = null
 var _retarget: float = 0.0
+## Dây buộc: lính bị kẹt sau tường/cửa khóa phòng (tường chặn lính nhưng người chơi vào được) hoặc tụt quá xa thì dịch chuyển về cạnh chủ.
+const LEASH_HARD: float = 700.0     # xa hơn mức này: về ngay
+const LEASH_STUCK_DIST: float = 160.0
+const LEASH_STUCK_SECS: float = 1.0
+var _stuck_t: float = 0.0
+var _last_pos: Vector2 = Vector2.ZERO
+var _sample_t: float = 0.0
 
 ## Tạo lính tại `pos`. `power` = hệ số sát thương (mặc định 1). `life_mult` kéo dài/rút ngắn thời gian tồn tại.
 static func spawn(p_player: Node, p_kind: String, pos: Vector2, power: float = 1.0, life_mult: float = 1.0, slot: int = 0, p_src: String = "") -> Node:
@@ -82,6 +89,7 @@ func _physics_process(delta: float) -> void:
 	_hit_t = maxf(0.0, _hit_t - delta)
 	_retarget = maxf(0.0, _retarget - delta)
 	_think(delta)
+	_leash(delta)
 	queue_redraw()
 
 func _expire() -> void:
@@ -108,6 +116,44 @@ func _explode() -> void:
 	fx.global_position = global_position
 	Global.burst(global_position, cfg["color"], 14, 220.0, 1.6)
 	Global.sfx("shockwave", 1.4)
+
+func _leash(delta: float) -> void:
+	if bool(cfg.get("stationary", false)) or String(cfg["mode"]) == "orbit":
+		return
+	var dist: float = global_position.distance_to(owner_player.global_position)
+	if dist > LEASH_HARD:
+		recall()
+		return
+	_sample_t += delta
+	if _sample_t < 0.25:
+		return
+	# muốn đi (velocity != 0) mà gần như không nhích, lại ở xa chủ => kẹt
+	var moved: float = global_position.distance_to(_last_pos)
+	_last_pos = global_position
+	if dist > LEASH_STUCK_DIST and velocity.length() > 1.0 and moved < 3.0:
+		_stuck_t += _sample_t
+	else:
+		_stuck_t = 0.0
+	_sample_t = 0.0
+	if _stuck_t >= LEASH_STUCK_SECS:
+		recall()
+
+## Dịch chuyển về chỗ trống gần chủ (thử vài điểm quanh chủ, không có chỗ trống thì ngay trên chủ).
+func recall() -> void:
+	_stuck_t = 0.0
+	var base: Vector2 = owner_player.global_position
+	var dest: Vector2 = base
+	for r in [36.0, 56.0]:
+		for k in 8:
+			var cand: Vector2 = base + Vector2.from_angle(TAU * float(k) / 8.0) * r
+			if not test_move(Transform2D(0.0, cand), Vector2.ZERO):
+				dest = cand
+				break
+		if dest != base:
+			break
+	Global.burst(global_position, cfg["color"], 5, 80.0, 0.8)
+	global_position = dest
+	_last_pos = dest
 
 func _think(delta: float) -> void:
 	match String(cfg["mode"]):
