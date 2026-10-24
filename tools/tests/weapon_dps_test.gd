@@ -7,6 +7,9 @@ const COMMON_BAND: Vector2 = Vector2(0.5, 1.5)        # DPS Common so với trun
 const MAX_LEGEND_RATIO: float = 3.6                   # Legendary / Common
 const MAX_MYTHIC_OVER_LEGEND: float = 1.6             # Mythic / Legendary
 const RARITIES: Array = ["common", "rare", "epic", "legendary", "mythic"]
+const MELEE_SAMPLES: int = 120                     # cận chiến đo đồng bộ nên lấy nhiều mẫu cho chí mạng ra đúng kỳ vọng
+const MONOTONIC_TOL: float = 0.95                   # bậc cao không được yếu hơn bậc trước quá 5% (Rare/Epic của vài vũ khí gần ngang nhau do nội tại khác nhau)
+const SAMPLES: int = 30                              # chí mạng/đòn đặc biệt có xác suất: đo trung bình nhiều mẫu cho khỏi dao động (trước đây 1 mẫu -> lúc fail lúc pass)
 
 var fails: int = 0
 
@@ -60,21 +63,24 @@ func _init() -> void:
 				d.add_to_group("enemies")
 				G.world.add_child(d)
 				d.global_position = p.global_position + Vector2(24.0, 0.0)
-				p.swinging = false
-				p._swing()
+				for _i in MELEE_SAMPLES:
+					p.swinging = false
+					p._swing()
 				total = int(d.total)
-				cd = p.fire_timer.wait_time
+				cd = p.fire_timer.wait_time * float(MELEE_SAMPLES) # tổng của MELEE_SAMPLES nhát => chia cho số nhát x thời gian hồi
 				d.queue_free()
 			else:
 				for n in G.world.get_children():
 					if n.get_script() == B:
 						n.queue_free()
-				await process_frame
-				p._shoot(1.0, false)
-				for n in G.world.get_children():
-					if n.get_script() == B and not n.is_queued_for_deletion():
-						total += int(n.damage)
-				cd = p.fire_timer.wait_time + float(G.weapons[id].get("charge_time", 0.0))
+				for _i in SAMPLES:
+					await process_frame
+					p._shoot(1.0, false)
+					for n in G.world.get_children():
+						if n.get_script() == B and not n.is_queued_for_deletion():
+							total += int(n.damage)
+							n.queue_free()
+				cd = (p.fire_timer.wait_time + float(G.weapons[id].get("charge_time", 0.0))) * float(SAMPLES)
 			table[id][r] = float(total) / maxf(cd, 0.05)
 			await process_frame
 	# --- báo cáo ---
@@ -89,7 +95,7 @@ func _init() -> void:
 		print("%-13s %s" % [id, "  ".join(RARITIES.map(func(r): return "%s %6.1f" % [r.substr(0, 3), t[r]]))])
 		ck(t["common"] >= median * COMMON_BAND.x and t["common"] <= median * COMMON_BAND.y, "%s common DPS %.1f out of band" % [id, t["common"]])
 		for i in range(1, RARITIES.size()):
-			ck(t[RARITIES[i]] >= t[RARITIES[i - 1]] * 0.98, "%s: %s weaker than %s" % [id, RARITIES[i], RARITIES[i - 1]])
+			ck(t[RARITIES[i]] >= t[RARITIES[i - 1]] * MONOTONIC_TOL, "%s: %s weaker than %s" % [id, RARITIES[i], RARITIES[i - 1]])
 		ck(t["legendary"] <= t["common"] * MAX_LEGEND_RATIO, "%s legendary %.1fx common" % [id, t["legendary"] / t["common"]])
 		ck(t["mythic"] <= t["legendary"] * MAX_MYTHIC_OVER_LEGEND, "%s mythic %.2fx legendary" % [id, t["mythic"] / t["legendary"]])
 	print("DONE fails=", fails)

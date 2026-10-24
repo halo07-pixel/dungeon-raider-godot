@@ -1167,14 +1167,15 @@ func _physics_process(delta: float) -> void:
 
 
 # ------------------------------------------------------------------ Sát thương / chết
-func take_damage(amount: int, _from_pos: Vector2 = Vector2.ZERO, _knock: float = 0.0) -> void:
+## true_dmg: bỏ qua giáp (cùng chữ ký 4 tham số với Enemy.take_damage; Volatile/Aftershock gọi chung cho quái lẫn boss).
+func take_damage(amount: int, _from_pos: Vector2 = Vector2.ZERO, _knock: float = 0.0, true_dmg: bool = false) -> void:
 	if not alive or not active or rebirth_left > 0.0:
 		return
 
 	var cfg: Dictionary = BOSS_DATA[kind]
 	var max_phase: int = int(cfg["phases"])
-	var current_armor = armor
-	if phase >= max_phase:
+	var current_armor = 0.0 if true_dmg else armor
+	if phase >= max_phase and not true_dmg:
 		current_armor += 3.0
 
 	var actual_damage = Global.armored_damage(amount, current_armor)
