@@ -17,8 +17,6 @@ const LavaTileScript = preload("res://scripts/lava_tile.gd")
 const IceTileScript = preload("res://scripts/ice_tile.gd")
 ## Boss ở các tầng chia hết cho số này rơi thêm 1 vũ khí (tối thiểu Rare). Tầng 5, 10, 15...
 const BOSS_WEAPON_REWARD_EVERY: int = 5
-## Cứ mỗi N tầng, Boss rơi thêm 1 Tome (ngoài phòng kho báu).
-const BOSS_TOME_REWARD_EVERY: int = 3
 ## Cứ mỗi N tầng, Boss để lại 3 Sigil (chọn 1).
 const BOSS_SIGIL_REWARD_EVERY: int = 2
 const LordArenaRuneScript = preload("res://scripts/lord_arena_rune.gd")
@@ -460,8 +458,7 @@ func _enter_room(cell: Vector2i) -> void:
 			
 			_spawn_weapon_choice(room_center(cell) + Vector2(0.0, -24.0))
 			_spawn_chest_decor(room_center(cell) + Vector2(0.0, 10.0))
-			_spawn_tome_choice(room_center(cell) + Vector2(0.0, 80.0), 2)
-			Global.message.emit("Treasure Room! Choose 1 of 3 weapons, plus 1 of 2 Tomes", Color(1.0, 0.85, 0.3))
+			Global.message.emit("Treasure Room! Choose 1 of 3 weapons", Color(1.0, 0.85, 0.3))
 		"altar":
 			room["cleared"] = true
 			var altar = _spawn_prop("altar", room_center(cell), cell, {"variant": "gold" if randf() < EventRooms.ALTAR_GOLD_CHANCE else "blood"})
@@ -1034,7 +1031,7 @@ func _room_cleared(cell: Vector2i) -> void:
 		if Global.floor_num % BOSS_SIGIL_REWARD_EVERY == 0 and not Global.in_council:
 			_spawn_sigil_choice(room_center(cell) + Vector2(0.0, -96.0), 3)
 			Global.message.emit("The boss left a cache of Sigils! Choose 1", Color(0.5, 0.8, 1.0))
-		if Global.floor_num % BOSS_TOME_REWARD_EVERY == 0 and not Global.in_council:
+		if Global.BOSS_TOME_FLOORS.has(Global.floor_num) and not Global.in_council:
 			_spawn_tome_choice(room_center(cell) + Vector2(72.0, 0.0), 1)
 			Global.message.emit("The boss dropped a Tome!", Color(0.8, 0.6, 1.0))
 		if Global.floor_num == HELL_LAST_FLOOR and not Global.in_council:

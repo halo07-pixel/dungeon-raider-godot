@@ -330,6 +330,8 @@ const HP_SCALE_PER_FLOOR: float = 5 / 9.0
 ## K=30: giáp 10 (quái tầng 10) giảm 25%, giáp 19 (Dungeon Lord) giảm ~39%, mọi vũ khí như nhau.
 const ARMOR_K: float = 30.0
 const MELEE_LIFESTEAL_MULT: float = 0.5
+## Tome hiếm: chỉ rơi từ Boss ở các tầng này, đúng 1 cái mỗi lần (không còn trong phòng kho báu).
+const BOSS_TOME_FLOORS: Array = [6, 12]
 ## Trần hút máu: tổng hồi từ hút máu/Siphon tối đa % máu tối đa mỗi giây (thùng token, cho dồn tối đa LEECH_BURST_SECS giây); đánh boss chỉ hồi LEECH_BOSS_MULT.
 const LEECH_CAP_PCT_PER_SEC: float = 0.035
 const LEECH_BURST_SECS: float = 2.0
