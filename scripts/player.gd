@@ -547,7 +547,7 @@ func _on_dodge_finished() -> void:
 ## Hệ số sát thương cộng thêm từ buff dùng chung (Sức Mạnh / Đà Chiến Đấu / Cuồng Nộ) — cho các
 ## nguồn sát thương PHỤ (Lăn Chém, Sét Lan, Giáp Phản Chấn) để buff không bị bỏ qua.
 func _secondary_dmg_mult() -> float:
-	var m: float = 1.0 + 0.08 * float(Global.buff_stack("buff_dmg")) + 0.05 * float(Global.upgrades["mastery"]) # Weapon Mastery áp cả đòn phụ/kỹ năng
+	var m: float = 1.0 + Global.power_bonus() + 0.05 * float(Global.upgrades["mastery"]) # Weapon Mastery áp cả đòn phụ/kỹ năng
 	if Global.buff_stack("buff_momentum") > 0:
 		m += MOMENTUM_PER_STACK * float(momentum_stacks)
 	if Global.buff_stack("buff_berserk") > 0 and max_hp > 0:
@@ -596,7 +596,7 @@ func _charge_time_needed() -> float:
 	var t: float = float(weapon.get("charge_time", 0.5))
 	if weapon_id == "bow" and fx_rarity == "rare":
 		t *= BOW_RARE_DRAW_MULT
-	t *= pow(0.9, float(Global.buff_stack("buff_haste"))) * _rank_perk("cd_mult", 1.0) * float(aff["cd"])
+	t *= _perm_cd_mult()
 	if weapon_id == "bow":
 		t *= pow(QUICKDRAW_PER_STACK, float(Global.buff_stack("buff_quickdraw")))
 	t *= skill_attack_cd_mult
@@ -640,7 +640,7 @@ func _shoot(charge_ratio_arg: float = -1.0, perfect: bool = false) -> void:
 	# ÁP DỤNG KỸ NĂNG: Cộng % sát thương (mastery)
 	mult += Global.upgrades["mastery"] * 0.05
 	# ÁP DỤNG BUFF: Sức Mạnh / Đà Chiến Đấu / Cuồng Nộ
-	mult += 0.08 * float(Global.buff_stack("buff_dmg"))
+	mult += Global.power_bonus()
 	if Global.buff_stack("buff_momentum") > 0:
 		mult += MOMENTUM_PER_STACK * float(momentum_stacks)
 	if Global.buff_stack("buff_berserk") > 0 and max_hp > 0:
@@ -747,9 +747,8 @@ func _shoot(charge_ratio_arg: float = -1.0, perfect: bool = false) -> void:
 		speed *= 1.0 + (float(aff["reach"]) - 1.0) * 0.5
 
 	# ÁP DỤNG BUFF: Nhanh Nhẹn / Chí Mạng / Tầm Đánh (tầm xa = bay xa+nhanh hơn) / Vung Kiếm Càn Quét (tầm xa = xuyên)
-	cd *= pow(0.9, float(Global.buff_stack("buff_haste")))
-	cd *= skill_attack_cd_mult * _rank_perk("cd_mult", 1.0) * float(aff["cd"])
-	if randf() < 0.08 * float(Global.buff_stack("buff_crit")) + _rank_perk("crit_add", 0.0) + float(aff["crit"]) + _passive_crit():
+	cd *= skill_attack_cd_mult * _perm_cd_mult()
+	if randf() < _crit_total():
 		is_crit = true
 	if _take_skill_crit():
 		is_crit = true
@@ -921,7 +920,7 @@ func _swing() -> void:
 	# ÁP DỤNG KỸ NĂNG: Cộng % sát thương (mastery)
 	mult += Global.upgrades["mastery"] * 0.05
 	# ÁP DỤNG BUFF: Sức Mạnh / Đà Chiến Đấu / Cuồng Nộ
-	mult += 0.08 * float(Global.buff_stack("buff_dmg"))
+	mult += Global.power_bonus()
 	if Global.buff_stack("buff_momentum") > 0:
 		mult += MOMENTUM_PER_STACK * float(momentum_stacks)
 	if Global.buff_stack("buff_berserk") > 0 and max_hp > 0:
@@ -997,9 +996,8 @@ func _swing() -> void:
 			cd *= 1.0 - REAP_CD_PER_STACK * float(reap_stacks)
 
 	# ÁP DỤNG BUFF: Nhanh Nhẹn / Chí Mạng / Tầm Đánh / Vung Kiếm Càn Quét
-	cd *= pow(0.9, float(Global.buff_stack("buff_haste")))
-	cd *= skill_attack_cd_mult * _rank_perk("cd_mult", 1.0) * float(aff["cd"])
-	if randf() < 0.08 * float(Global.buff_stack("buff_crit")) + _rank_perk("crit_add", 0.0) + float(aff["crit"]) + _passive_crit():
+	cd *= skill_attack_cd_mult * _perm_cd_mult()
+	if randf() < _crit_total():
 		is_crit = true
 	if _take_skill_crit():
 		is_crit = true
@@ -1289,6 +1287,14 @@ func _passive_dmg_mult() -> float:
 		"brawler":
 			return 1.0 + PASSIVE_BRAWLER_MELEE_DMG if melee else 1.0
 	return 1.0
+
+## Hồi đòn vĩnh viễn (Haste x rank x affix), không dưới Global.CD_FLOOR; Overdrive/kỹ năng nhân thêm bên ngoài.
+func _perm_cd_mult() -> float:
+	return maxf(Global.CD_FLOOR, Global.haste_mult() * _rank_perk("cd_mult", 1.0) * float(aff["cd"]))
+
+## Tỉ lệ chí mạng: buff/rank/affix bị chặn ở Global.CRIT_CAP, nội tại Rogue cộng sau.
+func _crit_total() -> float:
+	return minf(Global.CRIT_CAP, 0.08 * float(Global.buff_stack("buff_crit")) + _rank_perk("crit_add", 0.0) + float(aff["crit"])) + _passive_crit()
 
 func _passive_crit() -> float:
 	return PASSIVE_ROGUE_CRIT if Global.current_class == "rogue" else 0.0
