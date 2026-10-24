@@ -226,16 +226,6 @@ func weapon_summary(w_id: String, rarity: String) -> String:
 	var kind: String = "melee" if bool(w.get("is_melee", false)) else "ranged"
 	return "%s · DMG %d · %.2fs" % [kind, int(float(w["damage"]) * mult), float(w["cooldown"])]
 
-## Như weapon_summary nhưng cho 1 cây cụ thể (tính cả cấp nâng + dòng phụ Heavy/Swift/Brutal).
-func weapon_instance_summary(inst: Dictionary) -> String:
-	if inst.is_empty():
-		return ""
-	var w: Dictionary = weapons[inst["id"]]
-	var mods: Dictionary = WeaponInstance.affix_mods(inst)
-	var mult: float = float(rarities[inst["rarity"]]["mult"]) * WeaponInstance.level_mult(int(inst["level"])) * float(mods["dmg"])
-	var kind: String = "melee" if bool(w.get("is_melee", false)) else "ranged"
-	return "%s · DMG %d · %.2fs" % [kind, int(float(w["damage"]) * mult), float(w["cooldown"]) * float(mods["cd"])]
-
 var classes: Dictionary = {
 	"ranger": {"name": "Ranger", "max_hp": 100, "default_weapon": "pistol", "skill": "overdrive", "ultimate": "bullet_storm", "passive": {"name": "Marksman", "desc": "Ranged weapons deal +12% damage."}},
 	"brawler": {"name": "Brawler", "max_hp": 200, "default_weapon": "broadsword", "skill": "slam", "ultimate": "earthquake", "passive": {"name": "Bulwark", "desc": "Melee weapons deal +12% damage and you take 8% less damage."}},

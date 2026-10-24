@@ -39,9 +39,6 @@ func _on_cooldown_timeout() -> void:
 	if _in_touch:
 		try_attack()
 
-func is_in_touch() -> bool:
-	return _in_touch
-
 ## Gọi khi vào tầm (va chạm), khi hồi chiêu xong mà vẫn còn trong tầm, hoặc khi quái
 ## vừa spawn xong (_owner2d.active chuyển true) mà người chơi đã đứng sẵn trong tầm.
 func try_attack() -> void:

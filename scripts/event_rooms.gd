@@ -110,14 +110,3 @@ static func roll_from_ids(ids: Array, n: int) -> Array:
 	cands.shuffle()
 	return cands.slice(0, n)
 
-## Buff Epic ngẫu nhiên hợp với vũ khí đang cầm, chưa đạt trần stack ("" nếu hết).
-static func roll_epic_buff() -> String:
-	var wclass: String = Global.player_weapon_class()
-	var cands: Array = []
-	for id in Global.buff_pool:
-		var info: Dictionary = Global.buff_pool[id]
-		var bclass: String = String(info.get("class", "any"))
-		if info["tier"] == "epic" and (bclass == "any" or bclass == wclass) \
-				and Global.buff_stack(id) < int(Global.BUFF_MAX_STACK.get(id, 1)):
-			cands.append(id)
-	return String(cands.pick_random()) if not cands.is_empty() else ""

@@ -110,9 +110,6 @@ static func decode(code: String) -> Dictionary:
 		"affixes": affs,
 	})
 
-static func is_mythic(inst: Dictionary) -> bool:
-	return String(inst.get("rarity", "")) == "mythic"
-
 static func level_mult(level: int) -> float:
 	return 1.0 + LEVEL_DMG * float(clampi(level, 0, MAX_LEVEL))
 
@@ -151,10 +148,3 @@ static func affix_lines(inst: Dictionary) -> Array:
 
 static func mythic_trait(id: String) -> Dictionary:
 	return MYTHIC_TRAITS.get(id, {})
-
-## Giá trị "tổng điểm" thô để so sánh nhanh 2 cây (dùng cho gợi ý/forge): hệ số độ hiếm * cấp * số dòng phụ.
-static func power_score(inst: Dictionary) -> float:
-	if inst.is_empty():
-		return 0.0
-	var r: float = float(Global.rarities[inst["rarity"]]["mult"])
-	return r * level_mult(int(inst.get("level", 0))) * (1.0 + 0.05 * float(inst.get("affixes", []).size()))
