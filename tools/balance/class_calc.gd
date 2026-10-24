@@ -17,12 +17,14 @@ const BOSS_FLOORS: Array = [1, 3, 4, 6, 7, 9, 10]
 const SUMMON_POWER: float = 1.2 # nội tại Pack Leader +20% sát thương lính
 const MINION_UPTIME: float = 0.85 # tỉ lệ thời gian đủ 2 lính (hồi 6s/1.25, sống 12s)
 const SUMMONER_CD: float = 1.25 # Summoner hồi kỹ năng nhanh hơn 25%
-const ULT_HORDE_POWER: float = 1.5
+const ULT_HORDE_POWER: float = 1.2
 const ULT_HORDE_LIFE: float = 12.0 * 0.85
 const ULT_TAKEN_PCT_PER_SEC: float = 1.0 # GIẢ ĐỊNH: % máu tối đa mất mỗi giây khi đánh boss (nạp 0.6 điểm mỗi 1%)
 const ULT_KILL_PTS_PER_SEC: float = 0.4 # GIẢ ĐỊNH: ~0.2 quái/s x 2 điểm (lính nhỏ trong trận boss)
 const ULT_HIT_CHARGE: float = 0.7
 const ULT_HIT_BUDGET: float = 6.0
+# GIẢ ĐỊNH bầy quái: bầy 3 mục tiêu đứng gần nhau, giáp 0. Hệ số nhân [vũ khí, kỹ năng, ult] = số mục tiêu trung bình bị trúng.
+const SWARM: Dictionary = {"ranger": [1.0, 1.0, 3.0], "brawler": [1.5, 3.0, 3.0], "mage": [2.0, 3.0, 3.0], "rogue": [1.3, 1.5, 3.0], "summoner": [1.0, 2.0, 3.0]}
 const BOSS_HIT: Dictionary = {"ranger": 0.13, "brawler": 1.0, "mage": 0.15, "rogue": 0.7} # GIẢ ĐỊNH: tỉ lệ xung/đạn ult trúng boss
 
 var G
@@ -255,7 +257,24 @@ func _main() -> void:
 	for line in det:
 		_p(line)
 	_p("")
-	_p("## 6. Ghi chú đọc số liệu")
+	_p("## 6. Bầy quái (3 mục tiêu, giáp 0): vũ khí khởi đầu + kỹ năng khởi đầu + Ult, chỉ số trung bình = 100")
+	_p("")
+	_p("| Tầng | " + " | ".join(PackedStringArray(cls)) + " | lệch max |")
+	_p("|---|" + "---|".repeat(cls.size()) + "---|")
+	for f in BOSS_FLOORS:
+		var sv: Array = []
+		for c in cls:
+			var wid3: String = String(G.classes[c]["default_weapon"])
+			var m: Array = SWARM[c]
+			var ult3: float = ult_dps(c, wid3, f, 0.0, acc)
+			if c != "summoner": # ult bầy: nhân số mục tiêu trên cơ sở sát thương mỗi mục tiêu (tỉ lệ trúng boss thay bằng 1 phần)
+				ult3 = ult3 / float(BOSS_HIT[c]) * 0.4 # GIẢ ĐỊNH: mỗi mục tiêu nhận ~40% số xung
+			sv.append(weapon_dps(c, wid3, rarity, 0.0, acc) * float(m[0]) + float(skill_bonus(c, wid3, rarity, f, 0.0, acc)["extra"]) * float(m[1]) + ult3 * float(m[2]))
+		var mean3: float = sv.reduce(func(a, b): return a + b) / sv.size()
+		var ix: Array = sv.map(func(v): return int(round(v / mean3 * 100.0)))
+		_p("| %d | %s | %d |" % [f, " | ".join(PackedStringArray(ix.map(func(v): return str(v)))), int(ix.max()) - int(ix.min())])
+	_p("")
+	_p("## 7. Ghi chú đọc số liệu")
 	_p("- Giáp boss giảm theo phần trăm (K=%.0f); đạn nhỏ (SMG, Flamethrower) bị phạt như mọi vũ khí nhưng làm tròn tối thiểu 1 sát thương/đòn." % G.ARMOR_K)
 	_p("- Mục tiêu dự án: mọi class trong ±8% so với trung bình (cột lệch max ≤ 16). Class chênh quá ~25% so với trung bình ở nhiều tầng liên tiếp đáng cân nhắc chỉnh; dưới ~15% coi như cân bằng.")
 	_p("- Giả định Ultimate/tiến hoá (đổi ở hằng số đầu file): nạp ult = min(6, đòn/s x 0.7) + 0.4 (hạ quái) + 0.6 (nhận 1% máu/s); tỉ lệ ult trúng boss BOSS_HIT (Bullet Storm 13%, Starfall 15%, Blade Tempest 70%, Earthquake 100%); Summoner tiến hoá cộng thêm lên lính; Smoke Veil 1 nhịp/0.5s; Shadow Rush ước lượng. Chưa kiểm chứng bằng chơi thật.\n- Chưa tính: sát thương diện rộng (Arcane Staff nổ, Flamethrower/Scythe xuyên nhiều quái — lợi thế của mage trong bầy quái bị đánh giá thấp ở bảng boss), buff (Power/Crit/Berserk/...), rank vũ khí, trạng thái (cháy/độc/chảy máu), mastery, né/di chuyển, mô hình lượng sát thương nhận.")
