@@ -4,6 +4,7 @@ const HEAL_PCT: float = 0.22
 ## VŨ KHÍ thì KHÔNG tự nhặt: đứng gần và bấm "interact" (E). Còn ô trống thì vào ô trống, đủ ô thì đổi với
 ## vũ khí đang cầm và vũ khí cũ được thả xuống chỗ này (qua Global.weapon_drop_requested).
 const WeaponInstance = preload("res://scripts/weapon_instance.gd")
+const Art = preload("res://scripts/art.gd")
 
 const WeaponInfo = preload("res://scripts/weapon_info.gd")
 ## Tome: pickup "tome" (extra = id Tome) cũng nhặt bằng E; đã có Tome thì đổi, Tome cũ rơi xuống chỗ này.
@@ -312,8 +313,12 @@ func _draw() -> void:
 			var sc: Color = SigilsScript.RARITY_COLOR.get(String(sg.get("rarity", "common")), Color.WHITE)
 			var cy: float = bob
 			draw_circle(Vector2(0.0, cy), 15.0, Color(0.06, 0.06, 0.1))
-			draw_colored_polygon(PackedVector2Array([Vector2(0, cy - 11), Vector2(9, cy), Vector2(0, cy + 11), Vector2(-9, cy)]), sc)
-			draw_colored_polygon(PackedVector2Array([Vector2(0, cy - 5), Vector2(4, cy), Vector2(0, cy + 5), Vector2(-4, cy)]), Color(0.06, 0.06, 0.1))
+			var stex: Texture2D = Art.frame("sigil_anim", 2, _t, 2.5)
+			if stex != null:
+				draw_arc(Vector2(0.0, cy), 15.0, 0.0, TAU, 24, Color(sc, 0.8), 2.0)
+				draw_texture_rect(stex, Rect2(Vector2(-16.0, cy - 16.0), Vector2(32.0, 32.0)), false, sc)
+			else:
+				draw_colored_polygon(PackedVector2Array([Vector2(0, cy - 11), Vector2(9, cy), Vector2(0, cy + 11), Vector2(-9, cy)]), sc)
 			draw_string(ThemeDB.fallback_font, Vector2(-100.0, cy - 24.0), String(sg.get("name", "Sigil")), HORIZONTAL_ALIGNMENT_CENTER, 200.0, 14, sc)
 			if _near:
 				var sl: Array = _wrap("%s (%s)  %s" % [String(sg.get("name", "")), SigilsScript.RARITY_NAME.get(String(sg.get("rarity", "common")), ""), String(sg.get("desc", ""))], CARD_WRAP_CHARS)
@@ -330,8 +335,11 @@ func _draw() -> void:
 			var tc := Color(0.75, 0.55, 1.0)
 			draw_circle(Vector2(0.0, bob), 15.0, Color(0.1, 0.07, 0.18))
 			draw_arc(Vector2(0.0, bob), 15.0, 0.0, TAU, 24, tc, 3.0)
-			draw_rect(Rect2(Vector2(-7.0, bob - 8.0), Vector2(14.0, 16.0)), Color(0.45, 0.25, 0.7))
-			draw_rect(Rect2(Vector2(-7.0, bob - 8.0), Vector2(3.0, 16.0)), Color(0.8, 0.65, 1.0))
+			var ttex: Texture2D = Art.frame("tome_anim", 2, _t, 2.5)
+			if ttex != null:
+				draw_texture_rect(ttex, Rect2(Vector2(-16.0, bob - 16.0), Vector2(32.0, 32.0)), false)
+			else:
+				draw_rect(Rect2(Vector2(-7.0, bob - 8.0), Vector2(14.0, 16.0)), Color(0.45, 0.25, 0.7))
 			draw_string(ThemeDB.fallback_font, Vector2(-100.0, bob - 24.0), String(info.get("name", "Tome")) + " (Tome)", HORIZONTAL_ALIGNMENT_CENTER, 200.0, 14, tc)
 			if _near:
 				var lines: Array = _wrap("%s  |  cooldown %ds" % [String(info.get("desc", "")), int(float(info.get("cooldown", 0.0)))], CARD_WRAP_CHARS)
@@ -345,13 +353,21 @@ func _draw() -> void:
 				draw_string(ThemeDB.fallback_font, Vector2(-134.0, -52.0), "[E] take  (use with %s)" % Global.key_name_for_action("tome"), HORIZONTAL_ALIGNMENT_LEFT, 270.0, 11, Color(1.0, 0.9, 0.5))
 		"portal":
 			var pulse: float = 1.0 + 0.1 * sin(_t * 4.0)
-			draw_circle(Vector2.ZERO, 28.0 * pulse, Color(0.3, 0.2, 0.9, 0.35))
-			draw_circle(Vector2.ZERO, 18.0 * pulse, Color(0.5, 0.4, 1.0, 0.6))
-			draw_circle(Vector2.ZERO, 8.0, Color.WHITE)
+			draw_circle(Vector2.ZERO, 34.0 * pulse, Color(0.3, 0.2, 0.9, 0.18))
+			var ptex: Texture2D = Art.frame("portal_anim", 6, _t, 9.0)
+			if ptex != null:
+				draw_texture_rect(ptex, Rect2(Vector2(-28.0, -28.0), Vector2(56.0, 56.0)), false)
+			else:
+				draw_circle(Vector2.ZERO, 28.0 * pulse, Color(0.3, 0.2, 0.9, 0.35))
+				draw_circle(Vector2.ZERO, 8.0, Color.WHITE)
 			draw_string(ThemeDB.fallback_font, Vector2(-60.0, -38.0), "GO DOWN", HORIZONTAL_ALIGNMENT_CENTER, 120.0, 14, Color.WHITE)
 		"council_portal":
 			var pulse2: float = 1.0 + 0.12 * sin(_t * 5.0)
-			draw_circle(Vector2.ZERO, 30.0 * pulse2, Color(0.9, 0.1, 0.15, 0.35))
-			draw_circle(Vector2.ZERO, 19.0 * pulse2, Color(1.0, 0.3, 0.2, 0.6))
-			draw_circle(Vector2.ZERO, 8.0, Color(1.0, 0.9, 0.7))
+			draw_circle(Vector2.ZERO, 36.0 * pulse2, Color(0.9, 0.1, 0.15, 0.2))
+			var ctex: Texture2D = Art.frame("council_portal_anim", 6, _t, 11.0)
+			if ctex != null:
+				draw_texture_rect(ctex, Rect2(Vector2(-30.0, -30.0), Vector2(60.0, 60.0)), false)
+			else:
+				draw_circle(Vector2.ZERO, 30.0 * pulse2, Color(0.9, 0.1, 0.15, 0.35))
+				draw_circle(Vector2.ZERO, 8.0, Color(1.0, 0.9, 0.7))
 			draw_string(ThemeDB.fallback_font, Vector2(-70.0, -40.0), "THE COUNCIL", HORIZONTAL_ALIGNMENT_CENTER, 140.0, 14, Color(1.0, 0.5, 0.4))

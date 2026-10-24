@@ -5,6 +5,7 @@ extends CharacterBody2D
 ## Tách bạch: vật lý/di chuyển ở _physics_process, vẽ ở _draw, tín hiệu `expired` cho UI/âm thanh/hiệu ứng khi hết hạn.
 
 const BULLET = preload("res://scenes/bullet.tscn")
+const Art = preload("res://scripts/art.gd")
 
 signal expired(kind: String, pos: Vector2)
 
@@ -42,6 +43,7 @@ var _slot: int = 0
 var src: String = ""
 var _target_cache: Node = null
 var _retarget: float = 0.0
+var _face: float = 1.0 # 1 = nhìn phải, -1 = nhìn trái (lật sprite)
 ## Dây buộc: lính bị kẹt sau tường/cửa khóa phòng (tường chặn lính nhưng người chơi vào được) hoặc tụt quá xa thì dịch chuyển về cạnh chủ.
 const LEASH_HARD: float = 700.0     # xa hơn mức này: về ngay
 const LEASH_STUCK_DIST: float = 160.0
@@ -280,25 +282,41 @@ func _draw() -> void:
 	var size: float = float(cfg["size"])
 	if life < WARN_SECONDS and int(_t * 8.0) % 2 == 0:
 		col = Color(col, 0.35)
+	var tex: Texture2D = Art.frame("minion_%s" % kind, 2, _t, 4.0) # sprite xám-trắng, nhân màu theo loại
+	var half: float = size * 1.8
 	match String(cfg["mode"]):
 		"orbit":
 			var n: int = int(cfg["count"])
 			for i in n:
-				var p: Vector2 = Vector2.from_angle(_spin + TAU * float(i) / float(n)) * float(cfg["orbit"])
-				draw_circle(p, size, Color(col, 0.35))
-				draw_circle(p, size * 0.55, col)
+				var ang: float = _spin + TAU * float(i) / float(n)
+				var p: Vector2 = Vector2.from_angle(ang) * float(cfg["orbit"])
+				if tex != null:
+					draw_set_transform(p, ang + PI * 0.5, Vector2.ONE) # mũi lưỡi hướng ra ngoài
+					draw_texture_rect(tex, Rect2(Vector2(-half, -half), Vector2(half, half) * 2.0), false, col)
+					draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+				else:
+					draw_circle(p, size, Color(col, 0.35))
+					draw_circle(p, size * 0.55, col)
 			draw_arc(Vector2.ZERO, float(cfg["orbit"]), 0.0, TAU, 40, Color(col, 0.15), 1.5)
 		"guard":
 			draw_arc(Vector2.ZERO, float(cfg["block_radius"]), 0.0, TAU, 40, Color(col, 0.55), 2.0)
 			draw_circle(Vector2.ZERO, float(cfg["block_radius"]), Color(col, 0.08))
-			draw_circle(Vector2.ZERO, size, col)
+			_draw_body(tex, Vector2.ZERO, half, col, size)
 		"totem":
 			draw_arc(Vector2.ZERO, float(cfg["radius"]), 0.0, TAU, 40, Color(col, 0.25), 1.5)
-			draw_rect(Rect2(Vector2(-size * 0.5, -size), Vector2(size, size * 1.8)), col)
-			draw_circle(Vector2(0.0, -size), size * 0.6, Color(1, 1, 1, 0.8))
+			_draw_body(tex, Vector2(0.0, -size * 0.3), half, col, size)
 		_:
-			var bob: float = sin(_t * 7.0) * 2.0
+			var bob: float = 0.0 if bool(cfg.get("stationary", false)) else sin(_t * 7.0) * 2.0
 			draw_circle(Vector2(0.0, bob), size + 3.0, Color(col, 0.25))
-			draw_circle(Vector2(0.0, bob), size, col)
-			draw_circle(Vector2(-3.0, bob - 2.0), 1.8, Color(0.05, 0.05, 0.1))
-			draw_circle(Vector2(3.0, bob - 2.0), 1.8, Color(0.05, 0.05, 0.1))
+			_draw_body(tex, Vector2(0.0, bob), half, col, size)
+
+## Thân lính: sprite (lật theo hướng đi) hoặc hình tròn cũ nếu thiếu sprite.
+func _draw_body(tex: Texture2D, c: Vector2, half: float, col: Color, size: float) -> void:
+	if tex == null:
+		draw_circle(c, size, col)
+		return
+	if absf(velocity.x) > 5.0:
+		_face = -1.0 if velocity.x < 0.0 else 1.0
+	draw_set_transform(c, 0.0, Vector2(_face, 1.0))
+	draw_texture_rect(tex, Rect2(Vector2(-half, -half), Vector2(half, half) * 2.0), false, col)
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
