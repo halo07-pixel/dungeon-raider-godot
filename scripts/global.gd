@@ -801,6 +801,24 @@ func player_weapon_class() -> String:
 func buff_stack(id: String) -> int:
 	return int(run_buffs.get(id, 0))
 
+## Chống lạm phát: từ lớp thứ 3 mỗi lớp Power/Haste chỉ còn 60% hiệu lực; hồi đòn vĩnh viễn không dưới CD_FLOOR; chí mạng từ buff/affix/rank không quá CRIT_CAP.
+const STACK_DIMINISH_FROM: int = 2
+const STACK_DIMINISH: float = 0.6
+const CD_FLOOR: float = 0.65
+const CRIT_CAP: float = 0.55
+
+func _stack_weight(n: int) -> float: # tổng hiệu lực của n lớp (2 lớp đầu = 1, sau đó 0.6)
+	return float(mini(n, STACK_DIMINISH_FROM)) + STACK_DIMINISH * float(maxi(0, n - STACK_DIMINISH_FROM))
+
+func power_bonus() -> float: # phần cộng sát thương từ buff Power
+	return 0.08 * _stack_weight(buff_stack("buff_dmg"))
+
+func haste_mult() -> float: # hệ số hồi đòn từ buff Haste
+	var m: float = 1.0
+	for i in buff_stack("buff_haste"):
+		m *= 1.0 - 0.1 * (1.0 if i < STACK_DIMINISH_FROM else STACK_DIMINISH)
+	return m
+
 ## Trọng số được nới lại (trước: 60/32/8) sau khi đổi sang chỉ 1 lượt chọn buff/tầng
 ## (thay vì mỗi phòng) — ít lượt hơn nên cần tỉ lệ Rare/Epic cao hơn để vẫn đa dạng.
 func _buff_tier_weight(tier: String) -> float:

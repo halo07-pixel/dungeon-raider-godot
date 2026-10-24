@@ -102,13 +102,16 @@ func build(profile: String, F: int, melee: bool) -> Dictionary:
 ## Hệ số nhân sát thương trung bình (so với vũ khí common +0, không buff) của một build lên 1 mục tiêu.
 func dmg_mult(b: Dictionary, melee: bool, class_crit: float) -> Dictionary:
 	var rm: float = float(G.rarities[String(b["rarity"])]["mult"])
-	var add: float = rm + 0.05 * float(b["mastery"]) + 0.08 * float(b["dmg"])
+	var add: float = rm + 0.05 * float(b["mastery"]) + 0.08 * float(G._stack_weight(int(b["dmg"])))
 	add += float(_c(P, "MOMENTUM_PER_STACK", 0.05)) * 5.0 * 0.6 * float(b["momentum"]) # trung bình 60% số stack tối đa
 	add += 0.4 * 0.5 * float(b["berserk"])  # trung bình máu 50%
 	add += 0.2 * 0.5 * float(b["focus"])    # đứng yên ~50% thời gian
 	var level: float = 1.0 + float(_c(WI, "LEVEL_DMG", 0.08)) * float(b["level"])
-	var cd: float = pow(0.9, float(b["haste"])) * float(b["aff_cd"])
-	var crit_c: float = clampf(0.08 * float(b["crit"]) + float(b["aff_crit"]) + class_crit, 0.0, 1.0)
+	var hm: float = 1.0
+	for i in int(b["haste"]): # Haste giảm dần như Global.haste_mult()
+		hm *= 1.0 - 0.1 * (1.0 if i < int(G.STACK_DIMINISH_FROM) else float(G.STACK_DIMINISH))
+	var cd: float = maxf(float(G.CD_FLOOR), hm * float(b["aff_cd"]))
+	var crit_c: float = clampf(minf(float(G.CRIT_CAP), 0.08 * float(b["crit"]) + float(b["aff_crit"])) + class_crit, 0.0, 1.0)
 	var crit_f: float = 1.0 + crit_c # đòn chí mạng x2
 	var dmg: float = add * level * float(b["aff_dmg"]) * (1.0 + float(b["tree_power"]) * 0.0) # cây kỹ năng chỉ tác động kỹ năng, không tính vào sát thương vũ khí
 	var speed: float = 1.0 / cd
