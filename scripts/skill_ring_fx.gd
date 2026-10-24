@@ -23,3 +23,7 @@ func _draw() -> void:
 	draw_circle(Vector2.ZERO, r, Color(color, 0.10 * a))
 	draw_arc(Vector2.ZERO, r, 0.0, TAU, 64, Color(color, 0.35 * a), 10.0)
 	draw_arc(Vector2.ZERO, r, 0.0, TAU, 64, Color(1.0, 1.0, 1.0, 0.9 * a), 3.0)
+	draw_arc(Vector2.ZERO, r * 0.82, 0.0, TAU, 64, Color(color, 0.22 * a), 4.0) # vòng trong mờ đuổi theo
+	for i in 12: # hạt sáng chạy dọc mép sóng
+		var p: Vector2 = Vector2.from_angle(TAU * float(i) / 12.0 + k * 1.6) * r
+		draw_rect(Rect2(p - Vector2(2, 2), Vector2(4, 4)), Color(1.0, 1.0, 1.0, 0.85 * a))

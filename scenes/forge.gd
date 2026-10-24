@@ -3,6 +3,7 @@ extends Area2D
 ## và phân rã bằng Phế Liệu, ghép 2 cây cùng loại/độ hiếm lên bậc kế. Luật nằm ở scripts/forge_logic.gd; file này chỉ lo giao diện.
 const WeaponInstance = preload("res://scripts/weapon_instance.gd")
 const ForgeLogic = preload("res://scripts/forge_logic.gd")
+const Art = preload("res://scripts/art.gd")
 
 const INTERACT_RADIUS: float = 80.0
 
@@ -41,14 +42,19 @@ func _process(delta: float) -> void:
 	_t += delta
 	queue_redraw()
 
-## Đe + lửa lò vẽ bằng code (chưa có asset riêng).
+## Đe + lò rèn: sprite 32x24 có 4 khung (tools/gen_art_pass.py), phóng 2x; ánh lửa vẽ thêm bằng code.
+const SPRITE_SCALE: float = 2.0
 func _draw() -> void:
-	draw_rect(Rect2(-20, 2, 40, 10), Color(0.25, 0.25, 0.3))
-	draw_rect(Rect2(-26, -10, 52, 12), Color(0.38, 0.38, 0.45))
-	draw_rect(Rect2(-14, -16, 28, 6), Color(0.45, 0.45, 0.52))
 	var flick: float = 0.5 + 0.5 * sin(_t * 9.0)
-	draw_circle(Vector2(30, -2), 7.0 + 2.0 * flick, Color(1.0, 0.5, 0.1, 0.8))
-	draw_circle(Vector2(30, -2), 3.5, Color(1.0, 0.85, 0.3))
+	draw_set_transform(Vector2(0, 14), 0.0, Vector2(1.0, 0.3))
+	draw_circle(Vector2.ZERO, 34.0, Color(0, 0, 0, 0.3))
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+	draw_circle(Vector2(12, 0), 34.0 + 5.0 * flick, Color(1.0, 0.45, 0.1, 0.07 + 0.04 * flick)) # ánh lò
+	var tex: Texture2D = Art.frame("forge_anim", 4, _t, 6.0)
+	if tex == null:
+		return
+	var sz: Vector2 = tex.get_size() * SPRITE_SCALE
+	draw_texture_rect(tex, Rect2(Vector2(-sz.x * 0.5, 14.0 - sz.y), sz), false)
 
 func _on_body_entered(body: Node2D) -> void:
 	if body.name.to_lower() == "player":
