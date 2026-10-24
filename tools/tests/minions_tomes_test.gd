@@ -275,5 +275,9 @@ func _init() -> void:
 		ck(offered.size() == 2 and not offered.has("black_hole"), "tome choice: 2 offered, none is held: %s" % str(offered))
 	else:
 		print("NOTE: dungeon node not found, skipped choice test")
+	# ---- Tome hiếm: chỉ boss tầng 6 và 12 ----
+	ck(G.BOSS_TOME_FLOORS == [6, 12], "tome drops only from bosses on floors 6 and 12")
+	var tdun = main.get_node_or_null("Dungeon")
+	ck(tdun == null or not (tdun.get_script().source_code.contains("_spawn_tome_choice(room_center(cell) + Vector2(0.0, 80.0)")), "treasure room no longer offers tomes")
 	print("minions_tomes_test: ", "PASS" if fails == 0 else "FAIL (%d)" % fails)
 	quit(1 if fails > 0 else 0)

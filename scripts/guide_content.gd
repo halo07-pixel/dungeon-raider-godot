@@ -129,7 +129,7 @@ static func classes() -> String:
 	t += "[b]Skill Power[/b] raises your skill's damage and effects; [b]Skill Haste[/b] shortens its cooldown. Both come from the Skill buffs "
 	t += "(Arcana, Quick Cast, Surge, Overflow, Echo, Spellburst, Overload) and from some passives, so you can build around your skill instead of your weapon.\n"
 	t += _sub("Tomes (second skill)")
-	t += "A Tome is an extra skill that any class can use, on %s. You carry one. Find them in Treasure Rooms (pick 1 of 2) and as a drop from the boss every 3rd floor. " % _key("tome")
+	t += "A Tome is an extra skill that any class can use, on %s. You carry one. They are rare: the boss on floors %s each drops exactly one. " % [_key("tome"), ", ".join(Global.BOSS_TOME_FLOORS.map(func(f): return str(f)))]
 	t += "Take another and your old Tome drops on the floor; the new one starts on cooldown. Skill Power and Skill Haste apply to Tomes too.\n"
 	for tid in TomeSkillScript.ORDER:
 		var tc: Dictionary = TomeSkillScript.TOMES[tid]
@@ -197,6 +197,7 @@ static func weapons() -> String:
 			line += ", %s lifesteal" % _pct(float(r["lifesteal"]))
 		t += line + "\n"
 	t += "Melee weapons get only %s of the lifesteal (and half again against bosses).\n" % _pct(Global.MELEE_LIFESTEAL_MULT)
+	t += "Lifesteal healing is capped at %s of your max HP per second, so it cannot make you immortal.\n" % _pct(Global.LEECH_CAP_PCT_PER_SEC)
 	t += "Epic and Legendary weapons also gain a special effect. Mythic weapons keep the Legendary effect AND add a unique Mythic trait, but only start dropping from floor %d on.\n" % Global.MYTHIC_MIN_FLOOR
 	t += "Where weapons come from: dead-end Treasure Rooms show 3 different weapons and you may take ONE (the other two vanish; the first is at least Rare). Bosses on floors 5, 10 and 15 drop a Rare+ weapon. Bad luck protection: after %d weapon drops without an Epic or better, the next one is at least Epic; after %d without a Legendary, the next is at least Legendary.\n" % [Global.PITY_EPIC, Global.PITY_LEGENDARY]
 	t += _sub("The Forge")
