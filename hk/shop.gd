@@ -6,6 +6,7 @@ var _view: Control
 var _sel: int = 0
 var _msg: String = ""
 var _items: Array = []
+var _opened_frame: int = -1   # phím mở shop (Up) còn "just pressed" trong khung này: bỏ qua để không dịch lựa chọn
 
 func _init() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -27,6 +28,7 @@ func open(_player: Node = null) -> void:
 	_sel = 0
 	_msg = ""
 	_open = true
+	_opened_frame = Engine.get_process_frames()
 	get_tree().paused = true
 	_view.visible = true
 	_view.queue_redraw()
@@ -71,6 +73,8 @@ func _buy(it: Dictionary) -> void:
 
 func _process(_d: float) -> void:
 	if not _open:
+		return
+	if Engine.get_process_frames() == _opened_frame:
 		return
 	if Input.is_action_just_pressed("hk_pause") or Input.is_action_just_pressed("hk_attack"):
 		close()

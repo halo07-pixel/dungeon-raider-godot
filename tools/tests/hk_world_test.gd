@@ -108,7 +108,9 @@ func _init() -> void:
 	await w.transition("gate_2", "1")
 	St.geo = 77
 	w.player.global_position = Vector2(300, 500)
+	w.player.invuln = 0.0 # rest()/respawn_at(refill) đặt khung bất tử 1s; test chờ hết thay vì đợi thật
 	w.player.take_damage(0.0, 99)
+	ck(w.player.is_dead(), "take_damage(99) giết được người chơi")
 	await create_timer(2.5, true, false, true).timeout
 	ck(w.room.id == "gate_1", "chết thì về bench (%s)" % w.room.id)
 	ck(St.geo == 0 and int(St.shade.get("geo", 0)) == 77 and St.shade["room"] == "gate_2", "geo thành shade")
@@ -133,7 +135,8 @@ func _init() -> void:
 	ck(St.toggle_charm("iron_heart") and St.max_hp() == St.BASE_HP + 2, "bật Iron Heart +2 mặt nạ")
 	ck(St.toggle_charm("heavy_blow") == false, "chưa sở hữu thì không bật được")
 	St.give_charm("heavy_blow"); St.give_charm("long_reach")
-	ck(St.toggle_charm("heavy_blow") == true and St.toggle_charm("long_reach") == false, "hết ô thì không bật thêm (3 ô: 2+2>3)")
+	ck(St.toggle_charm("heavy_blow") == false, "hết ô thì không bật thêm (3 ô: 2+2>3)")
+	ck(St.toggle_charm("iron_heart") and St.toggle_charm("heavy_blow") and not St.toggle_charm("long_reach"), "tháo Iron Heart thì bật được Heavy Blow, Long Reach (2) vẫn vượt 3 ô")
 	ck(St.nail_damage() == 7, "Heavy Blow: sát thương 5 -> 7 (%d)" % St.nail_damage())
 	St.geo = 1000
 	w.shop.open(w.player)
@@ -141,6 +144,13 @@ func _init() -> void:
 	ck(stock.size() >= 3, "shop có hàng")
 	w.shop._buy(stock[0])
 	ck(St.hp_bonus == 1 and St.geo < 1000, "mua mặt nạ")
+	w.shop.close()
+	# phím Up mở shop không được dịch lựa chọn trong khung mở
+	Input.action_press("hk_up")
+	w.shop.open(w.player)
+	await process_frame
+	ck(w.shop._sel == 0, "khung đầu sau khi mở shop bị bỏ qua (sel=%d)" % w.shop._sel)
+	Input.action_release("hk_up")
 	w.shop.close()
 	# --- save/load round trip ---
 	St.save()
