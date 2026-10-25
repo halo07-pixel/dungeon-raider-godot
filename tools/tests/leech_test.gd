@@ -19,8 +19,7 @@ func _init() -> void:
 	var p = main.player
 	var WI = load("res://scripts/weapon_instance.gd")
 	# ---- hằng số đã hạ ----
-	ck(G.rarities["legendary"]["lifesteal"] <= 0.05 and G.rarities["mythic"]["lifesteal"] <= 0.08, "rarity lifesteal lowered")
-	ck(G.rarities["legendary"]["mult"] <= 1.75 and G.rarities["mythic"]["mult"] <= 1.9, "rarity mult lowered")
+	ck(float(G.rarities[G.STANDARD_RARITY]["lifesteal"]) == 0.0 and float(G.rarities[G.STANDARD_RARITY]["mult"]) == 1.0, "standard tier: no lifesteal, x1 damage")
 	ck(float(WI.AFFIXES["vampiric"]["mods"]["steal"]) <= 0.025, "vampiric lowered")
 	# ---- trần: bơm 1000 lần hút liên tục trong ~0 giây chỉ hồi tối đa ~ burst ----
 	p.max_hp = 100

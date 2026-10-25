@@ -143,10 +143,7 @@ func _run() -> void:
 	check(G.profile["council"] == 1, "council clear recorded")
 	check(G.purple_gems >= DG.COUNCIL_GEMS, "gems rewarded")
 	var weap := get_nodes_in_group("weapon_pickup")
-	var legendary := false
-	for w in weap:
-		if w.get("weapon_rarity") == "legendary": legendary = true
-	check(legendary, "legendary weapon reward")
+	check(weap.size() > 0, "weapon reward dropped")
 	check(dg.rooms[bc]["cleared"], "room cleared")
 	check(hud._council_rows.size() == 0 and hud.boss_bar.visible, "HUD restored")
 	# --- G. đi tiếp xuống tầng 16 ---

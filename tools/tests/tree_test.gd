@@ -13,7 +13,7 @@ func _run() -> void:
 	var T = load("res://scripts/skill_tree.gd")
 	# data
 	check(T.max_total_power() <= T.POWER_CAP + 0.0001, "power cap %.3f" % T.max_total_power())
-	check(T.ids().size() == 8, "8 nodes")
+	check(T.ids().size() == 7, "7 nodes")
 	for id in T.NODES:
 		var n = T.NODES[id]
 		check(G.upgrades.has(id), "upgrades key " + id)
@@ -34,27 +34,13 @@ func _run() -> void:
 	var e := {}
 	check(T.buff_choice_count(e) == 3 and T.rerolls_per_offer(e) == 0 and T.coin_bonus(e) == 0.0, "defaults")
 	check(T.skill_cooldown_mult(e) == 1.0 and T.skill_damage_mult(e) == 1.0 and T.shield_regen_mult(e) == 1.0, "defaults mult")
-	check(T.early_rare_steps(e, 1) == 0, "no early rare")
 	var all := {}
 	for id in T.NODES: all[id] = 1
 	check(T.buff_choice_count(all) == 4 and T.rerolls_per_offer(all) == 1, "all: choices")
-	check(T.early_rare_steps(all, 3) == 2 and T.early_rare_steps(all, 4) == 0, "early rare floors")
 	check(absf(T.total_power(all) - T.max_total_power()) < 0.0001, "total power")
 	# --- Global wiring ---
 	for k in G.upgrades: G.upgrades[k] = 0
 	G.reset_run()
-	# rarity
-	var rare0 := 0; var rare1 := 0
-	for i in 3000: if G.roll_weapon_rarity(2) != "common": rare0 += 1
-	G.upgrades["early_rare"] = 1
-	for i in 3000: if G.roll_weapon_rarity(2) != "common": rare1 += 1
-	check(rare1 > rare0, "early rare raises (%d->%d)" % [rare0, rare1])
-	var deep0 := 0
-	for i in 2000: if G.roll_weapon_rarity(8) != "common": deep0 += 1
-	G.upgrades["early_rare"] = 0
-	var deep1 := 0
-	for i in 2000: if G.roll_weapon_rarity(8) != "common": deep1 += 1
-	check(absf(float(deep0 - deep1)) < 250.0, "floor 8 unaffected (%d vs %d)" % [deep0, deep1])
 	# coins
 	G.coins = 0
 	for i in 100: G.add_coin()

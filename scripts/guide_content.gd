@@ -3,8 +3,6 @@ extends RefCounted
 ## Số liệu lấy TRỰC TIẾP từ dữ liệu game (Global.weapons / rarities / buff_pool / enemies, EnemyAffix,
 ## EventRooms, MetaProgress...) nên khi chỉnh cân bằng, sổ tay tự đúng. Chỉ phần mô tả (cách chơi, mẹo)
 ## là chữ viết tay. Tránh dùng ký tự "[" trong chữ thường: BBCode sẽ hiểu nhầm là thẻ.
-const WeaponInstance = preload("res://scripts/weapon_instance.gd")
-const ForgeLogic = preload("res://scripts/forge_logic.gd")
 
 const PlayerScript = preload("res://scripts/player.gd")
 const ClassSkillScript = preload("res://scripts/class_skill.gd")
@@ -82,7 +80,6 @@ static func basics() -> String:
 	t += "After the boss on floors 5 and 10 you also pick 1 of 2 upgrades for your class skill (this run only).\n"
 	t += "Interact: %s (altars, chests, shrines, picking up weapons)\n" % _key("interact")
 	t += "Swap weapon: %s or [b]Right mouse[/b] (you can carry 2 weapons; any class can use any weapon)\n" % _key("swap_weapon")
-	t += "Weapon level: each weapon you own has its own level, +0 to +5. Every level adds +8% damage, and a +5 weapon unlocks a small bonus unique to its type. Upgrade at the Forge. Levels belong to that exact weapon (they go with it when you swap or drop it).\n"
 	t += "Swap bonus: your first attack within 1.5 s of swapping deals x1.5 damage. If you landed a hit with one kind of weapon (melee or ranged) in the last 2 s and swap to the other kind, it is a COMBO: x2 damage.\n"
 	t += "Movement keys and dodge can be changed in Settings.\n"
 	t += _sub("A run")
@@ -186,32 +183,12 @@ static func weapons() -> String:
 		if bool(w.get("thrust", false)):
 			mline += ". Thrusts down a narrow line: the FIRST enemy takes full damage, enemies behind take less"
 		if bool(w.get("reap", false)):
-			mline += ". Sweeps all around. Epic and Legendary cost HP with every swing (never lethal) but heal you for a share of the damage dealt; Legendary also heals on kills"
+			mline += ". Sweeps all around. Costs HP with every swing (never lethal) but heals you for a share of the damage dealt"
 		t += mline + "\n"
-	t += _sub("Rarity")
-	var tag_hex: Dictionary = {"common": "#dddddd", "rare": "#44ff44", "epic": "#b644ff", "legendary": "#ffd700", "mythic": "#ff4060"}
-	for rid in Global.rarities:
-		var r: Dictionary = Global.rarities[rid]
-		var line: String = "[b][color=%s]%s[/color][/b]: x%s damage" % [tag_hex.get(rid, "#ffffff"), r["name"], _num(float(r["mult"]))]
-		if float(r["lifesteal"]) > 0.0:
-			line += ", %s lifesteal" % _pct(float(r["lifesteal"]))
-		t += line + "\n"
-	t += "Melee weapons get only %s of the lifesteal (and half again against bosses).\n" % _pct(Global.MELEE_LIFESTEAL_MULT)
-	t += "Lifesteal healing is capped at %s of your max HP per second, so it cannot make you immortal.\n" % _pct(Global.LEECH_CAP_PCT_PER_SEC)
-	t += "Epic and Legendary weapons also gain a special effect. Mythic weapons keep the Legendary effect AND add a unique Mythic trait, but only start dropping from floor %d on.\n" % Global.MYTHIC_MIN_FLOOR
-	t += "Where weapons come from: dead-end Treasure Rooms show 3 different weapons and you may take ONE (the other two vanish; the first is at least Rare). Bosses on floors 5, 10 and 15 drop a Rare+ weapon. Bad luck protection: after %d weapon drops without an Epic or better, the next one is at least Epic; after %d without a Legendary, the next is at least Legendary.\n" % [Global.PITY_EPIC, Global.PITY_LEGENDARY]
-	t += _sub("The Forge")
-	t += "On even floors a Forge stands next to the Merchant (press Enter). Upgrade a weapon from +0 to +5 for gold (cost grows with level and rarity). Salvage a weapon for Scrap (you must keep one weapon). Spend Scrap to reroll a weapon's affixes (Common has none, Mythic is locked). Fuse two weapons of the SAME type and rarity into the next rarity for gold; two Legendary of the same type become a Mythic for gold + %d Scrap. The result keeps the higher level and gets fresh affixes. Scrap is only kept for the current run.\n" % ForgeLogic.FUSE_MYTHIC_SCRAP
-	t += _sub("Affixes")
-	t += "Every Rare or better weapon drops with random bonus lines (Rare 1, Epic 2, Legendary 2, Mythic 3). Two weapons of the same type and rarity can be very different:\n"
-	for aid in WeaponInstance.AFFIXES:
-		var a: Dictionary = WeaponInstance.AFFIXES[aid]
-		var only: String = "" if String(a["kind"]) == "both" else " (%s only)" % String(a["kind"])
-		t += "[b]%s[/b]: %s%s\n" % [a["name"], a["desc"], only]
-	t += _sub("Mythic traits")
-	for wid in WeaponInstance.MYTHIC_TRAITS:
-		var mt: Dictionary = WeaponInstance.MYTHIC_TRAITS[wid]
-		t += "[b]%s[/b] - %s: %s\n" % [Global.weapons[wid]["name"], mt["name"], mt["desc"]]
+	t += _sub("Weapon types")
+	t += "Every weapon has exactly one tier, with its own signature effect. Weapons have no rarity, levels or random bonus lines: what you hold is what you get, so skill and the buffs you pick decide how strong you are.\n"
+	t += "Weapons have no lifesteal. Healing comes from pickups, Feast, Dodge Heal and buffs, and buff lifesteal is capped at %s of your max HP per second.\n" % _pct(Global.LEECH_CAP_PCT_PER_SEC)
+	t += "Where weapons come from: dead-end Treasure Rooms show 3 different weapons and you may take ONE (the other two vanish), the Weapon Roll at the Merchant gives a random type, and bosses on floors 5, 10 and 15 drop one.\n"
 	return t
 
 # ---------------------------------------------------------------- BUFFS

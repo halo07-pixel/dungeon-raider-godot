@@ -1193,7 +1193,7 @@ func place_weapon(slot: int, inst: Dictionary) -> bool:
 
 ## "Pistol +2 (Epic)" — tên hiển thị của cây đang cầm.
 func weapon_label() -> String:
-	return "%s (%s)" % [WeaponInstance.display_name(weapon_inst), rarity_data["name"]]
+	return WeaponInstance.display_name(weapon_inst)
 
 ## Nhặt vũ khí: còn ô trống thì vào ô trống (và cầm luôn), đủ ô thì thay vũ khí ô đang cầm.
 ## Trả về vũ khí bị thay (WeaponInstance) hoặc {} nếu không có — nơi gọi quyết định thả xuống sàn hay bỏ.

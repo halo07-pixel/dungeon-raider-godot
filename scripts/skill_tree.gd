@@ -14,7 +14,6 @@ const BRANCH_TITLE: Dictionary = {"comfort": "CONVENIENCE", "combat": "COMBAT"}
 const NODES: Dictionary = {
 	"choice4": {"branch": "comfort", "name": "Wider Choice", "desc": "Buff offers show 4 cards instead of 3.", "cost": 4, "req": "", "power": 0.0},
 	"reroll": {"branch": "comfort", "name": "Second Thoughts", "desc": "Reroll each buff offer once (press R).", "cost": 5, "req": "choice4", "power": 0.0},
-	"early_rare": {"branch": "comfort", "name": "Scavenger's Eye", "desc": "Weapons on floors 1-3 are a bit more likely to be Rare or better.", "cost": 3, "req": "", "power": 0.0},
 	"coin_bonus": {"branch": "comfort", "name": "Deep Pockets", "desc": "+10% coins from pickups.", "cost": 3, "req": "", "power": 0.0},
 	"start_buff": {"branch": "comfort", "name": "Packed Supplies", "desc": "Start every run with a random common buff.", "cost": 6, "req": "coin_bonus", "power": 0.05},
 	"q_cooldown": {"branch": "combat", "name": "Quick Study", "desc": "Class skill cooldown -10% (all classes).", "cost": 4, "req": "", "power": 0.07},
@@ -24,8 +23,6 @@ const NODES: Dictionary = {
 
 const CHOICE_COUNT_BASE: int = 3
 const CHOICE_COUNT_WIDE: int = 4
-const EARLY_RARE_MAX_FLOOR: int = 3
-const EARLY_RARE_STEPS: int = 2          # như thể đã đi sâu thêm 2 tầng khi tính độ hiếm
 const COIN_BONUS: float = 0.10
 const Q_COOLDOWN_MULT: float = 0.90
 const Q_DAMAGE_MULT: float = 1.10
@@ -79,9 +76,6 @@ static func buff_choice_count(up: Dictionary) -> int:
 
 static func rerolls_per_offer(up: Dictionary) -> int:
 	return 1 if owned(up, "reroll") else 0
-
-static func early_rare_steps(up: Dictionary, for_floor: int) -> int:
-	return EARLY_RARE_STEPS if owned(up, "early_rare") and for_floor <= EARLY_RARE_MAX_FLOOR else 0
 
 static func coin_bonus(up: Dictionary) -> float:
 	return COIN_BONUS if owned(up, "coin_bonus") else 0.0

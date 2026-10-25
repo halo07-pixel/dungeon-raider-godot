@@ -110,7 +110,7 @@ const L_PICKUP: int = 32
 var rarities: Dictionary = {
 	"common": {"name": "Common", "mult": 1.0, "lifesteal": 0.0, "color": Color(0.8, 0.8, 0.8), "weight": 50},
 	"rare": {"name": "Rare", "mult": 1.25, "lifesteal": 0.0, "color": Color(0.2, 0.8, 0.3), "weight": 30},
-	"epic": {"name": "Epic", "mult": 1.5, "lifesteal": 0.03, "color": Color(0.6, 0.2, 0.8), "weight": 12},
+	"epic": {"name": "Standard", "mult": 1.0, "lifesteal": 0.0, "color": Color(0.8, 0.9, 1.0), "weight": 12},
 	"legendary": {"name": "Legendary", "mult": 1.75, "lifesteal": 0.05, "color": Color(1.0, 0.8, 0.1), "weight": 3},
 	# Mythic: chỉ rơi từ tầng MYTHIC_MIN_FLOOR (weight 0 = không có trong bảng gốc), hoặc ghép 2 Legendary cùng loại ở Forge.
 	"mythic": {"name": "Mythic", "mult": 1.9, "lifesteal": 0.08, "color": Color(1.0, 0.25, 0.35), "weight": 0}
@@ -147,65 +147,19 @@ var weapons: Dictionary = {
 
 ## Số ô vũ khí Player có thể cầm cùng lúc (đổi bằng phím "swap_weapon").
 const MAX_WEAPON_SLOTS: int = 2
-## Độ hiếm vũ khí rơi từ rương/boss dịch dần lên theo tầng: mỗi tầng sau tầng 1 cộng thêm
-## trọng số cho rare/epic/legendary (trừ từ common), dừng ở WEAPON_RARITY_MAX_FLOORS tầng.
-const WEAPON_RARITY_FLOOR_BONUS: Dictionary = {"rare": 1.0, "epic": 0.7, "legendary": 0.3}
-const WEAPON_RARITY_MAX_FLOORS: int = 12
 const WEAPON_RARITY_ORDER: Array = ["common", "rare", "epic", "legendary", "mythic"]
-## Mythic chỉ xuất hiện từ tầng này; mỗi tầng sau đó cộng MYTHIC_WEIGHT_PER_FLOOR trọng số (tối đa MYTHIC_WEIGHT_CAP).
-const MYTHIC_MIN_FLOOR: int = 8
-const MYTHIC_WEIGHT_PER_FLOOR: float = 0.3
-const MYTHIC_WEIGHT_CAP: float = 2.0
-
-## Bảo hiểm xui (pity) cho vũ khí rơi từ rương/boss: sau PITY_EPIC lần liên tiếp không ra Epic+ thì lần kế tiếp tối thiểu Epic;
-## sau PITY_LEGENDARY lần không ra Legendary+ thì lần kế tối thiểu Legendary. Đếm theo ván (reset_run, lưu trong save).
-const PITY_EPIC: int = 5
-const PITY_LEGENDARY: int = 16
+## Bộ đếm pity: không còn tác dụng (mọi vũ khí cùng một bậc), giữ lại chỉ để save cũ vẫn đọc được.
 var weapon_pity: Dictionary = {"epic": 0, "legendary": 0}
 ## Phế Liệu (chỉ trong ván): nhận khi phân rã vũ khí ở Lò Rèn, dùng để reroll dòng phụ / ghép Mythic.
 var scrap: int = 0
 
 ## Như roll_weapon_rarity nhưng áp dụng + cập nhật bộ đếm pity. Dùng cho drop thật trong ván.
 func roll_weapon_rarity_pity(for_floor: int, min_rarity: String = "common") -> String:
-	var floor_min: String = min_rarity
-	if int(weapon_pity["legendary"]) >= PITY_LEGENDARY:
-		floor_min = _higher_rarity(floor_min, "legendary")
-	elif int(weapon_pity["epic"]) >= PITY_EPIC:
-		floor_min = _higher_rarity(floor_min, "epic")
-	var r: String = roll_weapon_rarity(for_floor, floor_min)
-	var idx: int = WEAPON_RARITY_ORDER.find(r)
-	weapon_pity["epic"] = 0 if idx >= WEAPON_RARITY_ORDER.find("epic") else int(weapon_pity["epic"]) + 1
-	weapon_pity["legendary"] = 0 if idx >= WEAPON_RARITY_ORDER.find("legendary") else int(weapon_pity["legendary"]) + 1
-	return r
-
-func _higher_rarity(a: String, b: String) -> String:
-	return a if WEAPON_RARITY_ORDER.find(a) >= WEAPON_RARITY_ORDER.find(b) else b
+	return STANDARD_RARITY # game thuần tay nghề: mọi vũ khí cùng một bậc, không còn bảo hiểm xui
 
 ## Random độ hiếm vũ khí cho tầng `for_floor`. `min_rarity` nâng độ hiếm tối thiểu (vd boss thưởng từ "rare").
 func roll_weapon_rarity(for_floor: int, min_rarity: String = "common") -> String:
-	var steps: int = clampi(for_floor - 1 + SkillTree.early_rare_steps(upgrades, for_floor), 0, WEAPON_RARITY_MAX_FLOORS)
-	var weights: Dictionary = {}
-	for rid in WEAPON_RARITY_ORDER:
-		weights[rid] = float(rarities[rid]["weight"])
-	for rid in WEAPON_RARITY_FLOOR_BONUS:
-		var bonus: float = float(WEAPON_RARITY_FLOOR_BONUS[rid]) * float(steps)
-		weights[rid] += bonus
-		weights["common"] = maxf(5.0, weights["common"] - bonus)
-	if for_floor >= MYTHIC_MIN_FLOOR:
-		weights["mythic"] = minf(MYTHIC_WEIGHT_CAP, MYTHIC_WEIGHT_PER_FLOOR * float(for_floor - MYTHIC_MIN_FLOOR + 1))
-	var total: float = 0.0
-	for rid in WEAPON_RARITY_ORDER:
-		total += float(weights[rid])
-	var pick: float = randf() * total
-	var chosen: String = "common"
-	for rid in WEAPON_RARITY_ORDER:
-		pick -= float(weights[rid])
-		if pick <= 0.0:
-			chosen = rid
-			break
-	if WEAPON_RARITY_ORDER.find(chosen) < WEAPON_RARITY_ORDER.find(min_rarity):
-		chosen = min_rarity
-	return chosen
+	return STANDARD_RARITY
 
 ## Chọn ngẫu nhiên 1 vũ khí (mọi class đều dùng được), ưu tiên không trùng các id trong `exclude`.
 func random_weapon_id(exclude: Array = []) -> String:
@@ -332,6 +286,8 @@ const ARMOR_K: float = 30.0
 const MELEE_LIFESTEAL_MULT: float = 0.5
 ## Tome hiếm: chỉ rơi từ Boss ở các tầng này, đúng 1 cái mỗi lần (không còn trong phòng kho báu).
 const BOSS_TOME_FLOORS: Array = [6, 12]
+## Game thuần tay nghề: mọi vũ khí cùng MỘT bậc (đặc tính riêng của từng loại, hệ số 1.0, không hút máu, không cấp +N, không dòng phụ).
+const STANDARD_RARITY: String = "epic"
 ## Trần hút máu: tổng hồi từ hút máu/Siphon tối đa % máu tối đa mỗi giây (thùng token, cho dồn tối đa LEECH_BURST_SECS giây); đánh boss chỉ hồi LEECH_BOSS_MULT.
 const LEECH_CAP_PCT_PER_SEC: float = 0.035
 const LEECH_BURST_SECS: float = 2.0
@@ -1245,7 +1201,7 @@ const SigilsScript = preload("res://scripts/sigils.gd")
 var profile: Dictionary = MetaProgress.new_profile()
 var upgrades: Dictionary = {
 	"hp_boost": 0, "start_coin": 0, "mastery": 0, "revive": 0,
-	"choice4": 0, "reroll": 0, "early_rare": 0, "coin_bonus": 0,
+	"choice4": 0, "reroll": 0, "coin_bonus": 0,
 	"start_buff": 0, "q_cooldown": 0, "q_damage": 0, "soft_shield": 0
 }
 

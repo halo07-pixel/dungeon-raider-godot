@@ -42,7 +42,6 @@ func _init() -> void:
 	put[1].pressed.emit()
 	ck(p.weapon_slots[1]["id"] == "spear" and p.weapon_slots[0]["id"] == "pistol", "placed in slot 2, slot 1 kept")
 	ck(p.active_slot == 1 and p.weapon_id == "spear", "slot 2 now in hand")
-	ck(p.weapon_slots[1]["affixes"] == ["swift", "reaching"], "affixes preserved")
 	# --- đủ 2 ô: thay ô 1 dù đang cầm ô 2 ---
 	npc.win_inst = WI.make("hammer", "epic", 0, ["heavy", "keen"])
 	npc._on_spin_finished()

@@ -62,12 +62,11 @@ func _initialize() -> void:
 	p.max_hp = 1000000
 	p.hp = 1000000
 	check(G.weapons["laser"]["pierce_count"] == 2 and not G.weapons["laser"]["pierce"], "Laser: pierce_count 2, không còn xuyên vô hạn")
-	await scenario("Pistol thường", main, "pistol", "common", {}, false, 1)
+	await scenario("Pistol chuẩn (xuyên 1)", main, "pistol", "common", {}, false, 2)
 	await scenario("SMG thường", main, "smg", "common", {}, false, 1)
-	await scenario("Pistol Epic", main, "pistol", "epic", {}, false, 2)
-	await scenario("Pistol + Sweep", main, "pistol", "common", {"buff_sweep": 1}, false, 2)
+	await scenario("Pistol + Sweep", main, "pistol", "common", {"buff_sweep": 1}, false, 3)
 	await scenario("Pistol + Mega Shot (phát thứ 6)", main, "pistol", "common", {"buff_super": 1}, true, 3)
-	await scenario("Pistol + Mega Shot (phát thường)", main, "pistol", "common", {"buff_super": 1}, false, 1)
+	await scenario("Pistol + Mega Shot (phát thường)", main, "pistol", "common", {"buff_super": 1}, false, 2)
 	await scenario("Laser thường", main, "laser", "common", {}, false, 3)
 	await scenario("Laser + Sweep", main, "laser", "common", {"buff_sweep": 1}, false, 4)
 	await scenario("Laser + Mega Shot (phát thứ 6)", main, "laser", "common", {"buff_super": 1}, true, 4)

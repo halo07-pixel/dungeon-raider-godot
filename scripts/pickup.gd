@@ -293,7 +293,7 @@ func _draw() -> void:
 		"weapon":
 			var r_data: Dictionary = Global.rarities[weapon_rarity]
 			var r_color: Color = r_data["color"]
-			var display_name: String = WeaponInstance.display_name(weapon_inst) + " (" + r_data["name"] + ")"
+			var display_name: String = WeaponInstance.display_name(weapon_inst)
 			
 			_draw_rarity_glow(r_color, weapon_rarity, bob)
 			draw_circle(Vector2(0.0, bob), 13.0, Color(0.1, 0.1, 0.15))

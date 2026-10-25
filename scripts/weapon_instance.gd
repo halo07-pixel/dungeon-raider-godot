@@ -57,18 +57,10 @@ static func normalize(v) -> Dictionary:
 	if not (v is Dictionary):
 		return {}
 	var id: String = String(v.get("id", ""))
-	var rarity: String = String(v.get("rarity", "common"))
-	if not Global.weapons.has(id) or not Global.rarities.has(rarity):
+	if not Global.weapons.has(id):
 		return {}
-	var melee: bool = bool(Global.weapons[id].get("is_melee", false))
-	var clean: Array = []
-	var raw = v.get("affixes", [])
-	if raw is Array:
-		for a in raw:
-			var aid: String = String(a)
-			if AFFIXES.has(aid) and not clean.has(aid) and _kind_ok(aid, melee):
-				clean.append(aid)
-	return {"id": id, "rarity": rarity, "level": clampi(int(v.get("level", 0)), 0, MAX_LEVEL), "affixes": clean}
+	# Ván lưu cũ có bậc/cấp/dòng phụ khác thì đưa hết về bậc chuẩn: chỉ giữ LOẠI vũ khí.
+	return {"id": id, "rarity": Global.STANDARD_RARITY, "level": 0, "affixes": []}
 
 static func _kind_ok(aid: String, melee: bool) -> bool:
 	var kind: String = String(AFFIXES[aid]["kind"])

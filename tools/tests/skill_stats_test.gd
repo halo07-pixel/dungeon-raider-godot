@@ -196,6 +196,8 @@ func _init() -> void:
 	main.dungeon.entities.add_child(e)
 	e.global_position = p.global_position + Vector2(100, 0)
 	e.active = true
+	e.get_node("Hurtbox").max_hp = 99999.0 # kiếm khí còn bay của vũ khí chuẩn có thể giết dummy
+	e.get_node("Hurtbox").hp = 99999.0
 	e.set_physics_process(false) # chỉ để well kéo qua knockback; ta tự tích hợp knockback bên dưới
 	var cs_gw = CS.new()
 	p.add_child(cs_gw)

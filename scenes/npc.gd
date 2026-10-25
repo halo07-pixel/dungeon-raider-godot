@@ -192,7 +192,7 @@ func _create_item_panel(inst: Dictionary, detail: bool = false) -> Control:
 	
 	var lbl = Label.new()
 	lbl.set_anchors_preset(Control.PRESET_FULL_RECT)
-	lbl.text = WeaponInstance.display_name(inst) + "\n\n" + String(r_data["name"])
+	lbl.text = WeaponInstance.display_name(inst)
 	if detail:
 		for aid in inst.get("affixes", []):
 			lbl.text += "\n" + WeaponInstance.affix_name(String(aid))
@@ -249,8 +249,7 @@ func _refresh_shop() -> void:
 	sep.custom_minimum_size = Vector2(0, 15)
 	main_container.add_child(sep)
 
-	main_container.add_child(_create_btn("Standard Gacha - 25 Gold\n50% Common / 30% Rare / 15% Epic / 5% Legendary", func(): _roll_gacha(25, false), Vector2(650, 85), Color(0.2, 0.4, 0.6)))
-	main_container.add_child(_create_btn("Premium Gacha - 50 Gold\nNo Common. 60% Rare / 30% Epic / 10% Legendary", func(): _roll_gacha(50, true), Vector2(650, 85), Color(0.6, 0.3, 0.6)))
+	main_container.add_child(_create_btn("Weapon Roll - 25 Gold\nA random weapon type (every weapon has its own style)", func(): _roll_gacha(25, false), Vector2(650, 85), Color(0.2, 0.4, 0.6)))
 	main_container.add_child(_create_btn("Health Potion - 15 Gold\nInstantly restores 50% Max HP", _buy_heal, Vector2(650, 85), Color(0.2, 0.6, 0.3)))
 	main_container.add_child(_create_btn("Leave Shop", _close_shop, Vector2(650, 60), Color(0.5, 0.2, 0.2)))
 
@@ -268,21 +267,7 @@ func _roll_gacha(cost: int, is_premium: bool) -> void:
 	confirm_box.hide()
 	gacha_container.show()
 	
-	# Xác định Độ Hiếm
-	var roll = randf() * 100.0
-	var r_int = 1
-	if is_premium:
-		if roll <= 10.0: r_int = 4
-		elif roll <= 40.0: r_int = 3
-		else: r_int = 2
-	else:
-		if roll <= 5.0: r_int = 4
-		elif roll <= 20.0: r_int = 3
-		elif roll <= 50.0: r_int = 2
-		else: r_int = 1
-		
-	var r_list = ["common", "rare", "epic", "legendary"]
-	win_rarity = r_list[r_int - 1]
+	win_rarity = Global.STANDARD_RARITY
 	Global.run_stats["gacha_" + win_rarity] += 1
 	
 	# Vũ khí mọi class đều dùng được: random trong toàn bộ kho
@@ -302,10 +287,8 @@ func _roll_gacha(cost: int, is_premium: bool) -> void:
 		if i == target_index:
 			wheel_strip.add_child(_create_item_panel(win_inst))
 		else:
-			var rand_r = r_list.pick_random()
-			if is_premium and rand_r == "common": rand_r = "rare" # Gacha xịn thì rác nhất là Xanh
 			var rand_w = w_pool.pick_random()
-			wheel_strip.add_child(_create_item_panel(WeaponInstance.make(String(rand_w), String(rand_r))))
+			wheel_strip.add_child(_create_item_panel(WeaponInstance.make(String(rand_w), win_rarity)))
 			
 	wheel_strip.position.x = 0
 	

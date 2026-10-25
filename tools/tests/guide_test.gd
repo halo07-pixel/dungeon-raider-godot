@@ -34,11 +34,7 @@ func _initialize() -> void:
 	for id in G.weapons:
 		if not (String(G.weapons[id]["name"]) in w): wmiss.append(id)
 	check(wmiss.is_empty(), "mọi vũ khí có trong sổ tay (thiếu: %s)" % str(wmiss))
-	var ls_missing: Array = []
-	for rid in ["epic", "legendary", "mythic"]:
-		var want: String = "%d%% lifesteal" % roundi(float(G.rarities[rid]["lifesteal"]) * 100.0)
-		if not (want in w): ls_missing.append("%s: %s" % [rid, want])
-	check(ls_missing.is_empty(), "hút máu theo bậc khớp dữ liệu thật (thiếu: %s)" % str(ls_missing))
+	check(not ("Mythic" in w) and not ("Forge" in w) and not ("Affixes" in w and "weapon drops" in w), "sổ tay không còn nhắc độ hiếm/lò rèn vũ khí")
 	check("Laser Gun" in w and "pierces 2 enemies" in w, "Laser ghi xuyên 2 quái")
 	var e: String = GC.enemies()
 	var emiss: Array = []
