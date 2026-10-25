@@ -8,6 +8,11 @@ const KEYS: Dictionary = {
 	"hk_jump": [KEY_Z, KEY_SPACE],
 	"hk_attack": [KEY_X, KEY_J],
 	"hk_dash": [KEY_C, KEY_K],
+	"hk_focus": [KEY_V, KEY_L],
+	"hk_spell": [KEY_F, KEY_I],
+	"hk_map": [KEY_M],
+	"hk_charms": [KEY_TAB, KEY_E],
+	"hk_pause": [KEY_ESCAPE],
 }
 
 static func ensure() -> void:
