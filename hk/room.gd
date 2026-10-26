@@ -240,7 +240,6 @@ func near_prompt() -> bool:
 
 func _draw() -> void:
 	var b: Rect2 = bounds()
-	draw_rect(b.grow(400.0), _pal["bg"])
 	# cột nền mờ cho có chiều sâu
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash(id)
@@ -253,7 +252,7 @@ func _draw() -> void:
 	for y in rows:
 		for x in cols:
 			if not _is_solid(x, y):
-				draw_texture_rect(SPRITES.tex("floor_%d%s" % [1 + (x * 7 + y * 13) % 8, sfx]), Rect2(x * TILE, y * TILE, TILE, TILE), false, Color(1, 1, 1) * float(BG_DIM.get(String(data.get("area", "gate")), 0.3)) + Color(0, 0, 0.05, 1))
+				draw_texture_rect(SPRITES.tex("floor_%d%s" % [1 + (x * 7 + y * 13) % 8, sfx]), Rect2(x * TILE, y * TILE, TILE, TILE), false, Color(1, 1, 1) * float(BG_DIM.get(String(data.get("area", "gate")), 0.3)) + Color(0, 0, 0.05, 0.0))
 	for y in rows:
 		for x in cols:
 			if not _is_solid(x, y):

@@ -2,6 +2,7 @@ extends CharacterBody2D
 ## Quái thường. `kind` chọn hành vi: crawler (bò tuần), flyer (bay đuổi), spitter (đứng bắn), charger (húc).
 ## Gán `kind` TRƯỚC khi add_child.
 signal died(pos: Vector2)
+signal sfx(name: String)
 const PROJECTILE = preload("res://hk/projectile.gd")
 const FX = preload("res://hk/fx.gd")
 const STATE = preload("res://hk/state.gd")
@@ -103,6 +104,7 @@ func _charger(delta: float) -> void:
 			_gravity_and_move(delta)
 			if _t <= 0.0:
 				state = "lunge"
+				sfx.emit("charge")
 				_t = 0.55
 		"lunge":
 			velocity.x = float(dir) * 520.0
@@ -153,6 +155,7 @@ func _spitter(delta: float) -> void:
 				s.color = Color(0.6, 0.9, 0.3)
 				get_parent().add_child.call_deferred(s)
 				s.position = position + Vector2(0, -8)
+				sfx.emit("spit")
 				state = "idle"
 				_t = 2.0
 
@@ -183,6 +186,7 @@ func _die() -> void:
 	STATE.geo += n
 	FX.float_text(get_parent(), global_position, "+%d" % n, Color(1.0, 0.9, 0.4))
 	FX.burst(get_parent(), global_position, DATA[kind]["color"], 12, 220.0)
+	sfx.emit("enemy_die")
 	died.emit(global_position)
 	queue_free()
 

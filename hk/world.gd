@@ -5,6 +5,8 @@ const WorldData = preload("res://hk/world_data.gd")
 const InputSetup = preload("res://hk/input.gd")
 const FX = preload("res://hk/fx.gd")
 const MUSIC = preload("res://hk/music.gd")
+const SFX = preload("res://hk/sfx.gd")
+const BACKDROP = preload("res://hk/backdrop.gd")
 const AREA_NAMES: Dictionary = {"gate": "Gate Ruins", "catacomb": "Weeping Catacombs", "vault": "Ashen Vaults"}
 const ZOOM: float = 1.5
 
@@ -18,6 +20,8 @@ var hud: Control
 var menu: Node
 var shop: Node
 var music: Node
+var sfx: Node
+var backdrop: Node
 var busy: bool = false
 var entry_spawn: Vector2 = Vector2.ZERO
 var boss: Node2D
@@ -49,12 +53,18 @@ func _ready() -> void:
 	cam.make_current()
 	music = MUSIC.new()
 	add_child(music)
+	sfx = SFX.new()
+	add_child(sfx)
+	backdrop = BACKDROP.new()
+	add_child(backdrop)
 	_build_ui()
 	player.hit_landed.connect(cam.shake)
 	player.health_changed.connect(hud.set_health)
 	player.soul_changed.connect(hud.set_soul)
 	player.died.connect(_on_player_died)
 	player.hazard_hit.connect(_on_hazard)
+	player.sfx.connect(sfx.play)
+	shop.sfx.connect(sfx.play)
 	hud.set_health(STATE.hp, STATE.max_hp())
 	hud.set_soul(STATE.soul)
 	load_room(STATE.bench_room)
@@ -73,6 +83,18 @@ func _build_ui() -> void:
 	hud.set_anchors_preset(Control.PRESET_FULL_RECT)
 	hud.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	layer.add_child(hud)
+	var vg := CanvasLayer.new()
+	vg.layer = 4   # dưới HUD (5), trên thế giới
+	add_child(vg)
+	var vr := ColorRect.new()
+	vr.set_anchors_preset(Control.PRESET_FULL_RECT)
+	vr.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var vsh := Shader.new()
+	vsh.code = "shader_type canvas_item;\nvoid fragment() { vec2 d = (UV - 0.5) * vec2(1.0, 0.8); COLOR = vec4(0.0, 0.0, 0.0, smoothstep(0.3, 0.85, length(d)) * 0.6); }"
+	var vmat := ShaderMaterial.new()
+	vmat.shader = vsh
+	vr.material = vmat
+	vg.add_child(vr)
 	var fl := CanvasLayer.new()
 	fl.layer = 20
 	add_child(fl)
@@ -129,6 +151,7 @@ func load_room(id: String) -> void:
 		sh.set_script(preload("res://hk/shade.gd"))
 		sh.amount = int(STATE.shade.get("geo", 0))
 		sh.position = Vector2(float(STATE.shade.get("x", 100)), float(STATE.shade.get("y", 100)))
+		sh.recovered.connect(func(_a: int): sfx.play("geo"))
 		_content.add_child(sh)
 	cam.set_bounds(room.bounds())
 	STATE.visit(id)
@@ -136,6 +159,7 @@ func load_room(id: String) -> void:
 	if area != _last_area:
 		_last_area = area
 		hud.banner(AREA_NAMES.get(area, area))
+		backdrop.set_area(area)
 	music.play(String(MUSIC.AREA_TRACK.get(area, "explore_stone")))
 
 func _spawn_enemy(ch: String, pos: Vector2) -> void:
@@ -143,6 +167,7 @@ func _spawn_enemy(ch: String, pos: Vector2) -> void:
 	var e := CharacterBody2D.new()
 	e.set_script(preload("res://hk/enemy.gd"))
 	e.kind = kinds[ch]
+	e.sfx.connect(sfx.play)
 	var h: float = float(e.DATA[e.kind]["size"].y)
 	e.position = pos - (Vector2(0, h * 0.5) if ch != "f" else Vector2.ZERO)
 	_content.add_child(e)
@@ -157,13 +182,20 @@ func _spawn_boss(bid: String, pos: Vector2) -> void:
 	boss.arena = room.bounds()
 	boss.engaged.connect(_on_boss_engaged)
 	boss.shake.connect(cam.shake)
+	boss.shake.connect(_on_boss_shake)
+
+func _on_boss_shake(strength: float) -> void:
+	if strength >= 2.0:
+		sfx.play("slam")
 
 func _on_boss_engaged() -> void:
 	room.locked = true
+	sfx.play("roar")
 	music.play(String(MUSIC.BOSS_TRACK.get(boss.kind, "boss_warden")))
 	hud.banner(boss.title())
 
 func _on_boss_defeated(bid: String) -> void:
+	sfx.play("boss_die")
 	STATE.set_flag("boss_" + bid)
 	room.locked = false
 	music.play(String(MUSIC.AREA_TRACK.get(String(rooms[room.id].get("area", "gate")), "explore_stone")))
@@ -241,15 +273,18 @@ func _on_interacted(kind: String, data: Dictionary) -> void:
 		return
 	match kind:
 		"bench":
+			sfx.play("bench")
 			rest()
 		"merchant":
 			shop.open(player)
 		"cache":
 			STATE.set_flag("cache_" + String(data["key"]))
+			sfx.play("geo")
 			var n: int = 25
 			STATE.geo += n
 			FX.float_text(_content, data["pos"], "+%d Geo" % n, Color(1, 0.9, 0.4))
 		"altar":
+			sfx.play("ability")
 			var aid: String = String(data.get("id", ""))
 			STATE.give_ability(aid)
 			STATE.set_flag("got_" + aid)
@@ -257,6 +292,7 @@ func _on_interacted(kind: String, data: Dictionary) -> void:
 			var info: Dictionary = STATE.ABILITIES[aid]
 			hud.banner(String(info["name"]), String(info["desc"]))
 		"charm":
+			sfx.play("charm")
 			var cid: String = String(data.get("id", ""))
 			STATE.give_charm(cid)
 			STATE.set_flag("got_" + cid)

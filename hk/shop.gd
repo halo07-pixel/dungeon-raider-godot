@@ -1,6 +1,7 @@
 extends CanvasLayer
 ## Cửa hàng của thương nhân: Up/Down chọn, Jump mua, Esc/Nail thoát. Chạy khi game pause.
 const STATE = preload("res://hk/state.gd")
+signal sfx(name: String)
 var _open: bool = false
 var _view: Control
 var _sel: int = 0
@@ -54,6 +55,7 @@ func _stock() -> Array:
 func _buy(it: Dictionary) -> void:
 	if STATE.geo < int(it["price"]):
 		_msg = "Not enough Geo."
+		sfx.emit("deny")
 		return
 	STATE.geo -= int(it["price"])
 	match String(it["id"]):
@@ -65,6 +67,7 @@ func _buy(it: Dictionary) -> void:
 		_:
 			STATE.give_charm(String(it["id"]))
 	_msg = "Thank you."
+	sfx.emit("buy")
 	_items = _stock()
 	_sel = clampi(_sel, 0, maxi(0, _items.size() - 1))
 	var pl := get_tree().get_nodes_in_group("hk_player")
