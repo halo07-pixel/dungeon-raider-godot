@@ -8,6 +8,12 @@ signal shake(strength: float)
 const PROJECTILE = preload("res://hk/projectile.gd")
 const ENEMY = preload("res://hk/enemy.gd")
 const FX = preload("res://hk/fx.gd")
+const SPRITES = preload("res://hk/sprites.gd")
+const LOOK: Dictionary = {
+	"warden": {"anim": "ogre_idle_anim", "scale": 3.0},
+	"wraith": {"anim": "necromancer_idle_anim", "scale": 3.0},
+	"lord": {"anim": "big_demon_idle_anim", "scale": 3.0},
+}
 const GRAVITY: float = 2400.0
 
 const DATA: Dictionary = {
@@ -356,22 +362,18 @@ func take_hit(dmg: int, _from: Vector2) -> void:
 		queue_free()
 
 func _draw() -> void:
-	var c: Color = Color.WHITE if _flash > 0.0 else DATA[kind]["color"]
-	if state.begins_with("wind") or state == "fade_out":
-		if int(_time * 30.0) % 2 == 0:
-			c = c.lightened(0.5)
-	c.a = _alpha
-	var h: Vector2 = _size * 0.5
-	if kind == "wraith":
-		draw_circle(Vector2.ZERO, h.x, c)
-		draw_colored_polygon(PackedVector2Array([Vector2(-h.x, 0), Vector2(0, h.y + 10), Vector2(h.x, 0)]), c)
-		draw_rect(Rect2(float(dir) * 8.0 - 5.0, -10, 10, 10), Color(0.05, 0.05, 0.15, _alpha))
+	var tint := Color.WHITE
+	if _flash > 0.0:
+		tint = Color(3, 3, 3, _alpha)
+	elif (state.begins_with("wind") or state == "fade_out") and int(_time * 30.0) % 2 == 0:
+		tint = Color(1.6, 0.8, 0.8, _alpha)
 	else:
-		draw_rect(Rect2(-h.x, -h.y, _size.x, _size.y), c)
-		draw_rect(Rect2(-h.x - 4, -h.y - 4, _size.x + 8, 14), c.darkened(0.25))
-		draw_rect(Rect2(float(dir) * h.x * 0.45 - 5.0, -h.y * 0.6, 10, 10), Color(0.1, 0.02, 0.02))
-		if state == "lunge":
-			draw_rect(Rect2(float(dir) * (h.x + 45.0) - 45.0, -h.y * 0.8, 90, _size.y * 0.8), Color(1, 1, 1, 0.55))
+		tint.a = _alpha
+	var h: Vector2 = _size * 0.5
+	var look: Dictionary = LOOK[kind]
+	SPRITES.draw(self, SPRITES.anim(String(look["anim"]), 6.0), Vector2(0, h.y), float(look["scale"]), dir < 0, tint)
+	if kind != "wraith" and state == "lunge":
+		draw_rect(Rect2(float(dir) * (h.x + 45.0) - 45.0, -h.y * 0.8, 90, _size.y * 0.8), Color(1, 1, 1, 0.55))
 	for m in _markers:
 		var gx: float = float(m["x"]) - global_position.x
 		var a: float = 0.25 + 0.35 * (1.0 - float(m["t"]))

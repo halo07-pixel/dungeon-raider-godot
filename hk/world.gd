@@ -4,6 +4,7 @@ const STATE = preload("res://hk/state.gd")
 const WorldData = preload("res://hk/world_data.gd")
 const InputSetup = preload("res://hk/input.gd")
 const FX = preload("res://hk/fx.gd")
+const MUSIC = preload("res://hk/music.gd")
 const AREA_NAMES: Dictionary = {"gate": "Gate Ruins", "catacomb": "Weeping Catacombs", "vault": "Ashen Vaults"}
 const ZOOM: float = 1.5
 
@@ -16,6 +17,7 @@ var cam: Camera2D
 var hud: Control
 var menu: Node
 var shop: Node
+var music: Node
 var busy: bool = false
 var entry_spawn: Vector2 = Vector2.ZERO
 var boss: Node2D
@@ -45,6 +47,8 @@ func _ready() -> void:
 	cam.zoom = Vector2(ZOOM, ZOOM)
 	add_child(cam)
 	cam.make_current()
+	music = MUSIC.new()
+	add_child(music)
 	_build_ui()
 	player.hit_landed.connect(cam.shake)
 	player.health_changed.connect(hud.set_health)
@@ -132,6 +136,7 @@ func load_room(id: String) -> void:
 	if area != _last_area:
 		_last_area = area
 		hud.banner(AREA_NAMES.get(area, area))
+	music.play(String(MUSIC.AREA_TRACK.get(area, "explore_stone")))
 
 func _spawn_enemy(ch: String, pos: Vector2) -> void:
 	var kinds: Dictionary = {"c": "crawler", "f": "flyer", "s": "spitter", "h": "charger"}
@@ -155,11 +160,13 @@ func _spawn_boss(bid: String, pos: Vector2) -> void:
 
 func _on_boss_engaged() -> void:
 	room.locked = true
+	music.play(String(MUSIC.BOSS_TRACK.get(boss.kind, "boss_warden")))
 	hud.banner(boss.title())
 
 func _on_boss_defeated(bid: String) -> void:
 	STATE.set_flag("boss_" + bid)
 	room.locked = false
+	music.play(String(MUSIC.AREA_TRACK.get(String(rooms[room.id].get("area", "gate")), "explore_stone")))
 	STATE.save()
 	hud.banner("%s defeated" % String(boss.title() if is_instance_valid(boss) else bid), "")
 	if bid == "lord":

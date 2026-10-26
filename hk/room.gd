@@ -7,6 +7,9 @@ signal interacted(kind: String, data: Dictionary)
 
 const TILE: int = 32
 const STATE = preload("res://hk/state.gd")
+const SPRITES = preload("res://hk/sprites.gd")
+const BG_DIM: Dictionary = {"gate": 0.3, "catacomb": 0.13, "vault": 0.3}   # độ sáng gạch nền
+const TILESET: Dictionary = {"gate": "", "catacomb": "_hell", "vault": "_ice"}   # hậu tố bộ gạch theo khu
 const PALETTES: Dictionary = {
 	"gate": {"bg": Color(0.05, 0.06, 0.09), "fill": Color(0.13, 0.15, 0.21), "edge": Color(0.40, 0.45, 0.60), "line": Color(0.09, 0.10, 0.15)},
 	"catacomb": {"bg": Color(0.07, 0.05, 0.07), "fill": Color(0.19, 0.14, 0.17), "edge": Color(0.62, 0.45, 0.50), "line": Color(0.12, 0.09, 0.11)},
@@ -47,6 +50,10 @@ func build(room_id: String, room_data: Dictionary) -> void:
 
 func bounds() -> Rect2:
 	return Rect2(0, 0, cols * TILE, rows * TILE)
+
+func _is_solid(x: int, y: int) -> bool:
+	var ch: String = _cell(x, y)
+	return ch == "#" or ch == "G"
 
 func _cell(x: int, y: int) -> String:
 	if x < 0 or y < 0 or x >= cols or y >= rows:
@@ -241,23 +248,26 @@ func _draw() -> void:
 		var cx: float = rng.randf_range(0.0, b.size.x)
 		var w: float = rng.randf_range(30.0, 90.0)
 		draw_rect(Rect2(cx, b.position.y, w, b.size.y), Color(_pal["fill"], 0.22))
-	for r in solids:
-		draw_rect(r, _pal["fill"])
-		var x: float = r.position.x
-		while x < r.end.x:
-			draw_line(Vector2(x, r.position.y), Vector2(x, r.end.y), _pal["line"], 1.0)
-			x += TILE
-		var y: float = r.position.y
-		while y < r.end.y:
-			draw_line(Vector2(r.position.x, y), Vector2(r.end.x, y), _pal["line"], 1.0)
-			y += TILE
-		draw_rect(Rect2(r.position, Vector2(r.size.x, 3)), _pal["edge"])
+	var sfx: String = String(TILESET.get(String(data.get("area", "gate")), ""))
+	# nền: gạch sẫm ở mọi ô trống
+	for y in rows:
+		for x in cols:
+			if not _is_solid(x, y):
+				draw_texture_rect(SPRITES.tex("floor_%d%s" % [1 + (x * 7 + y * 13) % 8, sfx]), Rect2(x * TILE, y * TILE, TILE, TILE), false, Color(1, 1, 1) * float(BG_DIM.get(String(data.get("area", "gate")), 0.3)) + Color(0, 0, 0.05, 1))
+	for y in rows:
+		for x in cols:
+			if not _is_solid(x, y):
+				continue
+			var top: bool = not _is_solid(x, y - 1)
+			var name: String = ("wall_mid" + sfx) if top else ("floor_%d%s" % [1 + (x * 5 + y * 11) % 8, sfx])
+			draw_texture_rect(SPRITES.tex(name), Rect2(x * TILE, y * TILE, TILE, TILE), false, Color.WHITE if top else Color(0.62, 0.62, 0.7))
+			if top:
+				draw_rect(Rect2(x * TILE, y * TILE, TILE, 3), _pal["edge"])
 	for r in oneways:
-		draw_rect(r, _pal["edge"].darkened(0.2))
+		for k in int(r.size.x / TILE):
+			draw_texture_rect(SPRITES.tex("wall_top_mid" + sfx), Rect2(r.position.x + k * TILE, r.position.y, TILE, TILE), false)
 	for r in hazards:
-		for k in 2:
-			var x0: float = r.position.x + float(k) * r.size.x * 0.5
-			draw_colored_polygon(PackedVector2Array([Vector2(x0, r.end.y), Vector2(x0 + r.size.x * 0.25, r.position.y - 8), Vector2(x0 + r.size.x * 0.5, r.end.y)]), Color(0.75, 0.78, 0.85))
+		draw_texture_rect(SPRITES.tex("floor_spikes_anim_f3"), Rect2(r.position.x - 4.0, r.position.y - 14.0, TILE, TILE), false)
 	for ch in doors:
 		draw_rect(doors[ch], Color(1, 1, 1, 0.04))
 	for it in interactables:
@@ -271,15 +281,14 @@ func _draw() -> void:
 				draw_rect(Rect2(pos.x - 18, pos.y - 6, 6, 6), Color(0.4, 0.35, 0.3))
 				draw_rect(Rect2(pos.x + 12, pos.y - 6, 6, 6), Color(0.4, 0.35, 0.3))
 			"merchant":
-				draw_rect(Rect2(r2.get_center().x - 14, r2.end.y - 48, 28, 48), Color(0.45, 0.35, 0.55))
-				draw_circle(Vector2(r2.get_center().x, r2.end.y - 54), 10, Color(0.7, 0.6, 0.8))
+				SPRITES.draw(self, SPRITES.anim("wizard_m_idle_anim", 6.0), Vector2(r2.get_center().x, r2.end.y), 2.0)
 			"altar":
-				draw_rect(Rect2(r2.get_center().x - 18, r2.end.y - 14, 36, 14), Color(0.3, 0.3, 0.35))
-				draw_circle(Vector2(r2.get_center().x, r2.end.y - 34), 12 + sin(Time.get_ticks_msec() * 0.004) * 2.0, Color(1, 0.85, 0.4))
+				SPRITES.draw(self, SPRITES.tex("altar_idle"), Vector2(r2.get_center().x, r2.end.y), 2.0)
+				draw_circle(Vector2(r2.get_center().x, r2.end.y - 44), 12 + sin(Time.get_ticks_msec() * 0.004) * 2.0, Color(1, 0.85, 0.4))
 			"charm":
-				draw_rect(Rect2(r2.get_center().x - 18, r2.end.y - 14, 36, 14), Color(0.3, 0.3, 0.35))
-				draw_circle(Vector2(r2.get_center().x, r2.end.y - 30), 9, Color(0.5, 0.9, 0.8))
+				SPRITES.draw(self, SPRITES.tex("altar_idle"), Vector2(r2.get_center().x, r2.end.y), 2.0)
+				draw_circle(Vector2(r2.get_center().x, r2.end.y - 40), 9, Color(0.5, 0.9, 0.8))
 			"cache":
-				draw_rect(Rect2(r2.position.x + 4, r2.position.y + 10, 24, 22), Color(0.6, 0.5, 0.25))
+				SPRITES.draw(self, SPRITES.tex("chest_full_open_anim_f0"), Vector2(r2.get_center().x, r2.end.y), 2.0)
 		if _player and r2.intersects(Rect2(_player.global_position - Vector2(13, 26), Vector2(26, 52))):
 			draw_string(ThemeDB.fallback_font, Vector2(r2.get_center().x - 6, r2.position.y - 6), "^", HORIZONTAL_ALIGNMENT_CENTER, -1, 20, Color(1, 1, 1, 0.9))

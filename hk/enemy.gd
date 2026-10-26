@@ -7,6 +7,13 @@ const FX = preload("res://hk/fx.gd")
 const STATE = preload("res://hk/state.gd")
 const GRAVITY: float = 2400.0
 
+const SPRITES = preload("res://hk/sprites.gd")
+const LOOK: Dictionary = {   # sprite + hệ số phóng; đáy sprite khớp đáy hộp va chạm
+	"crawler": {"anim": "slug_anim", "scale": 1.5},
+	"flyer": {"anim": "hell_imp_idle_anim", "scale": 2.0},
+	"spitter": {"anim": "orc_shaman_anim", "scale": 2.0},
+	"charger": {"anim": "chort_anim", "scale": 2.0},
+}
 const DATA: Dictionary = {
 	"crawler": {"hp": 12, "size": Vector2(38, 24), "geo": 1, "color": Color(0.75, 0.35, 0.3)},
 	"flyer": {"hp": 10, "size": Vector2(30, 30), "geo": 2, "color": Color(0.6, 0.4, 0.8)},
@@ -180,21 +187,10 @@ func _die() -> void:
 	queue_free()
 
 func _draw() -> void:
-	var c: Color = Color.WHITE if _flash > 0.0 else DATA[kind]["color"]
-	if state == "windup" and int(_time * 30.0) % 2 == 0:
-		c = c.lightened(0.6)
-	var h: Vector2 = _size * 0.5
-	match kind:
-		"flyer":
-			draw_circle(Vector2.ZERO, h.x, c)
-			draw_rect(Rect2(-h.x - 10, -4, 10, 4), c.darkened(0.2))
-			draw_rect(Rect2(h.x, -4, 10, 4), c.darkened(0.2))
-		"spitter":
-			draw_rect(Rect2(-h.x, -h.y, _size.x, _size.y), c)
-			draw_rect(Rect2(float(dir) * 8.0 - 4.0, -10, 8, 8), Color(0.1, 0.1, 0.05))
-		"charger":
-			draw_rect(Rect2(-h.x, -h.y, _size.x, _size.y), c)
-			draw_rect(Rect2(float(dir) * h.x - (0 if dir > 0 else 12), -h.y - 6, 12, 10), c.lightened(0.3))
-		_:
-			draw_rect(Rect2(-h.x, -h.y, _size.x, _size.y), c)
-	draw_rect(Rect2(float(dir) * h.x * 0.5 - 3.0, -h.y * 0.4 - 3.0, 6, 6), Color(0.1, 0.05, 0.05))
+	var tint := Color.WHITE
+	if _flash > 0.0:
+		tint = Color(3, 3, 3)
+	elif state == "windup" and int(_time * 30.0) % 2 == 0:
+		tint = Color(1.6, 0.7, 0.7)
+	var look: Dictionary = LOOK[kind]
+	SPRITES.draw(self, SPRITES.anim(String(look["anim"]), 8.0), Vector2(0, _size.y * 0.5), float(look["scale"]), dir < 0, tint)

@@ -10,6 +10,7 @@ signal hazard_hit
 const STATE = preload("res://hk/state.gd")
 const PROJECTILE = preload("res://hk/projectile.gd")
 const FX = preload("res://hk/fx.gd")
+const SPRITES = preload("res://hk/sprites.gd")
 
 const GRAVITY: float = 2400.0
 const MAX_FALL: float = 900.0
@@ -307,8 +308,13 @@ func _draw() -> void:
 	var a: float = 0.4 if invuln > 0.0 and int(invuln * 20.0) % 2 == 0 else 1.0
 	if focusing:
 		draw_circle(Vector2.ZERO, 34.0 + sin(_focus_t * 20.0) * 3.0, Color(1, 1, 1, 0.25))
-	draw_rect(Rect2(-13, -26, 26, 52), Color(0.85, 0.9, 1.0, a))
-	draw_rect(Rect2(float(facing) * 5.0 - 3.0, -16, 6, 8), Color(0.05, 0.05, 0.1, a))
+	var base: String = "knight_m_idle_anim"
+	if _stun > 0.0:
+		base = "knight_m_hit_anim"
+	elif is_on_floor() and absf(velocity.x) > 20.0:
+		base = "knight_m_run_anim"
+	var tint := Color(1.6, 1.6, 2.0, a) if _dash_t > 0.0 else Color(1, 1, 1, a)
+	SPRITES.draw(self, SPRITES.anim(base, 10.0), Vector2(0, 26), 2.0, facing < 0, tint)
 	if _attack_t > 0.0:
 		var size: Vector2 = _attack_size()
 		var c: Vector2 = attack_dir * (10.0 + (size.x if attack_dir.y == 0.0 else size.y) * 0.5)
