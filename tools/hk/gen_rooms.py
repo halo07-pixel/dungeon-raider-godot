@@ -92,6 +92,10 @@ r.plat(14, 18, 15); r.plat(28, 32, 15)
 for x, n in [(12, 2), (13, 1), (27, 3), (28, 1), (20, 2)]:
     r.hang(x, n)
 r.ground_door("1", "R", "gate_2", "1")
+r.extra += ["hint: 4 14 Up / W at the bench: rest and save",
+            "hint: 9 13 A / D or arrows: move     Z / Space: jump (hold = higher)",
+            "hint: 15 11 X / J: nail (hold Up/Down to aim)",
+            "hint: 29 13 Esc: pause, volume and controls"]
 
 r = new("gate_2", 40, 22, 18, "gate", "Collapsed Walk", (6, 0))
 r.pit(16, 19)

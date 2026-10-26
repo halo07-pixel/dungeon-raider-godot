@@ -1,6 +1,7 @@
 extends Node
 ## Âm thanh hiệu ứng tổng hợp bằng code (không cần file .wav), cùng cách làm với game cũ nhưng độc lập autoload.
 ## Các node báo lên bằng signal `sfx(name)`; world nối signal đó vào `play`. `history` lưu vài tên gần nhất (cho test).
+const STATE = preload("res://hk/state.gd")
 const RATE: int = 22050
 const VOLUME_DB: float = -6.0
 var history: Array = []
@@ -23,7 +24,7 @@ func play(name: String, pitch: float = 1.0) -> void:
 	var p := AudioStreamPlayer.new()
 	p.stream = _sounds[name]
 	p.pitch_scale = pitch * randf_range(0.94, 1.06)
-	p.volume_db = VOLUME_DB
+	p.volume_db = VOLUME_DB + STATE.vol_db(STATE.sfx_vol)
 	add_child(p)
 	p.finished.connect(p.queue_free)
 	p.play()

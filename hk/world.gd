@@ -70,6 +70,7 @@ func _ready() -> void:
 	player.hazard_hit.connect(_on_hazard)
 	player.sfx.connect(sfx.play)
 	shop.sfx.connect(sfx.play)
+	menu.volume_changed.connect(_on_volume_changed)
 	hud.set_health(STATE.hp, STATE.max_hp())
 	hud.set_soul(STATE.soul)
 	load_room(STATE.bench_room)
@@ -113,6 +114,10 @@ func _build_ui() -> void:
 	add_child(menu)
 	shop = preload("res://hk/shop.gd").new()
 	add_child(shop)
+
+func _on_volume_changed() -> void:
+	music.apply_volume()
+	sfx.play("buy")
 
 func _process(_d: float) -> void:
 	if Input.is_action_just_pressed("hk_debug"):

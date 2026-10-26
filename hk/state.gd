@@ -39,6 +39,13 @@ static var visited: Array = []
 static var bench_room: String = START_ROOM
 static var bench_id: String = "start"
 static var shade: Dictionary = {}       # {room, x, y, geo}
+# Âm lượng 0..10: không bị reset() xoá (là cài đặt, không phải tiến trình); lưu cùng file save.
+# shortcut: chỉ lưu khi có save, màn tiêu đề dùng mặc định tới khi vào ván; tách file cài đặt khi có thêm cài đặt khác.
+static var music_vol: int = 10
+static var sfx_vol: int = 10
+
+static func vol_db(v: int) -> float:
+	return -80.0 if v <= 0 else linear_to_db(float(v) / 10.0)
 
 static func reset() -> void:
 	hp_bonus = 0
@@ -130,11 +137,13 @@ static func geo_mult() -> float:
 static func to_dict() -> Dictionary:
 	return {"v": 1, "hp_bonus": hp_bonus, "soul": soul, "geo": geo, "abilities": abilities, "charms_owned": charms_owned,
 		"charms_equipped": charms_equipped, "notch_bonus": notch_bonus, "flags": flags, "visited": visited,
-		"bench_room": bench_room, "bench_id": bench_id, "shade": shade}
+		"bench_room": bench_room, "bench_id": bench_id, "shade": shade, "music_vol": music_vol, "sfx_vol": sfx_vol}
 
 static func from_dict(d: Dictionary) -> void:
 	reset()
 	hp_bonus = clampi(int(d.get("hp_bonus", 0)), 0, 4)
+	music_vol = clampi(int(d.get("music_vol", music_vol)), 0, 10)
+	sfx_vol = clampi(int(d.get("sfx_vol", sfx_vol)), 0, 10)
 	geo = maxi(0, int(d.get("geo", 0)))
 	notch_bonus = clampi(int(d.get("notch_bonus", 0)), 0, 4)
 	for a in d.get("abilities", []):

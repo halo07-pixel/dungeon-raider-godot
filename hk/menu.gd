@@ -2,6 +2,7 @@ extends CanvasLayer
 ## Menu tạm dừng: tab Bản đồ (M), Bùa (E/Tab), Tạm dừng (Esc). Chạy cả khi game đang pause.
 const STATE = preload("res://hk/state.gd")
 const WorldData = preload("res://hk/world_data.gd")
+signal volume_changed
 const CELL: float = 26.0
 const AREA_COLORS: Dictionary = {"gate": Color(0.35, 0.42, 0.62), "catacomb": Color(0.62, 0.4, 0.45), "vault": Color(0.3, 0.6, 0.65)}
 
@@ -62,6 +63,16 @@ func _process(_d: float) -> void:
 	elif Input.is_action_just_pressed("hk_charms") and tab != "charms":
 		tab = "charms"
 		sel = 0
+	if tab == "pause":
+		if Input.is_action_just_pressed("hk_down") or Input.is_action_just_pressed("hk_up"):
+			sel = 1 - sel
+		var step: int = int(Input.is_action_just_pressed("hk_right")) - int(Input.is_action_just_pressed("hk_left"))
+		if step != 0:
+			if sel == 0:
+				STATE.music_vol = clampi(STATE.music_vol + step, 0, 10)
+			else:
+				STATE.sfx_vol = clampi(STATE.sfx_vol + step, 0, 10)
+			volume_changed.emit()
 	if tab == "charms":
 		var n: int = STATE.CHARMS.size()
 		if Input.is_action_just_pressed("hk_down"):
@@ -163,3 +174,14 @@ func _draw_pause(v: Control, font: Font, sz: Vector2) -> void:
 	]
 	for i in lines.size():
 		v.draw_string(font, Vector2(sz.x * 0.5 - 380, 150.0 + i * 36.0), String(lines[i]), HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Color(0.9, 0.93, 1))
+	var y0: float = 150.0 + lines.size() * 36.0 + 30.0
+	var rows: Array = [["Music", STATE.music_vol], ["Effects", STATE.sfx_vol]]
+	for i in rows.size():
+		var y: float = y0 + i * 40.0
+		var col := Color(1, 1, 1) if i == sel else Color(0.6, 0.65, 0.75)
+		if i == sel:
+			v.draw_rect(Rect2(sz.x * 0.5 - 390, y - 26, 560, 38), Color(1, 1, 1, 0.1))
+		v.draw_string(font, Vector2(sz.x * 0.5 - 380, y), String(rows[i][0]), HORIZONTAL_ALIGNMENT_LEFT, -1, 20, col)
+		for k in 10:
+			v.draw_rect(Rect2(sz.x * 0.5 - 200 + k * 22, y - 18, 18, 20), col if k < int(rows[i][1]) else Color(1, 1, 1, 0.12))
+	v.draw_string(font, Vector2(sz.x * 0.5 - 380, y0 + 100), "Up/Down choose   Left/Right change volume", HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.6, 0.65, 0.75))
