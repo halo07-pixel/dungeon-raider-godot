@@ -7,6 +7,8 @@ const FX = preload("res://hk/fx.gd")
 const AREA_NAMES: Dictionary = {"gate": "Gate Ruins", "catacomb": "Weeping Catacombs", "vault": "Ashen Vaults"}
 const ZOOM: float = 1.5
 
+signal ending_reached   # báo lên main sau khi hạ Dungeon Lord
+
 var rooms: Dictionary = {}
 var room: Node2D
 var player: CharacterBody2D
@@ -162,7 +164,12 @@ func _on_boss_defeated(bid: String) -> void:
 	hud.banner("%s defeated" % String(boss.title() if is_instance_valid(boss) else bid), "")
 	if bid == "lord":
 		STATE.set_flag("ending")
-		hud.banner("The Dungeon Lord falls", "Thank you for playing")
+		STATE.save()
+		hud.banner("The Dungeon Lord falls", "")
+		busy = true
+		player.controls_enabled = false
+		await get_tree().create_timer(3.0, true, false, true).timeout
+		ending_reached.emit()
 
 func _on_door(door_id: String) -> void:
 	if busy:

@@ -145,12 +145,27 @@ func _init() -> void:
 	w.shop._buy(stock[0])
 	ck(St.hp_bonus == 1 and St.geo < 1000, "mua mặt nạ")
 	w.shop.close()
-	# phím Up mở shop không được dịch lựa chọn trong khung mở
-	Input.action_press("hk_up")
-	w.shop.open(w.player)
+	# phím Up mở shop không được dịch lựa chọn trong khung mở (action_press không tạo just_pressed -> dùng sự kiện thật)
+	var ev := InputEventAction.new()
+	ev.action = "hk_up"
+	ev.pressed = true
+	Input.parse_input_event(ev)
 	await process_frame
+	ck(Input.is_action_just_pressed("hk_up"), "kiểm tra thử: sự kiện hk_up là just_pressed")
+	w.shop.open(w.player)
+	w.shop._process(0.0)
 	ck(w.shop._sel == 0, "khung đầu sau khi mở shop bị bỏ qua (sel=%d)" % w.shop._sel)
-	Input.action_release("hk_up")
+	ev.pressed = false
+	Input.parse_input_event(ev)
+	await process_frame
+	await process_frame
+	ev.pressed = true
+	Input.parse_input_event(ev)
+	await process_frame
+	w.shop._process(0.0)
+	ck(w.shop._sel != 0, "khung sau đó thì Up chạy bình thường (sel=%d)" % w.shop._sel)
+	ev.pressed = false
+	Input.parse_input_event(ev)
 	w.shop.close()
 	# --- save/load round trip ---
 	St.save()
