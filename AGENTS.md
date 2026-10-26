@@ -54,3 +54,6 @@ Cuối mỗi lần làm: nói ngắn gọn đã đổi file nào, điều gì ch
 - Màn hình/menu mở bằng phím điều hướng phải bỏ qua khung đầu (phím mở còn just_pressed); xem `shop.gd`, `title.gd`.
 - `hk/state.gd` là static, không phải autoload: test phải `reset()` và đổi `save_path` sang file riêng.
 
+- **Hình = hộp.** Kích thước hộp quái/boss/vật tương tác lấy từ bbox nhìn thấy của sprite (`hk/bodies.gd`, sinh bởi `tools/hk/gen_bodies.py` sau khi đổi ảnh) — không gõ tay số hộp riêng. Vẽ qua `SPRITES.draw_body` (đáy nhìn thấy chạm chân hộp). Người chơi: `player.BODY` 24×44; validator dùng cùng số (HALF_W/HALF_H, GROUND_ACCEL).
+- Lật sprite: `draw_texture_rect` với `size.x < 0` vẫn phủ `[position.x, position.x+|size.x|]`, không tự dời vị trí.
+- F3 trong game bật lớp soi hộp thật (`hk/debug_boxes.gd`); `tools/_hkshot.gd <phòng> <png> [x y] debug` chụp kèm lớp này. Test: `hk_align_test.gd`.

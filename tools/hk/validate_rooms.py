@@ -21,9 +21,10 @@ import numpy as np
 ROOMS_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "hk", "rooms")
 TILE = 32
 DT = 1.0 / 60.0
-HALF_W, HALF_H = 13.0, 26.0
+HALF_W, HALF_H = 12.0, 22.0   # = player.BODY 24x44 / 2
 GRAVITY, MAX_FALL = 2400.0, 900.0
 RUN, JUMP_V, JUMP_CUT = 300.0, -780.0, 0.4
+GROUND_ACCEL = 6000.0   # = player.GROUND_ACCEL (chỉ trên mặt đất)
 DASH_V, DASH_T = 760.0, 0.18
 COYOTE, WALL_SLIDE, WALL_LOCK, WALL_COYOTE = 0.1, 90.0, 0.18, 0.1
 WALL_JUMP_VX, WALL_JUMP_VY = 320.0, JUMP_V * 0.95
@@ -286,7 +287,9 @@ def simulate(room, feat, starts, combos):
         dashing = dash_t[a] > 0
         # ---- vận tốc ngang / trọng lực
         free_x = wall_lock[a] <= 0
-        vx[a] = np.where(free_x, d * RUN, vx[a])
+        tgt = d * RUN
+        acc = np.where(ground[a], vx[a] + np.clip(tgt - vx[a], -GROUND_ACCEL * DT, GROUND_ACCEL * DT), tgt)
+        vx[a] = np.where(free_x, acc, vx[a])
         vy[a] = np.where(dashing, 0.0, np.minimum(vy[a] + GRAVITY * DT, MAX_FALL))
         vx[a] = np.where(dashing, dash_dir[a] * DASH_V, vx[a])
         # ---- bám tường

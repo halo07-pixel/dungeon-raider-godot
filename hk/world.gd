@@ -7,6 +7,7 @@ const FX = preload("res://hk/fx.gd")
 const MUSIC = preload("res://hk/music.gd")
 const SFX = preload("res://hk/sfx.gd")
 const BACKDROP = preload("res://hk/backdrop.gd")
+const DEBUG_BOXES = preload("res://hk/debug_boxes.gd")
 const AREA_NAMES: Dictionary = {"gate": "Gate Ruins", "catacomb": "Weeping Catacombs", "vault": "Ashen Vaults"}
 const ZOOM: float = 1.5
 
@@ -22,6 +23,7 @@ var shop: Node
 var music: Node
 var sfx: Node
 var backdrop: Node
+var debug_boxes: Node2D
 var busy: bool = false
 var entry_spawn: Vector2 = Vector2.ZERO
 var boss: Node2D
@@ -57,6 +59,9 @@ func _ready() -> void:
 	add_child(sfx)
 	backdrop = BACKDROP.new()
 	add_child(backdrop)
+	debug_boxes = DEBUG_BOXES.new()
+	debug_boxes.world = self
+	add_child(debug_boxes)
 	_build_ui()
 	player.hit_landed.connect(cam.shake)
 	player.health_changed.connect(hud.set_health)
@@ -110,6 +115,8 @@ func _build_ui() -> void:
 	add_child(shop)
 
 func _process(_d: float) -> void:
+	if Input.is_action_just_pressed("hk_debug"):
+		debug_boxes.toggle()
 	if is_instance_valid(player):
 		cam.global_position = player.global_position
 	menu.enabled = not busy and not shop.is_open() and not player.is_dead()
@@ -168,7 +175,7 @@ func _spawn_enemy(ch: String, pos: Vector2) -> void:
 	e.set_script(preload("res://hk/enemy.gd"))
 	e.kind = kinds[ch]
 	e.sfx.connect(sfx.play)
-	var h: float = float(e.DATA[e.kind]["size"].y)
+	var h: float = e.body_size(e.kind).y
 	e.position = pos - (Vector2(0, h * 0.5) if ch != "f" else Vector2.ZERO)
 	_content.add_child(e)
 
@@ -176,7 +183,7 @@ func _spawn_boss(bid: String, pos: Vector2) -> void:
 	boss = CharacterBody2D.new()
 	boss.set_script(preload("res://hk/boss.gd"))
 	boss.kind = bid
-	boss.position = pos - Vector2(0, 50)
+	boss.position = pos - Vector2(0, boss.body_size(bid).y * 0.5 + 1.0)   # chân boss đứng trên sàn của ô X
 	_content.add_child(boss)
 	boss.defeated.connect(_on_boss_defeated.bind(bid))
 	boss.arena = room.bounds()

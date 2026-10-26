@@ -3,6 +3,7 @@ extends StaticBody2D
 signal recovered(amount: int)
 const STATE = preload("res://hk/state.gd")
 const FX = preload("res://hk/fx.gd")
+const SPRITES = preload("res://hk/sprites.gd")
 var hp: int = 4
 var amount: int = 0
 var _t: float = 0.0
@@ -12,7 +13,7 @@ func _ready() -> void:
 	collision_mask = 0
 	var cs := CollisionShape2D.new()
 	var sh := RectangleShape2D.new()
-	sh.size = Vector2(34, 52)
+	sh.size = SPRITES.BODIES.rect("knight_m_idle_anim", 2.0).size
 	cs.shape = sh
 	add_child(cs)
 
@@ -31,7 +32,6 @@ func take_hit(_dmg: int, _from: Vector2) -> void:
 		queue_free()
 
 func _draw() -> void:
-	var b: float = sin(_t * 3.0) * 4.0
-	draw_rect(Rect2(-14, -26 + b, 28, 52), Color(0.55, 0.65, 0.9, 0.55))
-	draw_rect(Rect2(-8, -14 + b, 5, 8), Color(0.05, 0.05, 0.12))
-	draw_rect(Rect2(3, -14 + b, 5, 8), Color(0.05, 0.05, 0.12))
+	# bóng ma = bóng hiệp sĩ mờ, nhấp nhô nhẹ; chân nằm ở đáy hộp va chạm
+	var h: float = SPRITES.BODIES.rect("knight_m_idle_anim", 2.0).size.y
+	SPRITES.draw_body(self, "knight_m_idle_anim", Vector2(0, h * 0.5 + sin(_t * 3.0) * 4.0), 2.0, false, Color(0.55, 0.7, 1.4, 0.55), 6.0)

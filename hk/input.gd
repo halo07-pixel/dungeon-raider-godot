@@ -13,6 +13,7 @@ const KEYS: Dictionary = {
 	"hk_map": [KEY_M],
 	"hk_charms": [KEY_TAB, KEY_E],
 	"hk_pause": [KEY_ESCAPE],
+	"hk_debug": [KEY_F3],
 }
 
 static func ensure() -> void:
