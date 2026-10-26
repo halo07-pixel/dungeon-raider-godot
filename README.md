@@ -24,6 +24,7 @@ Kỹ năng: **Shadow Dash** (gate_8) → **Wings of Ash** nhảy đôi (cat_4) �
 - `world.gd` — nạp phòng, chuyển cửa, bench, chết/shade, tương tác, boss; báo `ending_reached` lên `main.gd`.
 - `room.gd` + `world_data.gd` — dựng phòng từ lưới ký tự `hk/rooms/*.txt` (1 ô = 32px).
 - `player.gd`, `enemy.gd`, `boss.gd`, `projectile.gd`, `shade.gd` — thực thể. `hud.gd`, `menu.gd`, `shop.gd`, `title.gd`, `ending.gd` — giao diện (giao tiếp bằng signal).
+- `sprites.gd`, `music.gd` — dùng lại sprite 0x72 (CC0) và nhạc CC0 của game cũ trong `assets/`; chỉ để vẽ/phát, không ảnh hưởng logic.
 - `input.gd` — đăng ký phím bằng code (không đụng InputMap game cũ).
 
 ## Công cụ
