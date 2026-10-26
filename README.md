@@ -24,13 +24,14 @@ Kỹ năng: **Shadow Dash** (gate_8) → **Wings of Ash** nhảy đôi (cat_4) �
 - `world.gd` — nạp phòng, chuyển cửa, bench, chết/shade, tương tác, boss; báo `ending_reached` lên `main.gd`.
 - `room.gd` + `world_data.gd` — dựng phòng từ lưới ký tự `hk/rooms/*.txt` (1 ô = 32px).
 - `player.gd`, `enemy.gd`, `boss.gd`, `projectile.gd`, `shade.gd` — thực thể. `hud.gd`, `menu.gd`, `shop.gd`, `title.gd`, `ending.gd` — giao diện (giao tiếp bằng signal).
+- `sfx.gd` (âm thanh hiệu ứng tổng hợp bằng code; các node báo lên bằng signal `sfx(name)`, world nối vào `sfx.play`), `backdrop.gd` (nền xa nhiều lớp theo khu).
 - `sprites.gd`, `music.gd` — dùng lại sprite 0x72 (CC0) và nhạc CC0 của game cũ trong `assets/`; chỉ để vẽ/phát, không ảnh hưởng logic.
 - `input.gd` — đăng ký phím bằng code (không đụng InputMap game cũ).
 
 ## Công cụ
 - `python3 tools/hk/gen_rooms.py` — sinh lại `hk/rooms/*.txt` (sửa phòng ở đây, không sửa tay file sinh ra).
 - `python3 tools/hk/validate_rooms.py [--quick]` — mô phỏng vật lý người chơi để kiểm tra mọi phòng/vật phẩm/kỹ năng tới được đúng thứ tự và không có bẫy. Thoát 1 nếu lỗi.
-- `godot --headless --path . --script tools/tests/hk_world_test.gd` (cũng `hk_player_test.gd`, `hk_flow_test.gd`) — test headless. `bash tools/tests/run_all.sh` chạy tất cả.
+- `godot --headless --path . --script tools/tests/hk_world_test.gd` (cũng `hk_player_test.gd`, `hk_flow_test.gd`, `hk_sfx_test.gd`) — test headless. `bash tools/tests/run_all.sh` chạy tất cả.
 - `tools/_hkshot.gd -- <room_id> <out.png>` dưới `xvfb-run ... --rendering-driver opengl3` — chụp ảnh một phòng.
 
 Giới hạn đã biết của validator: không mô phỏng pogo, Soul Bolt, quái/boss; mẫu thời điểm bấm phím rời rạc nên "không tới được" cần kiểm tay, còn "tới được" là chắc chắn.
