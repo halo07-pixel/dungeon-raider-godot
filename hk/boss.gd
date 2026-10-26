@@ -230,7 +230,7 @@ func _wraith(delta: float, p: Node2D) -> void:
 	match state:
 		"hover":
 			_face(p)
-			var target := Vector2(p.global_position.x + sin(_time * 1.3) * 200.0, p.global_position.y - 150.0)
+			var target := Vector2(p.global_position.x + sin(_time * 1.3) * 200.0, p.global_position.y - 140.0)   # cũ 150 với hộp 70 cao; hộp mới thấp hơn nên hạ 10 để đáy giữ nguyên tầm nhảy-chém (~-115)
 			target = _clamp_arena(target)
 			velocity = (target - global_position).limit_length(speed)
 			if _t <= 0.0:

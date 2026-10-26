@@ -1,5 +1,6 @@
 extends Node
 ## Phát nhạc nền từ assets/music (nhạc CC0 của game cũ). `play` cùng bài đang phát thì bỏ qua; đổi bài có fade-in ngắn.
+const STATE = preload("res://hk/state.gd")
 const DIR: String = "res://assets/music/"
 const AREA_TRACK: Dictionary = {"gate": "explore_stone", "catacomb": "explore_hell", "vault": "explore_ice"}
 const BOSS_TRACK: Dictionary = {"warden": "boss_warden", "wraith": "boss_necromancer", "lord": "lord_fight"}
@@ -30,7 +31,16 @@ func play(track: String, loop: bool = true) -> void:
 	if _tween:
 		_tween.kill()
 	_tween = create_tween()
-	_tween.tween_property(_player, "volume_db", VOLUME_DB, 0.8)
+	_tween.tween_property(_player, "volume_db", target_db(), 0.8)
+
+func target_db() -> float:
+	return VOLUME_DB + STATE.vol_db(STATE.music_vol)
+
+## Gọi khi người chơi đổi thanh âm lượng: đặt thẳng, bỏ fade đang chạy.
+func apply_volume() -> void:
+	if _tween:
+		_tween.kill()
+	_player.volume_db = target_db()
 
 func stop() -> void:
 	current = ""

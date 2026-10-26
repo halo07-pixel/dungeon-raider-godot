@@ -279,6 +279,13 @@ func _draw() -> void:
 			var tri := PackedVector2Array([Vector2(r.position.x + k * sw, r.end.y), Vector2(r.position.x + (k + 0.5) * sw, r.position.y), Vector2(r.position.x + (k + 1) * sw, r.end.y)])
 			draw_colored_polygon(tri, Color(0.8, 0.84, 0.92))
 			draw_polyline(PackedVector2Array([tri[0], tri[1], tri[2]]), Color(0.12, 0.12, 0.2), 2.0)
+	for h in data.get("hints", []):   # chữ gợi ý phím: rõ dần khi người chơi lại gần
+		var hpos := Vector2(float(h["col"]) * TILE, float(h["row"]) * TILE)
+		var a: float = 0.35
+		if _player:
+			a = clampf(1.5 - _player.global_position.distance_to(hpos) / 350.0, 0.35, 1.0)
+		draw_string(ThemeDB.fallback_font, hpos + Vector2(1, 1), String(h["text"]), HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0, 0, 0, a))
+		draw_string(ThemeDB.fallback_font, hpos, String(h["text"]), HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.95, 0.9, 0.7, a))
 	for ch in doors:
 		draw_rect(doors[ch], Color(1, 1, 1, 0.04))
 	for it in interactables:
