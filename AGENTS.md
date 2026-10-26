@@ -47,3 +47,11 @@ Cuối mỗi lần làm: nói ngắn gọn đã đổi file nào, điều gì ch
 
 ## 6. Công cụ Ponytail (nếu đã cài plugin)
 `/ponytail-review` trước khi báo "đã push nhánh"; `/ponytail-audit` định kỳ cho cả repo; `/ponytail-debt` để xem các `# shortcut:`.
+
+## 7. Bản Hollow Knight-style (`hk/`)
+- Phòng nằm ở `hk/rooms/*.txt`, được sinh bởi `tools/hk/gen_rooms.py`: sửa generator rồi sinh lại, không sửa tay.
+- Sau mọi thay đổi phòng hoặc hằng số di chuyển trong `player.gd`: chạy `python3 tools/hk/validate_rooms.py --quick` (phải OK) và `hk_world_test.gd`, `hk_player_test.gd`, `hk_flow_test.gd`.
+- Test input headless: `Input.action_press` KHÔNG tạo `is_action_just_pressed`; dùng `Input.parse_input_event(InputEventAction)` rồi `await process_frame`.
+- Màn hình/menu mở bằng phím điều hướng phải bỏ qua khung đầu (phím mở còn just_pressed); xem `shop.gd`, `title.gd`.
+- `hk/state.gd` là static, không phải autoload: test phải `reset()` và đổi `save_path` sang file riêng.
+

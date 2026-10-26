@@ -20,13 +20,21 @@ func hold(a: String, n: int) -> void:
 func _init() -> void:
 	await process_frame
 	load("res://hk/input.gd").ensure()
+	var St = load("res://hk/state.gd")
+	St.boot = "keep"
+	St.reset()
+	St.save_path = "user://hk_player_test_save.json"
+	St.give_ability("dash")   # dash cần kỹ năng Shadow Dash
 	var room := Node2D.new()
 	room.set_script(load("res://hk/room.gd"))
-	room.rects = [Rect2(-500, 600, 3000, 200)]
 	root.add_child(room)
+	var grid: Array = []
+	for r in 20:
+		grid.append("#".repeat(80) if r == 19 else "#" + ".".repeat(78) + "#")
+	room.build("test", {"area": "gate", "doors": {}, "grid": grid})   # mặt sàn ở y=608 (cũ: 600) nên các toạ độ y tuyệt đối bên dưới +8
 	var p := CharacterBody2D.new()
 	p.set_script(load("res://hk/player.gd"))
-	p.position = Vector2(0, 500)
+	p.position = Vector2(1000, 500)
 	root.add_child(p)
 	await frames(60)
 	ck(p.is_on_floor(), "đáp xuống sàn")
@@ -58,8 +66,9 @@ func _init() -> void:
 	await frames(40)
 	# chém quái
 	var e := CharacterBody2D.new()
-	e.set_script(load("res://hk/crawler.gd"))
-	e.position = Vector2(p.position.x + 60.0, 576)
+	e.set_script(load("res://hk/enemy.gd"))
+	e.kind = "crawler"
+	e.position = Vector2(p.position.x + 60.0, 584)
 	root.add_child(e)
 	await frames(2)
 	e.set_physics_process(false)
@@ -67,11 +76,11 @@ func _init() -> void:
 	p.facing = 1
 	await hold("hk_attack", 1)
 	await frames(10)
-	ck(e.hp == hp0 - 1, "chém ngang trúng quái, đúng 1 lần (%d -> %d)" % [hp0, e.hp])
+	ck(e.hp == hp0 - St.nail_damage(), "chém ngang trúng quái, đúng 1 lần (%d -> %d)" % [hp0, e.hp])
 	await frames(30)
 	# pogo: đứng trên quái, chém xuống khi đang ở trên không
-	e.position = Vector2(p.position.x, 590)
-	p.position = Vector2(p.position.x, 490)
+	e.position = Vector2(p.position.x, 598)
+	p.position = Vector2(p.position.x, 498)
 	p.velocity = Vector2.ZERO
 	p.can_dash = false
 	Input.action_press("hk_down")
@@ -84,7 +93,7 @@ func _init() -> void:
 	Input.action_release("hk_attack")
 	Input.action_release("hk_down")
 	ck(vy_min <= p.POGO_V + 1.0, "chém xuống trúng quái thì nảy lên (vy %.0f)" % vy_min)
-	ck(e.hp < hp0 - 1 or not is_instance_valid(e), "chém xuống gây sát thương")
+	ck(not is_instance_valid(e) or e.hp < hp0 - St.nail_damage(), "chém xuống gây sát thương")
 	await frames(60)
 	# mất máu + khung bất tử
 	var hp1: int = p.hp
