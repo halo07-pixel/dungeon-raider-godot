@@ -17,12 +17,17 @@ const LOOK: Dictionary = {
 const GRAVITY: float = 2400.0
 
 const DATA: Dictionary = {
-	"warden": {"title": "Gate Warden", "hp": 220, "size": Vector2(64, 96), "color": Color(0.55, 0.62, 0.78), "speed": 95.0},
-	"wraith": {"title": "Hollow Wraith", "hp": 260, "size": Vector2(54, 70), "color": Color(0.75, 0.82, 0.98), "speed": 200.0},
-	"lord": {"title": "Dungeon Lord", "hp": 420, "size": Vector2(76, 116), "color": Color(0.82, 0.36, 0.30), "speed": 115.0},
+	"warden": {"title": "Gate Warden", "hp": 220, "color": Color(0.55, 0.62, 0.78), "speed": 95.0},
+	"wraith": {"title": "Hollow Wraith", "hp": 260, "color": Color(0.75, 0.82, 0.98), "speed": 200.0},
+	"lord": {"title": "Dungeon Lord", "hp": 420, "color": Color(0.82, 0.36, 0.30), "speed": 115.0},
 }
 
 var kind: String = "warden"
+
+## Hộp va chạm = phần nhìn thấy của sprite (hk/bodies.gd).
+static func body_size(k: String) -> Vector2:
+	var look: Dictionary = LOOK[k]
+	return SPRITES.BODIES.rect(String(look["anim"]), float(look["scale"])).size
 var arena: Rect2 = Rect2(0, 0, 1280, 720)
 var hp: int = 100
 var max_hp: int = 100
@@ -44,7 +49,7 @@ func _ready() -> void:
 	var d: Dictionary = DATA[kind]
 	max_hp = int(d["hp"])
 	hp = max_hp
-	_size = d["size"]
+	_size = body_size(kind)
 	collision_layer = 4
 	collision_mask = 1 if kind != "wraith" else 0
 	add_to_group("hk_boss")
@@ -331,6 +336,12 @@ func _update_markers(delta: float) -> void:
 				get_parent().add_child.call_deferred(s)
 				s.position = Vector2(float(m["x"]), arena.position.y + 40.0)
 
+func body_rect() -> Rect2:
+	return Rect2(global_position - _size * 0.5, _size)
+
+func attack_rect() -> Rect2:
+	return _attack_rect()
+
 func _attack_rect() -> Rect2:
 	if state == "lunge":
 		return Rect2(global_position + Vector2(float(dir) * (_size.x * 0.5 + 45.0) - 45.0, -_size.y * 0.4), Vector2(90, _size.y * 0.8))
@@ -339,7 +350,7 @@ func _attack_rect() -> Rect2:
 func _touch_damage(p: Node2D) -> void:
 	if state == "dormant" or state == "intro" or _alpha < 0.9:
 		return
-	var pr := Rect2(p.global_position - Vector2(13, 26), Vector2(26, 52))
+	var pr := Rect2(p.global_position - p.BODY * 0.5, p.BODY)
 	var body := Rect2(global_position - _size * 0.5, _size)
 	if pr.intersects(body) or (state == "lunge" and pr.intersects(_attack_rect())):
 		p.take_damage(global_position.x)
@@ -371,7 +382,7 @@ func _draw() -> void:
 		tint.a = _alpha
 	var h: Vector2 = _size * 0.5
 	var look: Dictionary = LOOK[kind]
-	SPRITES.draw(self, SPRITES.anim(String(look["anim"]), 6.0), Vector2(0, h.y), float(look["scale"]), dir < 0, tint)
+	SPRITES.draw_body(self, String(look["anim"]), Vector2(0, h.y), float(look["scale"]), dir < 0, tint, 6.0)
 	if kind != "wraith" and state == "lunge":
 		draw_rect(Rect2(float(dir) * (h.x + 45.0) - 45.0, -h.y * 0.8, 90, _size.y * 0.8), Color(1, 1, 1, 0.55))
 	for m in _markers:
@@ -379,6 +390,6 @@ func _draw() -> void:
 		var a: float = 0.25 + 0.35 * (1.0 - float(m["t"]))
 		draw_rect(Rect2(gx - 14.0, -global_position.y + arena.position.y, 28.0, arena.size.y), Color(1, 0.3, 0.3, a * 0.5))
 	if state != "dormant":
-		var w: float = 160.0
-		draw_rect(Rect2(-w * 0.5, -h.y - 26, w, 6), Color(0.1, 0.1, 0.15))
-		draw_rect(Rect2(-w * 0.5, -h.y - 26, w * float(hp) / float(max_hp), 6), Color(0.95, 0.4, 0.35))
+		var w: float = clampf(_size.x * 1.6, 120.0, 220.0)   # thanh máu ngay trên đỉnh phần nhìn thấy, rộng theo cỡ boss
+		draw_rect(Rect2(-w * 0.5, -h.y - 18, w, 8), Color(0.05, 0.05, 0.1, 0.85))
+		draw_rect(Rect2(-w * 0.5 + 1.0, -h.y - 17, (w - 2.0) * float(hp) / float(max_hp), 6), Color(0.95, 0.4, 0.35))

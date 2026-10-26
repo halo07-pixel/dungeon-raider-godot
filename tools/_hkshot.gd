@@ -1,5 +1,5 @@
 extends SceneTree
-## Chụp ảnh một phòng: godot --path . -s tools/_hkshot.gd -- <room_id> <out.png> [x y]
+## Chụp ảnh một phòng: godot --path . -s tools/_hkshot.gd -- <room_id> <out.png> [x y] [debug]
 func _init() -> void:
 	var args := OS.get_cmdline_user_args()
 	var rid: String = args[0] if args.size() > 0 else "gate_1"
@@ -18,6 +18,8 @@ func _init() -> void:
 	await create_timer(0.3).timeout
 	if args.size() > 3:
 		w.player.global_position = Vector2(float(args[2]), float(args[3]))
+	if "debug" in args:
+		w.debug_boxes.toggle()
 	await create_timer(0.8).timeout
 	root.get_viewport().get_texture().get_image().save_png(out)
 	quit()

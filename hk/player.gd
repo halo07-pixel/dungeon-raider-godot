@@ -12,6 +12,10 @@ const STATE = preload("res://hk/state.gd")
 const PROJECTILE = preload("res://hk/projectile.gd")
 const FX = preload("res://hk/fx.gd")
 const SPRITES = preload("res://hk/sprites.gd")
+## Hộp va chạm: rộng = 80% phần nhìn thấy (30px), cao = phần nhìn thấy (42px) + 2. Đáy hộp = chân nhân vật.
+const BODY: Vector2 = Vector2(24, 44)
+const FOOT: float = 22.0   # BODY.y / 2
+const GROUND_ACCEL: float = 6000.0   # đạt RUN_SPEED trong 0.05s trên mặt đất; trên không giữ điều khiển tức thì
 
 const GRAVITY: float = 2400.0
 const MAX_FALL: float = 900.0
@@ -71,7 +75,7 @@ func _ready() -> void:
 	collision_mask = 1
 	var cs := CollisionShape2D.new()
 	var sh := RectangleShape2D.new()
-	sh.size = Vector2(26, 52)
+	sh.size = BODY
 	cs.shape = sh
 	add_child(cs)
 	add_to_group("hk_player")
@@ -130,7 +134,8 @@ func _physics_process(delta: float) -> void:
 		_stun -= delta
 		velocity.x = move_toward(velocity.x, 0.0, 900.0 * delta)
 	elif _wall_lock <= 0.0:
-		velocity.x = move * RUN_SPEED
+		var target: float = move * RUN_SPEED
+		velocity.x = move_toward(velocity.x, target, GROUND_ACCEL * delta) if is_on_floor() else target
 		if move != 0.0:
 			facing = 1 if move > 0.0 else -1
 
@@ -156,7 +161,7 @@ func _physics_process(delta: float) -> void:
 		_air_jumps -= 1
 		sfx.emit("double_jump")
 		_buffer = 0.0
-		FX.burst(get_parent(), global_position + Vector2(0, 26), Color(0.8, 0.85, 1.0), 6, 100.0)
+		FX.burst(get_parent(), global_position + Vector2(0, FOOT), Color(0.8, 0.85, 1.0), 6, 100.0)
 	if Input.is_action_just_released("hk_jump") and velocity.y < 0.0:
 		velocity.y *= JUMP_CUT
 
@@ -174,7 +179,7 @@ func _track_air(delta: float) -> void:
 	if is_on_floor():
 		if _air_t > 0.18:
 			sfx.emit("land")
-			FX.burst(get_parent(), global_position + Vector2(0, 26), Color(0.7, 0.7, 0.75), 5, 90.0)
+			FX.burst(get_parent(), global_position + Vector2(0, FOOT), Color(0.7, 0.7, 0.75), 5, 90.0)
 		_air_t = 0.0
 	else:
 		_air_t += delta
@@ -244,6 +249,15 @@ func _start_attack() -> void:
 	_attack_cd = STATE.attack_cooldown()
 	_hit_set.clear()
 
+## Vùng đánh thật (toạ độ thế giới) theo hướng chém hiện tại. Vùng truy vấn va chạm, vệt chém và debug đều dùng hàm này.
+func is_attacking() -> bool:
+	return _attack_t > 0.0
+
+func attack_rect() -> Rect2:
+	var size: Vector2 = _attack_size()
+	var c: Vector2 = global_position + attack_dir * (10.0 + (size.x if attack_dir.y == 0.0 else size.y) * 0.5)
+	return Rect2(c - size * 0.5, size)
+
 func _attack_size() -> Vector2:
 	var r: float = STATE.nail_reach_mult()
 	return Vector2(84.0 * r, 56.0) if attack_dir.y == 0.0 else Vector2(60.0, 80.0 * r)
@@ -252,12 +266,12 @@ func _tick_attack(delta: float) -> void:
 	if _attack_t <= 0.0:
 		return
 	_attack_t -= delta
-	var size: Vector2 = _attack_size()
+	var rc: Rect2 = attack_rect()
 	var q := PhysicsShapeQueryParameters2D.new()
 	var sh := RectangleShape2D.new()
-	sh.size = size
+	sh.size = rc.size
 	q.shape = sh
-	q.transform = Transform2D(0.0, global_position + attack_dir * (10.0 + (size.x if attack_dir.y == 0.0 else size.y) * 0.5))
+	q.transform = Transform2D(0.0, rc.get_center())
 	q.collision_mask = 4
 	for r in get_world_2d().direct_space_state.intersect_shape(q, 8):
 		var c = r["collider"]
@@ -335,20 +349,33 @@ func _draw() -> void:
 	var a: float = 0.4 if invuln > 0.0 and int(invuln * 20.0) % 2 == 0 else 1.0
 	if focusing:
 		draw_circle(Vector2.ZERO, 34.0 + sin(_focus_t * 20.0) * 3.0, Color(1, 1, 1, 0.25))
+	var foot := Vector2(0, FOOT)
 	for g in _trail:
-		SPRITES.draw(self, SPRITES.tex("knight_m_run_anim_f0"), Vector2(g["p"]) - global_position + Vector2(0, 26), 2.0, int(g["f"]) < 0, Color(0.5, 0.8, 1.5, 0.5 * float(g["t"]) / 0.18))
+		SPRITES.draw_body(self, "knight_m_run_anim", Vector2(g["p"]) - global_position + foot, 2.0, int(g["f"]) < 0, Color(0.5, 0.8, 1.5, 0.5 * float(g["t"]) / 0.18))
 	var base: String = "knight_m_idle_anim"
 	if _stun > 0.0:
 		base = "knight_m_hit_anim"
 	elif is_on_floor() and absf(velocity.x) > 20.0:
 		base = "knight_m_run_anim"
 	var tint := Color(1.6, 1.6, 2.0, a) if _dash_t > 0.0 else Color(1, 1, 1, a)
-	SPRITES.draw(self, SPRITES.anim(base, 10.0), Vector2(0, 26), 2.0, facing < 0, tint)
+	SPRITES.draw_body(self, base, foot, 2.0, facing < 0, tint, 10.0)
 	if _attack_t > 0.0:
-		# vệt chém hình lưỡi liềm; hộp va chạm thật vẫn là _attack_size()
-		var size: Vector2 = _attack_size()
-		var reach: float = size.x if attack_dir.y == 0.0 else size.y
+		# vệt chém = nửa elip nằm trọn trong vùng đánh thật (attack_rect)
+		var rc: Rect2 = attack_rect()
+		var horiz: bool = attack_dir.y == 0.0
+		var f: Vector2 = attack_dir
+		var pdir := Vector2(-f.y, f.x)
+		var ea: float = (rc.size.x if horiz else rc.size.y) * 0.5
+		var eb: float = (rc.size.y if horiz else rc.size.x) * 0.5
+		var c: Vector2 = rc.get_center() - global_position - f * ea
 		var fade: float = clampf(_attack_t / ATTACK_ACTIVE, 0.0, 1.0)
-		var ang: float = attack_dir.angle()
-		draw_arc(Vector2.ZERO, 12.0 + reach * 0.55, ang - 0.9, ang + 0.9, 14, Color(1, 1, 1, 0.85 * fade), 7.0)
-		draw_arc(Vector2.ZERO, 6.0 + reach * 0.55, ang - 0.7, ang + 0.7, 12, Color(0.7, 0.85, 1, 0.5 * fade), 4.0)
+		var pts := PackedVector2Array()
+		for k in 13:
+			var th: float = -PI * 0.5 + PI * float(k) / 12.0
+			pts.append(c + f * cos(th) * ea + pdir * sin(th) * eb)
+		draw_polyline(pts, Color(1, 1, 1, 0.85 * fade), 6.0)
+		var pts2 := PackedVector2Array()
+		for k in 13:
+			var th2: float = -PI * 0.5 + PI * float(k) / 12.0
+			pts2.append(c + f * cos(th2) * ea * 0.82 + pdir * sin(th2) * eb * 0.82)
+		draw_polyline(pts2, Color(0.7, 0.85, 1, 0.5 * fade), 3.0)

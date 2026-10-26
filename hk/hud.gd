@@ -1,6 +1,8 @@
 extends Control
 ## HUD: mặt nạ máu, ống Soul, Geo, biểu ngữ tên khu vực/thông báo.
 const STATE = preload("res://hk/state.gd")
+const SPRITES = preload("res://hk/sprites.gd")
+const PIXEL: float = 3.0   # cùng mật độ pixel với thế giới (sprite x2, camera x1.5)
 var hp: int = 5
 var max_hp: int = 5
 var soul: int = 0
@@ -42,11 +44,9 @@ func _draw() -> void:
 	draw_rect(Rect2(22, 52 + 30 - 60.0 * fill, 60, 60.0 * fill), Color(0.85, 0.92, 1.0, 0.9))
 	draw_arc(Vector2(52, 52), 30, 0, TAU, 32, Color(0.7, 0.75, 0.9), 3.0)
 	for i in max_hp:
-		var c := Color(0.95, 0.95, 1.0) if i < hp else Color(0.22, 0.22, 0.3)
-		var p := Vector2(104 + i * 36, 30)
-		draw_colored_polygon(PackedVector2Array([p, p + Vector2(26, 0), p + Vector2(26, 20), p + Vector2(13, 34), p + Vector2(0, 20)]), c)
-	draw_circle(Vector2(116, 78), 7, Color(0.95, 0.85, 0.4))
-	draw_string(font, Vector2(130, 85), str(geo), HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Color(0.95, 0.9, 0.7))
+		SPRITES.draw_body(self, "ui_heart_full" if i < hp else "ui_heart_empty", Vector2(120.0 + i * 46.0, 62.0), PIXEL)
+	SPRITES.draw_body(self, "coin_anim", Vector2(120.0, 96.0), PIXEL, false, Color.WHITE, 8.0)
+	draw_string(font, Vector2(138, 94), str(geo), HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Color(0.95, 0.9, 0.7))
 	if banner_a > 0.01:
 		var w: float = size.x
 		draw_string(font, Vector2(0, size.y * 0.78), banner_text, HORIZONTAL_ALIGNMENT_CENTER, w, 42, Color(1, 1, 1, banner_a))

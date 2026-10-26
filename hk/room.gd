@@ -8,6 +8,8 @@ signal interacted(kind: String, data: Dictionary)
 const TILE: int = 32
 const STATE = preload("res://hk/state.gd")
 const SPRITES = preload("res://hk/sprites.gd")
+const PLAYER = preload("res://hk/player.gd")
+const REACH: float = 28.0   # đệm quanh vật thể tương tác (px): đứng sát hình là tương tác được
 const BG_DIM: Dictionary = {"gate": 0.3, "catacomb": 0.13, "vault": 0.3}   # độ sáng gạch nền
 const TILESET: Dictionary = {"gate": "", "catacomb": "_hell", "vault": "_ice"}   # hậu tố bộ gạch theo khu
 const PALETTES: Dictionary = {
@@ -60,6 +62,10 @@ func _cell(x: int, y: int) -> String:
 		return "#"
 	return String(_cells[y])[x]
 
+## Vùng tương tác = phần nhìn thấy của vật + đệm REACH hai bên và phía trên, nên đứng sát hình là bấm được.
+func _add_interactable(kind: String, vis: Rect2, d: Dictionary) -> void:
+	interactables.append({"rect": vis.grow_individual(REACH, REACH, REACH, 4.0), "vis": vis, "kind": kind, "data": d})
+
 func _parse() -> void:
 	var door_cells: Dictionary = {}
 	for y in rows:
@@ -78,11 +84,11 @@ func _parse() -> void:
 			match ch:
 				"^": hazards.append(Rect2(x * TILE + 4, y * TILE + 14, TILE - 8, TILE - 14))
 				"c", "f", "s", "h": entities.append({"type": ch, "pos": pos if ch != "f" else pos - Vector2(0, 16)})
-				"B": interactables.append({"rect": Rect2(x * TILE - 20, y * TILE - 32, TILE + 40, TILE + 32), "kind": "bench", "data": {"pos": pos}})
-				"M": interactables.append({"rect": Rect2(x * TILE - 24, y * TILE - 64, TILE + 48, TILE + 64), "kind": "merchant", "data": {}})
-				"$": interactables.append({"rect": Rect2(x * TILE, y * TILE, TILE, TILE), "kind": "cache", "data": {"key": "%s:%d:%d" % [id, x, y], "pos": pos}})
-				"A": interactables.append({"rect": Rect2(x * TILE - 16, y * TILE - 48, TILE + 32, TILE + 48), "kind": "altar", "data": data.get("altar", {})})
-				"C": interactables.append({"rect": Rect2(x * TILE - 16, y * TILE - 48, TILE + 32, TILE + 48), "kind": "charm", "data": data.get("charm", {})})
+				"B": _add_interactable("bench", Rect2(pos.x - 22.0, pos.y - 14.0, 44.0, 14.0), {"pos": pos})
+				"M": _add_interactable("merchant", SPRITES.visible_at("wizard_m_idle_anim", 2.0, pos), {})
+				"$": _add_interactable("cache", SPRITES.visible_at("chest_full_open_anim", 2.0, pos), {"key": "%s:%d:%d" % [id, x, y], "pos": pos})
+				"A": _add_interactable("altar", SPRITES.visible_at("altar_idle", 2.0, pos), data.get("altar", {}))
+				"C": _add_interactable("charm", SPRITES.visible_at("altar_idle", 2.0, pos), data.get("charm", {}))
 				"X": entities.append({"type": "boss", "pos": pos})
 				"@": entities.append({"type": "spawn", "pos": pos})
 			if ch.is_valid_int() and ch != "0":
@@ -151,7 +157,7 @@ func spawn_for_door(door_id: String) -> Vector2:
 	var m: float = minf(minf(dl, dr), minf(dt, db))
 	if m == dl or m == dr:
 		var x: float = r.end.x + 22.0 if m == dl else r.position.x - 22.0
-		return Vector2(x, r.end.y - 27.0)
+		return Vector2(x, r.end.y - PLAYER.BODY.y * 0.5 - 1.0)
 	if m == dt:
 		return Vector2(c.x, r.end.y + 40.0)
 	# cửa dưới: đứng trên mép sàn ngay cạnh lỗ khoét (không rơi lại xuống cửa)
@@ -159,7 +165,7 @@ func spawn_for_door(door_id: String) -> Vector2:
 	var row: int = int(r.position.y / TILE)
 	while row > 0 and _cell(col, row) == "#":
 		row -= 1
-	return Vector2(float(col) * TILE + TILE * 0.5, float(row + 1) * TILE - 27.0)
+	return Vector2(float(col) * TILE + TILE * 0.5, float(row + 1) * TILE - PLAYER.BODY.y * 0.5 - 1.0)
 
 func entry_velocity(door_id: String) -> Vector2:
 	var r: Rect2 = doors[door_id]
@@ -177,14 +183,14 @@ func entry_velocity(door_id: String) -> Vector2:
 func default_spawn() -> Vector2:
 	for e in entities:
 		if e["type"] == "spawn":
-			return e["pos"] - Vector2(0, 27)
+			return e["pos"] - Vector2(0, PLAYER.BODY.y * 0.5 + 1.0)
 	var k: String = String(doors.keys()[0]) if not doors.is_empty() else ""
 	return spawn_for_door(k) if k != "" else Vector2(64, 64)
 
 func bench_spawn() -> Vector2:
 	for it in interactables:
 		if it["kind"] == "bench":
-			return it["data"]["pos"] - Vector2(0, 27)
+			return it["data"]["pos"] - Vector2(0, PLAYER.BODY.y * 0.5 + 1.0)
 	return default_spawn()
 
 func set_player(p: Node2D) -> void:
@@ -193,7 +199,7 @@ func set_player(p: Node2D) -> void:
 func _physics_process(_d: float) -> void:
 	if _player == null or not is_instance_valid(_player):
 		return
-	var pr := Rect2(_player.global_position - Vector2(13, 26), Vector2(26, 52))
+	var pr := Rect2(_player.global_position - _player.BODY * 0.5, _player.BODY)
 	for r in hazards:
 		if pr.intersects(r.grow(-2.0)):
 			hazard_touched.emit(r.get_center().x)
@@ -232,7 +238,7 @@ func _visible(it: Dictionary) -> bool:
 func near_prompt() -> bool:
 	if _player == null:
 		return false
-	var pr := Rect2(_player.global_position - Vector2(13, 26), Vector2(26, 52))
+	var pr := Rect2(_player.global_position - _player.BODY * 0.5, _player.BODY)
 	for it in interactables:
 		if pr.intersects(it["rect"]) and _visible(it):
 			return true
@@ -264,30 +270,39 @@ func _draw() -> void:
 				draw_rect(Rect2(x * TILE, y * TILE, TILE, 3), _pal["edge"])
 	for r in oneways:
 		for k in int(r.size.x / TILE):
-			draw_texture_rect(SPRITES.tex("wall_top_mid" + sfx), Rect2(r.position.x + k * TILE, r.position.y, TILE, TILE), false)
+			# dải nhìn thấy của wall_top_mid nằm ở đáy ảnh (4px gốc = 8px): kéo lên để trùng 8px va chạm ở đỉnh ô
+			draw_texture_rect(SPRITES.tex("wall_top_mid" + sfx), Rect2(r.position.x + k * TILE, r.position.y - (TILE - r.size.y), TILE, TILE), false)
 	for r in hazards:
-		draw_texture_rect(SPRITES.tex("floor_spikes_anim_f3"), Rect2(r.position.x - 4.0, r.position.y - 14.0, TILE, TILE), false)
+		# gai vẽ đúng trong vùng gây sát thương r: 3 tam giác (đỉnh ở mép trên r)
+		var sw: float = r.size.x / 3.0
+		for k in 3:
+			var tri := PackedVector2Array([Vector2(r.position.x + k * sw, r.end.y), Vector2(r.position.x + (k + 0.5) * sw, r.position.y), Vector2(r.position.x + (k + 1) * sw, r.end.y)])
+			draw_colored_polygon(tri, Color(0.8, 0.84, 0.92))
+			draw_polyline(PackedVector2Array([tri[0], tri[1], tri[2]]), Color(0.12, 0.12, 0.2), 2.0)
 	for ch in doors:
 		draw_rect(doors[ch], Color(1, 1, 1, 0.04))
 	for it in interactables:
 		if not _visible(it):
 			continue
-		var r2: Rect2 = it["rect"]
+		var vis: Rect2 = it["vis"]
+		var foot := Vector2(vis.get_center().x, vis.end.y)
+		var prompt_y: float = vis.position.y - 8.0
 		match it["kind"]:
 			"bench":
-				var pos: Vector2 = it["data"]["pos"]
-				draw_rect(Rect2(pos.x - 22, pos.y - 14, 44, 8), Color(0.55, 0.5, 0.45))
-				draw_rect(Rect2(pos.x - 18, pos.y - 6, 6, 6), Color(0.4, 0.35, 0.3))
-				draw_rect(Rect2(pos.x + 12, pos.y - 6, 6, 6), Color(0.4, 0.35, 0.3))
+				draw_rect(Rect2(vis.position.x, vis.position.y, vis.size.x, 8.0), Color(0.55, 0.5, 0.45))
+				draw_rect(Rect2(vis.position.x + 4.0, vis.position.y + 8.0, 6.0, 6.0), Color(0.4, 0.35, 0.3))
+				draw_rect(Rect2(vis.end.x - 10.0, vis.position.y + 8.0, 6.0, 6.0), Color(0.4, 0.35, 0.3))
 			"merchant":
-				SPRITES.draw(self, SPRITES.anim("wizard_m_idle_anim", 6.0), Vector2(r2.get_center().x, r2.end.y), 2.0)
+				SPRITES.draw_body(self, "wizard_m_idle_anim", foot, 2.0, false, Color.WHITE, 6.0)
 			"altar":
-				SPRITES.draw(self, SPRITES.tex("altar_idle"), Vector2(r2.get_center().x, r2.end.y), 2.0)
-				draw_circle(Vector2(r2.get_center().x, r2.end.y - 44), 12 + sin(Time.get_ticks_msec() * 0.004) * 2.0, Color(1, 0.85, 0.4))
+				SPRITES.draw_body(self, "altar_idle", foot, 2.0)
+				draw_circle(Vector2(foot.x, vis.position.y - 18.0), 12 + sin(Time.get_ticks_msec() * 0.004) * 2.0, Color(1, 0.85, 0.4))
+				prompt_y = vis.position.y - 40.0
 			"charm":
-				SPRITES.draw(self, SPRITES.tex("altar_idle"), Vector2(r2.get_center().x, r2.end.y), 2.0)
-				draw_circle(Vector2(r2.get_center().x, r2.end.y - 40), 9, Color(0.5, 0.9, 0.8))
+				SPRITES.draw_body(self, "altar_idle", foot, 2.0)
+				draw_circle(Vector2(foot.x, vis.position.y - 14.0), 9, Color(0.5, 0.9, 0.8))
+				prompt_y = vis.position.y - 34.0
 			"cache":
-				SPRITES.draw(self, SPRITES.tex("chest_full_open_anim_f0"), Vector2(r2.get_center().x, r2.end.y), 2.0)
-		if _player and r2.intersects(Rect2(_player.global_position - Vector2(13, 26), Vector2(26, 52))):
-			draw_string(ThemeDB.fallback_font, Vector2(r2.get_center().x - 6, r2.position.y - 6), "^", HORIZONTAL_ALIGNMENT_CENTER, -1, 20, Color(1, 1, 1, 0.9))
+				SPRITES.draw_body(self, "chest_full_open_anim", foot, 2.0, false, Color.WHITE, 0.0)
+		if _player and Rect2(_player.global_position - _player.BODY * 0.5, _player.BODY).intersects(it["rect"]):
+			draw_string(ThemeDB.fallback_font, Vector2(foot.x - 10.0, prompt_y), "^", HORIZONTAL_ALIGNMENT_CENTER, 20, 20, Color(1, 1, 1, 0.9))

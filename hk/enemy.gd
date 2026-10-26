@@ -16,13 +16,18 @@ const LOOK: Dictionary = {   # sprite + hệ số phóng; đáy sprite khớp đ
 	"charger": {"anim": "chort_anim", "scale": 2.0},
 }
 const DATA: Dictionary = {
-	"crawler": {"hp": 12, "size": Vector2(38, 24), "geo": 1, "color": Color(0.75, 0.35, 0.3)},
-	"flyer": {"hp": 10, "size": Vector2(30, 30), "geo": 2, "color": Color(0.6, 0.4, 0.8)},
-	"spitter": {"hp": 14, "size": Vector2(34, 40), "geo": 2, "color": Color(0.5, 0.65, 0.3)},
-	"charger": {"hp": 24, "size": Vector2(46, 36), "geo": 3, "color": Color(0.85, 0.5, 0.2)},
+	"crawler": {"hp": 12, "geo": 1, "color": Color(0.75, 0.35, 0.3)},
+	"flyer": {"hp": 10, "geo": 2, "color": Color(0.6, 0.4, 0.8)},
+	"spitter": {"hp": 14, "geo": 2, "color": Color(0.5, 0.65, 0.3)},
+	"charger": {"hp": 24, "geo": 3, "color": Color(0.85, 0.5, 0.2)},
 }
 
 var kind: String = "crawler"
+
+## Hộp va chạm = phần nhìn thấy của sprite (xem hk/bodies.gd), nên hình và hộp luôn khớp.
+static func body_size(k: String) -> Vector2:
+	var look: Dictionary = LOOK[k]
+	return SPRITES.BODIES.rect(String(look["anim"]), float(look["scale"])).size
 var hp: int = 10
 var dir: int = -1
 var state: String = "idle"     # charger/spitter: idle | windup | lunge | recover
@@ -37,7 +42,7 @@ var _time: float = 0.0
 func _ready() -> void:
 	var d: Dictionary = DATA[kind]
 	hp = int(d["hp"])
-	_size = d["size"]
+	_size = body_size(kind)
 	collision_layer = 4
 	collision_mask = 1
 	add_to_group("hk_enemy")
@@ -50,7 +55,9 @@ func _ready() -> void:
 	_contact.collision_layer = 0
 	_contact.collision_mask = 2
 	var c2 := CollisionShape2D.new()
-	c2.shape = sh
+	var hs := RectangleShape2D.new()
+	hs.size = _size * 0.85   # vùng gây sát thương nhỏ hơn thân một chút
+	c2.shape = hs
 	_contact.add_child(c2)
 	add_child(_contact)
 	_home = position
@@ -74,6 +81,12 @@ func _physics_process(delta: float) -> void:
 		if b.has_method("take_damage"):
 			b.take_damage(global_position.x)
 	queue_redraw()
+
+func body_rect() -> Rect2:
+	return Rect2(global_position - _size * 0.5, _size)
+
+func contact_rect() -> Rect2:
+	return Rect2(global_position - _size * 0.425, _size * 0.85)
 
 func _gravity_and_move(delta: float) -> void:
 	velocity.y = minf(velocity.y + GRAVITY * delta, 900.0)
@@ -197,4 +210,4 @@ func _draw() -> void:
 	elif state == "windup" and int(_time * 30.0) % 2 == 0:
 		tint = Color(1.6, 0.7, 0.7)
 	var look: Dictionary = LOOK[kind]
-	SPRITES.draw(self, SPRITES.anim(String(look["anim"]), 8.0), Vector2(0, _size.y * 0.5), float(look["scale"]), dir < 0, tint)
+	SPRITES.draw_body(self, String(look["anim"]), Vector2(0, _size.y * 0.5), float(look["scale"]), dir < 0, tint)
