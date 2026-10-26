@@ -3,7 +3,7 @@
 Metroidvania 2D: ba khu (Gate Ruins → Weeping Catacombs → Ashen Vaults), 24 phòng, 3 boss, 3 kỹ năng mở khoá khu vực, 8 bùa, thương nhân, bench, chết để lại Shade giữ Geo.
 Mở bằng **Godot 4.7+** (Import `project.godot`), bấm **F5**. Cảnh chính: `hk/main.tscn` (tiêu đề → New Game / Continue).
 
-Game cũ (roguelite nhìn từ trên xuống) được lưu ở nhánh `archive/dungeon-raider-v1`; mã cũ vẫn còn trong `scripts/` và `scenes/` cho tới khi có quyết định xoá riêng.
+Game cũ (roguelite nhìn từ trên xuống) được lưu ở nhánh `archive/dungeon-raider-v1`; mã cũ đã được xoá khỏi `main`. Khôi phục: `git checkout archive/dungeon-raider-v1`.
 
 ## Điều khiển
 | Hành động | Phím |
@@ -31,7 +31,7 @@ Kỹ năng: **Shadow Dash** (gate_8) → **Wings of Ash** nhảy đôi (cat_4) �
 ## Công cụ
 - `python3 tools/hk/gen_rooms.py` — sinh lại `hk/rooms/*.txt` (sửa phòng ở đây, không sửa tay file sinh ra).
 - `python3 tools/hk/validate_rooms.py [--quick]` — mô phỏng vật lý người chơi để kiểm tra mọi phòng/vật phẩm/kỹ năng tới được đúng thứ tự và không có bẫy. Thoát 1 nếu lỗi.
-- `godot --headless --path . --script tools/tests/hk_world_test.gd` (cũng `hk_player_test.gd`, `hk_flow_test.gd`, `hk_sfx_test.gd`) — test headless. `bash tools/tests/run_all.sh` chạy tất cả.
+- `godot --headless --path . --script tools/tests/hk_world_test.gd` (cũng `hk_player_test.gd`, `hk_flow_test.gd`, `hk_sfx_test.gd`) — test headless. `bash tools/tests/run_all.sh` chạy tất cả (cần `godot` trong PATH).
 - `tools/_hkshot.gd -- <room_id> <out.png>` dưới `xvfb-run ... --rendering-driver opengl3` — chụp ảnh một phòng.
 
 Giới hạn đã biết của validator: không mô phỏng pogo, Soul Bolt, quái/boss; mẫu thời điểm bấm phím rời rạc nên "không tới được" cần kiểm tay, còn "tới được" là chắc chắn.
