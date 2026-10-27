@@ -152,7 +152,7 @@ func load_room(id: String) -> void:
 	boss = null
 	for e in room.entities:
 		match String(e["type"]):
-			"c", "f", "s", "h":
+			"c", "f", "s", "h", "g", "d":
 				_spawn_enemy(String(e["type"]), e["pos"])
 			"boss":
 				var bid: String = String(data.get("boss", {}).get("id", ""))
@@ -175,13 +175,13 @@ func load_room(id: String) -> void:
 	music.play(String(MUSIC.AREA_TRACK.get(area, "explore_stone")))
 
 func _spawn_enemy(ch: String, pos: Vector2) -> void:
-	var kinds: Dictionary = {"c": "crawler", "f": "flyer", "s": "spitter", "h": "charger"}
+	var kinds: Dictionary = {"c": "crawler", "f": "flyer", "s": "spitter", "h": "charger", "g": "guard", "d": "dropper"}
 	var e := CharacterBody2D.new()
 	e.set_script(preload("res://hk/enemy.gd"))
 	e.kind = kinds[ch]
 	e.sfx.connect(sfx.play)
 	var h: float = e.body_size(e.kind).y
-	e.position = pos - (Vector2(0, h * 0.5) if ch != "f" else Vector2.ZERO)
+	e.position = pos - (Vector2(0, h * 0.5) if ch != "f" and ch != "d" else Vector2.ZERO)
 	_content.add_child(e)
 
 func _spawn_boss(bid: String, pos: Vector2) -> void:

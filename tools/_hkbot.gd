@@ -1,6 +1,6 @@
 extends SceneTree
 ## Bot đo độ khó (không chạy trong run_all): godot --headless --path . -s tools/_hkbot.gd -- <kind> [lần]
-## kind = crawler|flyer|spitter|charger|warden|wraith|lord. Bot "người chơi trung bình": tiến lại, chém khi tới tầm,
+## kind = crawler|flyer|spitter|charger|guard|dropper|warden|wraith|lord|brute|hexer. Bot "người chơi trung bình": tiến lại, chém khi tới tầm,
 ## nhảy né sau ~0.25s khi quái/boss vào thế đánh. In: số lần bị trúng, thời gian hạ, tỉ lệ hạ được trong 90s.
 const DANGER: Array = ["windup", "lunge", "wind_slash", "wind_slam", "air"]
 var _pulse: Array = []
@@ -35,7 +35,7 @@ func _init() -> void:
 	var kind: String = args[0]
 	var runs: int = int(args[1]) if args.size() > 1 else 6
 	var St = load("res://hk/state.gd")
-	var boss_kinds: Array = ["warden", "wraith", "lord"]
+	var boss_kinds: Array = ["warden", "wraith", "lord", "brute", "hexer"]
 	var is_boss: bool = kind in boss_kinds
 	var tot_hits: int = 0
 	var tot_time: float = 0.0
@@ -75,6 +75,8 @@ func _init() -> void:
 			e.set_script(load("res://hk/enemy.gd"))
 			e.kind = kind
 			e.position = Vector2(900, 540 if kind != "flyer" else 480)
+			if kind == "dropper":
+				e.position = Vector2(700, 80)
 			root.add_child(e)
 		for i in 40:
 			await physics_frame

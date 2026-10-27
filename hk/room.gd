@@ -83,7 +83,7 @@ func _parse() -> void:
 			var pos: Vector2 = Vector2(x * TILE + TILE * 0.5, y * TILE + TILE)
 			match ch:
 				"^": hazards.append(Rect2(x * TILE + 4, y * TILE + 14, TILE - 8, TILE - 14))
-				"c", "f", "s", "h": entities.append({"type": ch, "pos": pos if ch != "f" else pos - Vector2(0, 16)})
+				"c", "f", "s", "h", "g", "d": entities.append({"type": ch, "pos": pos if ch != "f" and ch != "d" else pos - Vector2(0, 16)})
 				"B": _add_interactable("bench", Rect2(pos.x - 22.0, pos.y - 14.0, 44.0, 14.0), {"pos": pos})
 				"M": _add_interactable("merchant", SPRITES.visible_at("wizard_m_idle_anim", 2.0, pos), {})
 				"$": _add_interactable("cache", SPRITES.visible_at("chest_full_open_anim", 2.0, pos), {"key": "%s:%d:%d" % [id, x, y], "pos": pos})

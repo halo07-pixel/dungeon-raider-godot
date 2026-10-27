@@ -1,5 +1,6 @@
 extends CharacterBody2D
 ## Boss: warden / lord (đi bộ, chém lao, nhảy đập, triệu hồi, mưa đá) và wraith (bay, bắn quạt, bổ nhào, chớp dịch chuyển).
+## Mini-boss: brute (đi bộ, đập đất + chém, như warden nhẹ) và hexer (bay, bắn quạt, chớp dịch chuyển, triệu hồi quỷ nhỏ).
 ## Mỗi đòn có thời gian báo trước (nhấp nháy). Gán `kind` TRƯỚC khi add_child, `arena` sau khi add.
 signal engaged
 signal defeated
@@ -13,13 +14,18 @@ const LOOK: Dictionary = {
 	"warden": {"anim": "ogre_idle_anim", "scale": 3.0},
 	"wraith": {"anim": "necromancer_idle_anim", "scale": 3.0},
 	"lord": {"anim": "big_demon_idle_anim", "scale": 3.0},
+	"brute": {"anim": "frost_big_zombie_anim", "scale": 2.5},
+	"hexer": {"anim": "hell_acolyte_anim", "scale": 3.0},
 }
+const FLYERS: Array = ["wraith", "hexer"]
 const GRAVITY: float = 2400.0
 
 const DATA: Dictionary = {
 	"warden": {"title": "Gate Warden", "hp": 220, "color": Color(0.55, 0.62, 0.78), "speed": 95.0},
 	"wraith": {"title": "Hollow Wraith", "hp": 260, "color": Color(0.75, 0.82, 0.98), "speed": 200.0},
 	"lord": {"title": "Dungeon Lord", "hp": 420, "color": Color(0.82, 0.36, 0.30), "speed": 115.0},
+	"brute": {"title": "Bone Brute", "hp": 110, "color": Color(0.55, 0.75, 0.85), "speed": 85.0},
+	"hexer": {"title": "Ash Hexer", "hp": 90, "color": Color(0.85, 0.45, 0.35), "speed": 170.0},
 }
 
 var kind: String = "warden"
@@ -51,7 +57,7 @@ func _ready() -> void:
 	hp = max_hp
 	_size = body_size(kind)
 	collision_layer = 4
-	collision_mask = 1 if kind != "wraith" else 0
+	collision_mask = 0 if kind in FLYERS else 1
 	add_to_group("hk_boss")
 	var cs := CollisionShape2D.new()
 	var sh := RectangleShape2D.new()
@@ -75,7 +81,7 @@ func _physics_process(delta: float) -> void:
 		return
 	if state == "dormant":
 		velocity = Vector2(0, velocity.y)
-		if kind != "wraith":
+		if not (kind in FLYERS):
 			velocity.y = minf(velocity.y + GRAVITY * delta, 900.0)
 			move_and_slide()
 		if absf(p.global_position.x - global_position.x) < 480.0 and absf(p.global_position.y - global_position.y) < 260.0:
@@ -85,13 +91,13 @@ func _physics_process(delta: float) -> void:
 		queue_redraw()
 		return
 	if state == "intro":
-		if kind != "wraith":
+		if not (kind in FLYERS):
 			velocity.y = minf(velocity.y + GRAVITY * delta, 900.0)
 			velocity.x = 0.0
 			move_and_slide()
 		if _t <= 0.0:
 			_next()
-	elif kind == "wraith":
+	elif kind in FLYERS:
 		_wraith(delta, p)
 	else:
 		_ground(delta, p)
@@ -103,8 +109,8 @@ func _face(p: Node2D) -> void:
 	dir = 1 if p.global_position.x > global_position.x else -1
 
 func _next() -> void:
-	state = "walk" if kind != "wraith" else "hover"
-	_t = randf_range(0.5, 1.0) if kind != "wraith" else randf_range(1.0, 1.6)
+	state = "hover" if kind in FLYERS else "walk"
+	_t = randf_range(1.0, 1.6) if kind in FLYERS else randf_range(0.5, 1.0)
 
 # ------------------------------------------------------------ đi bộ (warden, lord)
 func _ground(delta: float, p: Node2D) -> void:
@@ -171,7 +177,11 @@ func _ground(delta: float, p: Node2D) -> void:
 
 func _pick_attack() -> void:
 	var opts: Array = ["slash", "slam"]
-	if kind == "lord":
+	if kind == "brute":   # nhiều đập đất hơn chém: đòn chậm, báo trước dài
+		opts = ["slam", "slam", "slash"]
+		if phase == 2:
+			opts.append("combo")
+	elif kind == "lord":
 		opts.append("summon")
 		if phase == 2:
 			opts.append("rain")
@@ -211,6 +221,17 @@ func _shockwave() -> void:
 		get_parent().add_child.call_deferred(s)
 		s.position = Vector2(global_position.x + float(sgn) * 40.0, global_position.y + _size.y * 0.5 - 14.0)
 
+## Hexer triệu một quỷ bay nhỏ cạnh mình (tối đa 3 con sống cùng lúc).
+func _conjure() -> void:
+	if get_tree().get_nodes_in_group("hk_enemy").size() >= 3:
+		return
+	var e := CharacterBody2D.new()
+	e.set_script(ENEMY)
+	e.kind = "flyer"
+	get_parent().add_child.call_deferred(e)
+	e.position = _clamp_arena(global_position + Vector2(float(-dir) * 70.0, 20.0))
+	FX.burst(get_parent(), global_position, DATA[kind]["color"], 10, 180.0)
+
 func _summon() -> void:
 	var alive: int = get_tree().get_nodes_in_group("hk_enemy").size()
 	for sgn in [-1.0, 1.0]:
@@ -235,6 +256,8 @@ func _wraith(delta: float, p: Node2D) -> void:
 			velocity = (target - global_position).limit_length(speed)
 			if _t <= 0.0:
 				var r: int = randi() % 3
+				if kind == "hexer" and r == 1:   # hexer không bổ nhào: thay bằng triệu hồi
+					r = 3
 				if r == 0:
 					state = "wind_bolt"
 					_t = 0.55
@@ -243,9 +266,19 @@ func _wraith(delta: float, p: Node2D) -> void:
 					_t = 0.75
 					_dive_x = p.global_position.x
 					_markers.append({"x": _dive_x, "t": 0.75})
+				elif r == 3:
+					state = "wind_conjure"
+					_t = 0.8
 				else:
 					state = "fade_out"
 					_t = 0.3
+		"wind_conjure":
+			velocity = Vector2.ZERO
+			_face(p)
+			if _t <= 0.0:
+				_conjure()
+				state = "hover"
+				_t = 1.4
 		"wind_bolt":
 			velocity = Vector2.ZERO
 			_face(p)
@@ -383,7 +416,7 @@ func _draw() -> void:
 	var h: Vector2 = _size * 0.5
 	var look: Dictionary = LOOK[kind]
 	SPRITES.draw_body(self, String(look["anim"]), Vector2(0, h.y), float(look["scale"]), dir < 0, tint, 6.0)
-	if kind != "wraith" and state == "lunge":
+	if not (kind in FLYERS) and state == "lunge":
 		draw_rect(Rect2(float(dir) * (h.x + 45.0) - 45.0, -h.y * 0.8, 90, _size.y * 0.8), Color(1, 1, 1, 0.55))
 	for m in _markers:
 		var gx: float = float(m["x"]) - global_position.x

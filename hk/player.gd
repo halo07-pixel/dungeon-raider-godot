@@ -278,8 +278,16 @@ func _tick_attack(delta: float) -> void:
 		if c in _hit_set or not c.has_method("take_hit"):
 			continue
 		_hit_set.append(c)
-		c.take_hit(STATE.nail_damage(), global_position)
-		_on_nail_hit()
+		if c.take_hit(STATE.nail_damage(), global_position) == false:
+			_on_blocked()
+		else:
+			_on_nail_hit()
+
+func _on_blocked() -> void:   # khiên chặn: bật lùi như chém trúng nhưng không cộng Soul/pogo
+	if attack_dir.y == 0.0:
+		velocity.x = -attack_dir.x * RECOIL_SPEED
+		_stun = 0.08
+	_attack_t = 0.0
 
 func _on_nail_hit() -> void:
 	sfx.emit("hit")

@@ -100,7 +100,7 @@ func _init() -> void:
 		ck(w.boss == null, "%s: đã hạ boss thì không xuất hiện lại" % id)
 		ck(not w.room.locked, "%s: vào lại sau khi hạ không bị khoá" % id)
 		St.flags.erase("boss_" + bid)
-	ck(bosses == 3, "3 phòng boss (%d)" % bosses)
+	ck(bosses == 5, "5 phòng boss gồm 2 mini-boss (%d)" % bosses)
 	# chết giữa trận boss: về bench, phòng mới không khoá
 	St.flags.erase("boss_warden")
 	for id in rooms:
@@ -128,9 +128,10 @@ func _init() -> void:
 		if rooms[id].has("boss"):
 			boss_flags.append("boss_" + String(rooms[id]["boss"]["id"]))
 	for id in rooms:
-		if rooms[id].has("altar"):
-			var need: String = String(rooms[id]["altar"].get("needs", ""))
-			ck(need == "" or need in boss_flags, "%s: điều kiện bàn thờ '%s' có thể đạt được (boss tồn tại)" % [id, need])
+		for k in ["altar", "charm"]:
+			if rooms[id].has(k):
+				var need: String = String(rooms[id][k].get("needs", ""))
+				ck(need == "" or need in boss_flags, "%s: điều kiện %s '%s' có thể đạt được (boss tồn tại)" % [id, k, need])
 	if alt_room != "":
 		w.busy = false
 		w.load_room(alt_room)
