@@ -220,6 +220,7 @@ func _draw_charms(v: Control, font: Font, sz: Vector2) -> void:
 	v.draw_string(font, Vector2(sz.x * 0.5 - 300, sz.y - 40), "Up/Down choose   Jump equip/unequip", HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.6, 0.65, 0.75))
 
 func _draw_pause(v: Control, font: Font, sz: Vector2) -> void:
+	v.draw_string(font, Vector2(sz.x * 0.5 - 380, 118.0), "Play time  " + STATE.fmt_time(STATE.play_time), HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Color(0.95, 0.9, 0.7))
 	var lines: Array = [
 		"Move: A/D or arrows      Jump: Z or Space (hold = higher)",
 		"Nail: X or J (hold Up/Down to aim; hit enemies below you to bounce)",

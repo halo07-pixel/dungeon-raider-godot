@@ -20,18 +20,15 @@ func tap(action: String) -> void:
 func _init() -> void:
 	await process_frame
 	var St = load("res://hk/state.gd")
-	St.save_path = "user://hk_flow_save.json"
-	St.delete_save()
+	St.slot_base = "user://hk_flow_save.json"
+	for i in St.SLOTS:
+		DirAccess.remove_absolute(St.slot_path(i))
 	var main: Node = load("res://hk/main.tscn").instantiate()
 	root.add_child(main)
 	await create_timer(0.3, true, false, true).timeout
 	ck(main._overlay != null and main._overlay.get_script().resource_path.ends_with("title.gd"), "mở game ra màn hình tiêu đề")
 	ck(main._world == null, "chưa có world khi ở tiêu đề")
-	# không có save: mặc định New Game; Continue bị khoá (Down rồi Jump không làm gì)
-	await tap("hk_down")
-	await tap("hk_jump")
-	ck(main._world == null, "Continue bị khoá khi chưa có save")
-	await tap("hk_up")
+	# không có save: ô 1 trống, Jump = New Game
 	await tap("hk_jump")
 	await create_timer(0.5, true, false, true).timeout
 	ck(main._world != null and main._world.room != null, "New Game vào world")
@@ -50,6 +47,7 @@ func _init() -> void:
 	await tap("hk_jump")
 	await create_timer(0.5, true, false, true).timeout
 	ck(main._world != null and St.flag("ending"), "Continue nạp lại save có cờ ending")
-	St.delete_save()
+	for i in St.SLOTS:
+		DirAccess.remove_absolute(St.slot_path(i))
 	print("DONE fails=", fails)
 	quit(1 if fails > 0 else 0)

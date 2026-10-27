@@ -29,6 +29,9 @@ const CHARMS: Dictionary = {
 }
 
 static var save_path: String = SAVE_PATH_DEFAULT
+static var slot_base: String = SAVE_PATH_DEFAULT   # ô 1 dùng đúng đường dẫn này (giữ save cũ); ô 2,3 thêm hậu tố _2, _3
+const SLOTS: int = 3
+static var play_time: float = 0.0       # giây chơi, cộng ở world._process (đồng hồ speedrun)
 static var boot: String = "continue"   # new | continue | keep — world đọc khi khởi động
 static var hp_bonus: int = 0            # từ vật phẩm "mặt nạ" mua ở shop
 static var hp: int = BASE_HP
@@ -68,6 +71,7 @@ static func reset() -> void:
 	bench_id = "start"
 	shade = {}
 	pins = []
+	play_time = 0.0
 	hp = max_hp()
 
 static func has_ability(id: String) -> bool:
@@ -166,7 +170,7 @@ static func geo_mult() -> float:
 static func to_dict() -> Dictionary:
 	return {"v": 1, "hp_bonus": hp_bonus, "soul": soul, "geo": geo, "abilities": abilities, "charms_owned": charms_owned,
 		"charms_equipped": charms_equipped, "notch_bonus": notch_bonus, "flags": flags, "visited": visited,
-		"bench_room": bench_room, "bench_id": bench_id, "shade": shade, "music_vol": music_vol, "sfx_vol": sfx_vol, "shake_on": shake_on, "pins": pins}
+		"bench_room": bench_room, "bench_id": bench_id, "shade": shade, "music_vol": music_vol, "sfx_vol": sfx_vol, "shake_on": shake_on, "pins": pins, "time": play_time}
 
 static func from_dict(d: Dictionary) -> void:
 	reset()
@@ -175,6 +179,8 @@ static func from_dict(d: Dictionary) -> void:
 	sfx_vol = clampi(int(d.get("sfx_vol", sfx_vol)), 0, 10)
 	shake_on = bool(d.get("shake_on", shake_on)) if d.get("shake_on", true) is bool else shake_on
 	geo = maxi(0, int(d.get("geo", 0)))
+	var tm = d.get("time", 0.0)
+	play_time = maxf(0.0, float(tm)) if (tm is float or tm is int) else 0.0
 	notch_bonus = clampi(int(d.get("notch_bonus", 0)), 0, 4)
 	for a in d.get("abilities", []):
 		give_ability(String(a))
@@ -214,6 +220,28 @@ static func load_save() -> bool:
 		return false
 	from_dict(data)
 	return true
+
+static func slot_path(i: int) -> String:
+	return slot_base if i == 0 else "%s_%d.json" % [slot_base.get_basename(), i + 1]
+
+## Tóm tắt một ô save để hiện ở màn hình tiêu đề; {} nếu trống hoặc hỏng.
+static func slot_info(i: int) -> Dictionary:
+	var p: String = slot_path(i)
+	if not FileAccess.file_exists(p):
+		return {}
+	var data = JSON.parse_string(FileAccess.get_file_as_string(p))
+	if not (data is Dictionary):
+		return {}
+	var tm = data.get("time", 0.0)
+	var vis = data.get("visited", [])
+	var fl = data.get("flags", {})
+	return {"time": maxf(0.0, float(tm)) if (tm is float or tm is int) else 0.0,
+		"rooms": (vis as Array).size() if vis is Array else 0,
+		"done": fl is Dictionary and bool(fl.get("ending", false))}
+
+static func fmt_time(sec: float) -> String:
+	var s: int = int(sec)
+	return "%d:%02d:%02d" % [s / 3600, (s / 60) % 60, s % 60]
 
 static func delete_save() -> void:
 	if FileAccess.file_exists(save_path):

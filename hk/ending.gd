@@ -10,7 +10,7 @@ var _stats: String = ""
 func _ready() -> void:
 	layer = 40
 	process_mode = Node.PROCESS_MODE_ALWAYS
-	_stats = "Rooms explored: %d / 24     Charms: %d     Geo: %d" % [STATE.visited.size(), STATE.charms_owned.size(), STATE.geo]
+	_stats = "Rooms explored: %d / 24     Charms: %d     Geo: %d     Time: %s" % [STATE.visited.size(), STATE.charms_owned.size(), STATE.geo, STATE.fmt_time(STATE.play_time)]
 	_view = Control.new()
 	_view.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_view.mouse_filter = Control.MOUSE_FILTER_IGNORE
