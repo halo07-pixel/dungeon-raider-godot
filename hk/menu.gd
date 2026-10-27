@@ -202,12 +202,12 @@ func _draw_charms(v: Control, font: Font, sz: Vector2) -> void:
 	var i: int = 0
 	for id in STATE.CHARMS:
 		var c: Dictionary = STATE.CHARMS[id]
-		var y: float = 150.0 + i * 46.0
+		var y: float = 150.0 + i * 34.0
 		var owned: bool = id in STATE.charms_owned
 		var on: bool = id in STATE.charms_equipped
 		var col := Color(0.4, 0.42, 0.5) if not owned else (Color(0.6, 1, 0.8) if on else Color(0.95, 0.95, 1))
 		if i == sel:
-			v.draw_rect(Rect2(sz.x * 0.5 - 320, y - 26, 640, 40), Color(1, 1, 1, 0.1))
+			v.draw_rect(Rect2(sz.x * 0.5 - 320, y - 24, 640, 32), Color(1, 1, 1, 0.1))
 		var label: String = String(c["name"]) if owned else "???"
 		v.draw_string(font, Vector2(sz.x * 0.5 - 300, y), label + ("   [equipped]" if on else ""), HORIZONTAL_ALIGNMENT_LEFT, -1, 22, col)
 		v.draw_string(font, Vector2(sz.x * 0.5 + 220, y), "●".repeat(int(c["cost"])), HORIZONTAL_ALIGNMENT_LEFT, -1, 22, col)

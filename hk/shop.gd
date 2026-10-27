@@ -47,7 +47,7 @@ func _stock() -> Array:
 		out.append({"id": "mask", "name": "Extra Mask", "price": 250 + 200 * STATE.hp_bonus, "desc": "+1 mask permanently."})
 	if STATE.notch_bonus < 2:
 		out.append({"id": "notch", "name": "Charm Notch", "price": 300 + 250 * STATE.notch_bonus, "desc": "+1 charm notch."})
-	for cid in ["swift_edge", "soul_siphon", "fortune"]:
+	for cid in ["swift_edge", "soul_siphon", "fortune", "second_wind", "frugal_soul", "spring_nail", "shade_cloak"]:
 		if not (cid in STATE.charms_owned):
 			out.append({"id": cid, "name": "Charm: " + String(STATE.CHARMS[cid]["name"]), "price": 120 + 40 * int(STATE.CHARMS[cid]["cost"]), "desc": String(STATE.CHARMS[cid]["desc"])})
 	return out

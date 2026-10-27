@@ -34,7 +34,6 @@ const IFRAMES: float = 1.2
 const STUN: float = 0.25
 const WALL_SLIDE: float = 90.0
 const WALL_LOCK: float = 0.18
-const SPELL_COST: int = 33
 const SPELL_DAMAGE: int = 15
 const SPELL_COOLDOWN: float = 0.45
 
@@ -167,7 +166,7 @@ func _physics_process(delta: float) -> void:
 
 	if Input.is_action_just_pressed("hk_attack") and _attack_cd <= 0.0 and _stun <= 0.0:
 		_start_attack()
-	if Input.is_action_just_pressed("hk_spell") and _spell_cd <= 0.0 and _stun <= 0.0 and STATE.soul >= SPELL_COST:
+	if Input.is_action_just_pressed("hk_spell") and _spell_cd <= 0.0 and _stun <= 0.0 and STATE.soul >= STATE.spell_cost():
 		_cast_spell()
 	move_and_slide()
 	_track_air(delta)
@@ -198,7 +197,7 @@ func _update_wall(move: float) -> bool:
 
 ## Focus: giữ phím khi đứng yên trên đất, đủ Soul thì hồi 1 mặt nạ. Trả về true nếu đang chiếm điều khiển.
 func _focus(delta: float) -> bool:
-	var want: bool = Input.is_action_pressed("hk_focus") and is_on_floor() and _stun <= 0.0 and STATE.soul >= SPELL_COST and hp < max_hp
+	var want: bool = Input.is_action_pressed("hk_focus") and is_on_floor() and _stun <= 0.0 and STATE.soul >= STATE.spell_cost() and hp < max_hp
 	if not want:
 		focusing = false
 		_focus_t = 0.0
@@ -210,7 +209,7 @@ func _focus(delta: float) -> bool:
 	_focus_t += delta
 	if _focus_t >= STATE.focus_time():
 		_focus_t = 0.0
-		STATE.soul -= SPELL_COST
+		STATE.soul -= STATE.spell_cost()
 		hp = mini(max_hp, hp + 1)
 		health_changed.emit(hp, max_hp)
 		soul_changed.emit(soul)
@@ -220,7 +219,7 @@ func _focus(delta: float) -> bool:
 
 func _cast_spell() -> void:
 	sfx.emit("spell")
-	STATE.soul -= SPELL_COST
+	STATE.soul -= STATE.spell_cost()
 	soul_changed.emit(soul)
 	_spell_cd = SPELL_COOLDOWN
 	var s := Area2D.new()
@@ -292,7 +291,7 @@ func _on_blocked() -> void:   # khiên chặn: bật lùi như chém trúng như
 func _on_nail_hit() -> void:
 	sfx.emit("hit")
 	if attack_dir.y > 0.0:
-		velocity.y = POGO_V # pogo: chém xuống trúng thì nảy lên và hồi dash
+		velocity.y = POGO_V * STATE.pogo_mult() # pogo: chém xuống trúng thì nảy lên và hồi dash
 		can_dash = true
 		_air_jumps = 1
 	elif attack_dir.y == 0.0:
@@ -303,11 +302,14 @@ func _on_nail_hit() -> void:
 	hit_landed.emit(1.0)
 	_hitstop(0.05)
 
+func _cloaked() -> bool:   # bùa Shade Cloak: bất khả xâm phạm trong lúc dash
+	return _dash_t > 0.0 and STATE.has_charm("shade_cloak")
+
 func take_damage(from_x: float, dmg: int = 1) -> void:
-	if invuln > 0.0 or _dead or not controls_enabled:
+	if invuln > 0.0 or _dead or not controls_enabled or _cloaked():
 		return
 	hp = maxi(0, hp - dmg)
-	invuln = IFRAMES
+	invuln = IFRAMES + STATE.iframes_bonus()
 	_stun = STUN
 	_dash_t = 0.0
 	_attack_t = 0.0
@@ -323,7 +325,7 @@ func take_damage(from_x: float, dmg: int = 1) -> void:
 
 ## Gai/hầm: mất 1 mặt nạ rồi world đưa về chỗ an toàn.
 func hazard_damage(from_x: float) -> void:
-	if invuln > 0.0 or _dead:
+	if invuln > 0.0 or _dead or _cloaked():
 		return
 	take_damage(from_x)
 	if not _dead:
