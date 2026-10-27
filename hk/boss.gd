@@ -400,10 +400,32 @@ func take_hit(dmg: int, _from: Vector2) -> void:
 		shake.emit(3.0)
 		_markers.clear()
 	if hp <= 0:
-		FX.burst(get_parent(), global_position, DATA[kind]["color"], 40, 360.0)
+		FX.death(get_parent(), global_position, DATA[kind]["color"], true)
 		shake.emit(5.0)
 		defeated.emit()
 		queue_free()
+
+## Vạch báo trước đòn (chỉ vẽ trong lúc "wind_*"), khớp với cách đòn thật di chuyển/ra đòn.
+func _draw_telegraph(h: Vector2) -> void:
+	var p := _player()
+	var k: float = 1.0 - clampf(_t / 0.5, 0.0, 1.0)   # tiến độ báo trước (0 -> 1)
+	var a: float = 0.12 + 0.25 * k
+	match state:
+		"wind_slash":   # lao tới: quãng đường 470x0.28s + tầm chém 90
+			var reach: float = 470.0 * 0.28 + 90.0
+			draw_rect(Rect2(minf(float(dir) * h.x, float(dir) * (h.x + reach)), -h.y * 0.8, reach, _size.y * 0.8), Color(1, 0.25, 0.2, a))
+		"wind_slam":   # nhảy đập: rơi gần chỗ người chơi (tối đa 240px), vòng co lại ở chỗ rơi
+			if p:
+				var lx: float = clampf(p.global_position.x - global_position.x, -240.0, 240.0)
+				var fy: float = h.y
+				draw_arc(Vector2(lx, fy - 4.0), lerpf(70.0, 24.0, k), 0.0, TAU, 24, Color(1, 0.3, 0.2, 0.35 + 0.4 * k), 3.0)
+				draw_line(Vector2(lx - 36.0, fy - 2.0), Vector2(lx + 36.0, fy - 2.0), Color(1, 0.3, 0.2, 0.5), 4.0)
+		"wind_bolt":   # nhắm người chơi
+			if p:
+				var d: Vector2 = (p.global_position - global_position).normalized()
+				draw_line(d * h.x, d * 320.0, Color(0.7, 0.85, 1.0, a * 2.0), 2.0)
+		"wind_conjure":
+			draw_arc(Vector2(float(-dir) * 70.0, 20.0), lerpf(40.0, 10.0, k), 0.0, TAU, 16, Color(0.9, 0.5, 0.3, 0.6), 2.0)
 
 func _draw() -> void:
 	var tint := Color.WHITE
@@ -418,6 +440,7 @@ func _draw() -> void:
 	SPRITES.draw_body(self, String(look["anim"]), Vector2(0, h.y), float(look["scale"]), dir < 0, tint, 6.0)
 	if not (kind in FLYERS) and state == "lunge":
 		draw_rect(Rect2(float(dir) * (h.x + 45.0) - 45.0, -h.y * 0.8, 90, _size.y * 0.8), Color(1, 1, 1, 0.55))
+	_draw_telegraph(h)
 	for m in _markers:
 		var gx: float = float(m["x"]) - global_position.x
 		var a: float = 0.25 + 0.35 * (1.0 - float(m["t"]))
