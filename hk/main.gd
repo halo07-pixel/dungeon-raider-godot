@@ -26,7 +26,8 @@ func _show_title() -> void:
 	add_child(t)
 	_overlay = t
 
-func _start_game(mode: String, title: Node) -> void:
+func _start_game(mode: String, slot: int, title: Node) -> void:
+	STATE.save_path = STATE.slot_path(slot)
 	STATE.boot = mode
 	_music.stop()
 	title.queue_free()

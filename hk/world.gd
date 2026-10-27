@@ -119,7 +119,8 @@ func _on_volume_changed() -> void:
 	music.apply_volume()
 	sfx.play("buy")
 
-func _process(_d: float) -> void:
+func _process(d: float) -> void:
+	STATE.play_time += d
 	if Input.is_action_just_pressed("hk_debug"):
 		debug_boxes.toggle()
 	if is_instance_valid(player):
