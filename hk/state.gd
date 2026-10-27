@@ -39,6 +39,8 @@ static var visited: Array = []
 static var bench_room: String = START_ROOM
 static var bench_id: String = "start"
 static var shade: Dictionary = {}       # {room, x, y, geo}
+static var pins: Array = []             # ghim bản đồ do người chơi đặt: {room, x, y}
+const MAX_PINS: int = 10
 # Âm lượng 0..10: không bị reset() xoá (là cài đặt, không phải tiến trình); lưu cùng file save.
 # shortcut: chỉ lưu khi có save, màn tiêu đề dùng mặc định tới khi vào ván; tách file cài đặt khi có thêm cài đặt khác.
 static var music_vol: int = 10
@@ -60,6 +62,7 @@ static func reset() -> void:
 	bench_room = START_ROOM
 	bench_id = "start"
 	shade = {}
+	pins = []
 	hp = max_hp()
 
 static func has_ability(id: String) -> bool:
@@ -105,6 +108,18 @@ static func flag(id: String) -> bool:
 static func set_flag(id: String) -> void:
 	flags[id] = true
 
+## Đặt ghim tại `pos` trong phòng `room_id`; nếu đã có ghim trong bán kính `radius` thì gỡ nó. Trả true khi đặt mới
+## (false khi gỡ, hoặc khi đã đủ MAX_PINS).
+static func toggle_pin(room_id: String, pos: Vector2, radius: float = 48.0) -> bool:
+	for p in pins:
+		if String(p["room"]) == room_id and Vector2(float(p["x"]), float(p["y"])).distance_to(pos) <= radius:
+			pins.erase(p)
+			return false
+	if pins.size() >= MAX_PINS:
+		return false
+	pins.append({"room": room_id, "x": pos.x, "y": pos.y})
+	return true
+
 static func visit(room_id: String) -> void:
 	if not (room_id in visited):
 		visited.append(room_id)
@@ -137,7 +152,7 @@ static func geo_mult() -> float:
 static func to_dict() -> Dictionary:
 	return {"v": 1, "hp_bonus": hp_bonus, "soul": soul, "geo": geo, "abilities": abilities, "charms_owned": charms_owned,
 		"charms_equipped": charms_equipped, "notch_bonus": notch_bonus, "flags": flags, "visited": visited,
-		"bench_room": bench_room, "bench_id": bench_id, "shade": shade, "music_vol": music_vol, "sfx_vol": sfx_vol}
+		"bench_room": bench_room, "bench_id": bench_id, "shade": shade, "music_vol": music_vol, "sfx_vol": sfx_vol, "pins": pins}
 
 static func from_dict(d: Dictionary) -> void:
 	reset()
@@ -161,6 +176,9 @@ static func from_dict(d: Dictionary) -> void:
 	bench_id = String(d.get("bench_id", "start"))
 	var s = d.get("shade", {})
 	shade = s if s is Dictionary else {}
+	for p in d.get("pins", []):   # dữ liệu save có thể hỏng: chỉ nhận ghim đúng kiểu, tối đa MAX_PINS
+		if p is Dictionary and p.get("room") is String and (p.get("x") is float or p.get("x") is int) and (p.get("y") is float or p.get("y") is int) and pins.size() < MAX_PINS:
+			pins.append({"room": String(p["room"]), "x": float(p["x"]), "y": float(p["y"])})
 	hp = max_hp()
 
 ## Ghi nguyên tử: ghi file tạm rồi đổi tên, để mất điện giữa chừng không hỏng save.
