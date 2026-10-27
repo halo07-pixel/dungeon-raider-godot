@@ -10,12 +10,13 @@ const STATE = preload("res://hk/state.gd")
 const SPRITES = preload("res://hk/sprites.gd")
 const PLAYER = preload("res://hk/player.gd")
 const REACH: float = 28.0   # đệm quanh vật thể tương tác (px): đứng sát hình là tương tác được
-const BG_DIM: Dictionary = {"gate": 0.3, "catacomb": 0.13, "vault": 0.3}   # độ sáng gạch nền
-const TILESET: Dictionary = {"gate": "", "catacomb": "_hell", "vault": "_ice"}   # hậu tố bộ gạch theo khu
+const BG_DIM: Dictionary = {"gate": 0.3, "catacomb": 0.13, "vault": 0.3, "archive": 0.25}   # độ sáng gạch nền
+const TILESET: Dictionary = {"gate": "", "catacomb": "_hell", "vault": "_ice", "archive": ""}   # hậu tố bộ gạch theo khu
 const PALETTES: Dictionary = {
 	"gate": {"bg": Color(0.05, 0.06, 0.09), "fill": Color(0.13, 0.15, 0.21), "edge": Color(0.40, 0.45, 0.60), "line": Color(0.09, 0.10, 0.15)},
 	"catacomb": {"bg": Color(0.07, 0.05, 0.07), "fill": Color(0.19, 0.14, 0.17), "edge": Color(0.62, 0.45, 0.50), "line": Color(0.12, 0.09, 0.11)},
 	"vault": {"bg": Color(0.03, 0.06, 0.08), "fill": Color(0.09, 0.17, 0.20), "edge": Color(0.35, 0.65, 0.70), "line": Color(0.06, 0.12, 0.14)},
+	"archive": {"bg": Color(0.05, 0.04, 0.09), "fill": Color(0.14, 0.11, 0.22), "edge": Color(0.55, 0.45, 0.75), "line": Color(0.09, 0.07, 0.15)},
 }
 
 var id: String = ""

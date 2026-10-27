@@ -93,7 +93,7 @@ func _init() -> void:
 	ck(d.state == "hang" and absf(d.global_position.y - 80.0) < 2.0, "dropper về lại chỗ treo")
 	d.queue_free()
 	# ---- mini-boss
-	for kind in ["brute", "hexer"]:
+	for kind in ["brute", "hexer", "colossus"]:
 		var b := CharacterBody2D.new()
 		b.set_script(load("res://hk/boss.gd"))
 		b.kind = kind
@@ -124,11 +124,11 @@ func _init() -> void:
 				stage = 2
 		Engine.time_scale = 1.0
 		ck(defeated[0], "%s: hạ được và phát tín hiệu defeated" % kind)
-		var want: Array = ["wind_slam", "wind_slash"] if kind == "brute" else ["wind_bolt", "wind_conjure", "fade_out"]
+		var want: Array = ["wind_slam", "wind_slash"] if kind != "hexer" else ["wind_bolt", "wind_conjure", "fade_out"]
 		var hit: int = 0
 		for w in want:
 			if states.has(w):
 				hit += 1
-		ck(hit >= (1 if kind == "brute" else 2), "%s: dùng các đòn riêng (%s)" % [kind, str(states.keys())])
+		ck(hit >= (1 if kind != "hexer" else 2), "%s: dùng các đòn riêng (%s)" % [kind, str(states.keys())])
 	print("DONE fails=", fails)
 	quit(1 if fails > 0 else 0)

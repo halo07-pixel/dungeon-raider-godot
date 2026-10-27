@@ -25,6 +25,7 @@ const CHARMS: Dictionary = {
 	"second_wind": {"name": "Second Wind", "cost": 1, "desc": "You stay untouchable 0.5s longer after being hit."},
 	"shade_cloak": {"name": "Shade Cloak", "cost": 2, "desc": "You cannot be hurt while dashing."},
 	"frugal_soul": {"name": "Frugal Soul", "cost": 1, "desc": "Soul Bolt and Focus cost 27 Soul instead of 33."},
+	"swift_current": {"name": "Swift Current", "cost": 1, "desc": "Dash recharges twice as fast."},
 	"spring_nail": {"name": "Spring Nail", "cost": 1, "desc": "Bouncing off enemies with a downward nail launches you 25% higher."},
 }
 
@@ -159,6 +160,9 @@ static func spell_cost() -> int:
 
 static func iframes_bonus() -> float:
 	return 0.5 if has_charm("second_wind") else 0.0
+
+static func dash_cooldown() -> float:
+	return 0.2 if has_charm("swift_current") else 0.4
 
 static func pogo_mult() -> float:
 	return 1.25 if has_charm("spring_nail") else 1.0

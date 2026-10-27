@@ -4,7 +4,7 @@ const STATE = preload("res://hk/state.gd")
 const WorldData = preload("res://hk/world_data.gd")
 signal volume_changed
 const CELL: float = 26.0
-const AREA_COLORS: Dictionary = {"gate": Color(0.35, 0.42, 0.62), "catacomb": Color(0.62, 0.4, 0.45), "vault": Color(0.3, 0.6, 0.65)}
+const AREA_COLORS: Dictionary = {"gate": Color(0.35, 0.42, 0.62), "catacomb": Color(0.62, 0.4, 0.45), "vault": Color(0.3, 0.6, 0.65), "archive": Color(0.6, 0.5, 0.8)}
 
 var rooms: Dictionary = {}
 var enabled: bool = true

@@ -26,7 +26,6 @@ const COYOTE: float = 0.1
 const JUMP_BUFFER: float = 0.12
 const DASH_SPEED: float = 760.0
 const DASH_TIME: float = 0.18
-const DASH_COOLDOWN: float = 0.4
 const ATTACK_ACTIVE: float = 0.15
 const POGO_V: float = -600.0
 const RECOIL_SPEED: float = 220.0
@@ -125,7 +124,7 @@ func _physics_process(delta: float) -> void:
 		can_dash = false
 		sfx.emit("dash")
 		_dash_t = DASH_TIME
-		_dash_cd = DASH_COOLDOWN
+		_dash_cd = STATE.dash_cooldown()
 		return
 
 	var move: float = Input.get_axis("hk_left", "hk_right")

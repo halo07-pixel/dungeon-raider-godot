@@ -274,6 +274,7 @@ for x in (6, 31):
     r.block(x, 1, x + 1, 4)
 r.ground_door("1", "L", "vault_4", "2")
 r.ground_door("2", "R", "vault_6", "1")
+r.door("3", "B", 30, "arc_1", "1")   # lối xuống Drowned Archive (khu phụ, không bắt buộc)
 
 r = new("vault_6", 40, 22, 18, "vault", "Last Gauntlet", (62, 16))
 r.pit(8, 12); r.pit(26, 30)
@@ -293,6 +294,48 @@ for x in (14, 33):
     r.block(x, 1, x + 1, 3)
 r.ground_door("1", "L", "vault_6", "2")
 r.extra.append("boss: id=lord")
+
+# ====================================================== DROWNED ARCHIVE (khu 4, nhánh phụ từ Hearth)
+r = new("arc_1", 30, 30, 26, "archive", "Flooded Stair", (56, 21))
+r.door("1", "T", 14, "vault_5", "3")
+r.ground_door("2", "R", "arc_2", "1")
+for x0, x1, y in [(8, 12, 23), (17, 21, 20), (8, 12, 17), (17, 21, 14), (8, 12, 11), (17, 21, 8), (8, 12, 5), (17, 21, 3)]:
+    r.plat(x0, x1, y)
+r.put(19, 19, "f"); r.enemy("c", 14); r.enemy("s", 25); r.put(10, 16, "$")
+
+r = new("arc_2", 40, 22, 18, "archive", "Silt Corridor", (60, 21))
+r.pit(12, 15); r.pit(24, 27)
+r.plat(8, 11, 15); r.plat(16, 19, 15); r.plat(20, 23, 12)
+r.enemy("g", 18); r.put(25, 9, "f"); r.enemy("s", 34); r.put(6, 1, "d")
+for x, n in [(30, 3), (36, 2)]:
+    r.hang(x, n)
+r.ground_door("1", "L", "arc_1", "2")
+r.ground_door("2", "R", "arc_3", "1")
+
+r = new("arc_3", 40, 22, 18, "archive", "Sunken Library", (66, 21))
+r.put(6, 17, "B"); r.put(14, 17, "M")
+for x in (9, 28):
+    r.block(x, 1, x + 1, 4)
+r.enemy("h", 32)
+r.ground_door("1", "L", "arc_2", "2")
+r.ground_door("2", "R", "arc_4", "1")
+
+r = new("arc_4", 40, 22, 18, "archive", "Pearl Walk", (72, 21))
+r.pit(8, 12); r.pit(20, 31)
+for x0, x1, y in [(14, 17, 15), (20, 22, 14), (24, 26, 12), (28, 30, 14)]:
+    r.plat(x0, x1, y)
+r.enemy("g", 5); r.put(24, 8, "f"); r.enemy("h", 36); r.put(15, 1, "d")
+r.put(37, 17, "B")
+r.ground_door("1", "L", "arc_3", "2")
+r.ground_door("2", "R", "arc_5", "1")
+
+r = new("arc_5", 48, 24, 20, "archive", "Tide Court", (78, 21))
+r.put(6, 19, "C"); r.put(32, 19, "X")
+r.plat(12, 16, 17); r.plat(37, 41, 17)
+for x in (20, 28):
+    r.block(x, 1, x + 1, 3)
+r.ground_door("1", "L", "arc_4", "2")
+r.extra += ["charm: id=swift_current needs=boss_colossus", "boss: id=colossus"]
 
 if __name__ == "__main__":
     os.makedirs(OUT, exist_ok=True)
