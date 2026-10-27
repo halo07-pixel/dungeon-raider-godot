@@ -4,6 +4,7 @@ const STATE = preload("res://hk/state.gd")
 const WorldData = preload("res://hk/world_data.gd")
 const InputSetup = preload("res://hk/input.gd")
 const FX = preload("res://hk/fx.gd")
+const LORE = preload("res://hk/lore.gd")
 const MUSIC = preload("res://hk/music.gd")
 const SFX = preload("res://hk/sfx.gd")
 const BACKDROP = preload("res://hk/backdrop.gd")
@@ -205,7 +206,7 @@ func _on_boss_engaged() -> void:
 	room.locked = true
 	sfx.play("roar")
 	music.play(String(MUSIC.BOSS_TRACK.get(boss.kind, "boss_warden")))
-	hud.banner(boss.title())
+	hud.banner(boss.title(), String(LORE.memory(boss.kind).get("intro", "")))
 
 func _on_boss_defeated(bid: String) -> void:
 	sfx.play("boss_die")
@@ -213,11 +214,11 @@ func _on_boss_defeated(bid: String) -> void:
 	room.locked = false
 	music.play(String(MUSIC.AREA_TRACK.get(String(rooms[room.id].get("area", "gate")), "explore_stone")))
 	STATE.save()
-	hud.banner("%s defeated" % String(boss.title() if is_instance_valid(boss) else bid), "")
+	hud.banner("%s defeated" % String(boss.title() if is_instance_valid(boss) else bid), String(LORE.memory(bid).get("memory", "")))
 	if bid == "lord":
 		STATE.set_flag("ending")
 		STATE.save()
-		hud.banner("The Dungeon Lord falls", "")
+		hud.banner("The Dungeon Lord falls", String(LORE.memory("lord")["memory"]))
 		busy = true
 		player.controls_enabled = false
 		await get_tree().create_timer(3.0, true, false, true).timeout
@@ -274,6 +275,7 @@ func _on_player_died() -> void:
 	var spawn: Vector2 = room.default_spawn() if STATE.bench_id == "start" else room.bench_spawn()
 	player.respawn_at(spawn, true)
 	player.soul_changed.emit(0)
+	hud.banner("You fall", LORE.death_line(String(rooms[room.id].get("area", "gate"))))
 	entry_spawn = spawn
 	cam.global_position = spawn
 	cam.reset_smoothing()
@@ -319,7 +321,7 @@ func rest() -> void:
 	STATE.bench_room = room.id
 	STATE.bench_id = "bench"
 	STATE.save()
-	hud.banner("Rested")
+	hud.banner("Rested", LORE.bench_line())
 	await _fade_to(1.0, 0.3)
 	load_room(room.id)
 	var spawn: Vector2 = room.bench_spawn()

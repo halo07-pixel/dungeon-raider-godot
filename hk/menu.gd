@@ -2,6 +2,7 @@ extends CanvasLayer
 ## Menu tạm dừng: tab Bản đồ (M), Bùa (E/Tab), Tạm dừng (Esc). Chạy cả khi game đang pause.
 const STATE = preload("res://hk/state.gd")
 const WorldData = preload("res://hk/world_data.gd")
+const LORE = preload("res://hk/lore.gd")
 signal volume_changed
 const CELL: float = 26.0
 const AREA_COLORS: Dictionary = {"gate": Color(0.35, 0.42, 0.62), "catacomb": Color(0.62, 0.4, 0.45), "vault": Color(0.3, 0.6, 0.65), "archive": Color(0.6, 0.5, 0.8)}
@@ -52,10 +53,12 @@ func _process(_d: float) -> void:
 			open("map")
 		elif Input.is_action_just_pressed("hk_charms"):
 			open("charms")
+		elif Input.is_action_just_pressed("hk_memories"):
+			open("memories")
 		elif Input.is_action_just_pressed("hk_pause"):
 			open("pause")
 		return
-	if Input.is_action_just_pressed("hk_pause") or (tab == "map" and Input.is_action_just_pressed("hk_map")) or (tab == "charms" and Input.is_action_just_pressed("hk_charms")):
+	if Input.is_action_just_pressed("hk_pause") or (tab == "map" and Input.is_action_just_pressed("hk_map")) or (tab == "charms" and Input.is_action_just_pressed("hk_charms")) or (tab == "memories" and Input.is_action_just_pressed("hk_memories")):
 		close()
 		return
 	if Input.is_action_just_pressed("hk_map") and tab != "map":
@@ -64,6 +67,8 @@ func _process(_d: float) -> void:
 	elif Input.is_action_just_pressed("hk_charms") and tab != "charms":
 		tab = "charms"
 		sel = 0
+	elif Input.is_action_just_pressed("hk_memories") and tab != "memories":
+		tab = "memories"
 	if tab == "pause":
 		sel = (sel + int(Input.is_action_just_pressed("hk_down")) - int(Input.is_action_just_pressed("hk_up")) + 3) % 3
 		var step: int = int(Input.is_action_just_pressed("hk_right")) - int(Input.is_action_just_pressed("hk_left"))
@@ -104,13 +109,14 @@ func _draw_view() -> void:
 	var font: Font = ThemeDB.fallback_font
 	var sz: Vector2 = v.size
 	v.draw_rect(Rect2(Vector2.ZERO, sz), Color(0.02, 0.03, 0.06, 0.93))
-	var tabs: Array = [["map", "MAP (M)"], ["charms", "CHARMS (E)"], ["pause", "PAUSE (Esc)"]]
+	var tabs: Array = [["map", "MAP (M)"], ["charms", "CHARMS (E)"], ["memories", "MEMORIES (N)"], ["pause", "PAUSE (Esc)"]]
 	for i in tabs.size():
 		var col := Color(1, 1, 1) if tab == tabs[i][0] else Color(0.45, 0.5, 0.6)
-		v.draw_string(font, Vector2(sz.x * 0.5 - 300 + i * 220, 50), tabs[i][1], HORIZONTAL_ALIGNMENT_LEFT, -1, 24, col)
+		v.draw_string(font, Vector2(sz.x * 0.5 - 300 + i * 190, 50), tabs[i][1], HORIZONTAL_ALIGNMENT_LEFT, -1, 24, col)
 	match tab:
 		"map": _draw_map(v, font, sz)
 		"charms": _draw_charms(v, font, sz)
+		"memories": _draw_memories(v, font, sz)
 		"pause": _draw_pause(v, font, sz)
 
 ## Biểu tượng trong một phòng đã đến: {k: loại, c: (cột, hàng) theo ô lưới}. Chỉ vật chưa lấy/chưa hạ; cửa dẫn tới phòng chưa đến là "exit".
@@ -219,6 +225,16 @@ func _draw_charms(v: Control, font: Font, sz: Vector2) -> void:
 	v.draw_string(font, Vector2(sz.x * 0.5 - 300, sz.y - 70), desc, HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Color(0.85, 0.9, 1))
 	v.draw_string(font, Vector2(sz.x * 0.5 - 300, sz.y - 40), "Up/Down choose   Jump equip/unequip", HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.6, 0.65, 0.75))
 
+func _draw_memories(v: Control, font: Font, sz: Vector2) -> void:
+	v.draw_string(font, Vector2(sz.x * 0.5 - 380, 118.0), "Memories  %d / %d" % [LORE.count(), LORE.MEMORIES.size()], HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Color(0.95, 0.9, 0.7))
+	for i in LORE.MEMORIES.size():
+		var m: Dictionary = LORE.MEMORIES[i]
+		var got: bool = LORE.has_memory(String(m["id"]))
+		var y: float = 170.0 + i * 70.0
+		v.draw_string(font, Vector2(sz.x * 0.5 - 380, y), String(m["title"]) if got else "???", HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Color(0.95, 0.95, 1) if got else Color(0.4, 0.42, 0.5))
+		v.draw_string(font, Vector2(sz.x * 0.5 - 380, y + 28), String(m["memory"]) if got else "A boss still holds this memory.", HORIZONTAL_ALIGNMENT_LEFT, -1, 17, Color(0.75, 0.82, 0.95) if got else Color(0.4, 0.42, 0.5))
+	v.draw_string(font, Vector2(sz.x * 0.5 - 380, sz.y - 40), "N or Esc: close", HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.6, 0.65, 0.75))
+
 func _draw_pause(v: Control, font: Font, sz: Vector2) -> void:
 	v.draw_string(font, Vector2(sz.x * 0.5 - 380, 118.0), "Play time  " + STATE.fmt_time(STATE.play_time), HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Color(0.95, 0.9, 0.7))
 	var lines: Array = [
@@ -226,7 +242,7 @@ func _draw_pause(v: Control, font: Font, sz: Vector2) -> void:
 		"Nail: X or J (hold Up/Down to aim; hit enemies below you to bounce)",
 		"Dash: C or K (needs Shadow Dash)      Focus (hold, heal): V or L",
 		"Soul Bolt: F or I      Interact: Up arrow / W (benches, altars, shop)",
-		"Map: M (arrows pan, P pin)      Charms: E or Tab      Close: Esc",
+		"Map: M (arrows pan, P pin)      Charms: E or Tab      Memories: N      Close: Esc",
 		"",
 		"Abilities: " + (", ".join(STATE.abilities.map(func(a): return STATE.ABILITIES[a]["name"])) if not STATE.abilities.is_empty() else "none yet"),
 	]

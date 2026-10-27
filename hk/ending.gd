@@ -2,6 +2,7 @@ extends CanvasLayer
 ## Màn kết thúc sau khi hạ Dungeon Lord. Hiện thống kê, Jump/Enter để về màn hình tiêu đề (signal `finished`).
 const STATE = preload("res://hk/state.gd")
 const WorldData = preload("res://hk/world_data.gd")
+const LORE = preload("res://hk/lore.gd")
 signal finished
 var _a: float = 0.0
 var _view: Control
@@ -32,8 +33,8 @@ func _draw_view() -> void:
 	var font: Font = ThemeDB.fallback_font
 	var sz: Vector2 = v.size
 	v.draw_rect(Rect2(Vector2.ZERO, sz), Color(0.02, 0.02, 0.05, _a))
-	v.draw_string(font, Vector2(0, sz.y * 0.36), "The Dungeon Lord has fallen", HORIZONTAL_ALIGNMENT_CENTER, sz.x, 44, Color(1, 1, 1, _a))
-	v.draw_string(font, Vector2(0, sz.y * 0.36 + 44), "The vaults fall silent. Thank you for playing.", HORIZONTAL_ALIGNMENT_CENTER, sz.x, 20, Color(0.75, 0.8, 0.95, _a))
+	v.draw_string(font, Vector2(0, sz.y * 0.36), String(LORE.ending_lines()[0]), HORIZONTAL_ALIGNMENT_CENTER, sz.x, 44, Color(1, 1, 1, _a))
+	v.draw_string(font, Vector2(0, sz.y * 0.36 + 44), String(LORE.ending_lines()[1]), HORIZONTAL_ALIGNMENT_CENTER, sz.x, 20, Color(0.75, 0.8, 0.95, _a))
 	v.draw_string(font, Vector2(0, sz.y * 0.56), _stats, HORIZONTAL_ALIGNMENT_CENTER, sz.x, 20, Color(0.95, 0.9, 0.7, _a))
 	if _t > 2.5:
 		v.draw_string(font, Vector2(0, sz.y - 50), "Jump/Enter: title", HORIZONTAL_ALIGNMENT_CENTER, sz.x, 16, Color(0.6, 0.65, 0.75, 0.6 + 0.4 * sin(_t * 3.0)))
