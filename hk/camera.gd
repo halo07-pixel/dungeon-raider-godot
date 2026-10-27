@@ -1,5 +1,6 @@
 extends Camera2D
 ## Camera bám người chơi, mượt, giới hạn theo phòng, rung khi trúng đòn (nhận tín hiệu từ player qua main).
+const STATE = preload("res://hk/state.gd")
 var _shake: float = 0.0
 
 func _ready() -> void:
@@ -7,6 +8,8 @@ func _ready() -> void:
 	position_smoothing_speed = 8.0
 
 func shake(strength: float) -> void:
+	if not STATE.shake_on:
+		return
 	_shake = maxf(_shake, strength * 4.0)
 
 func set_bounds(b: Rect2) -> void:

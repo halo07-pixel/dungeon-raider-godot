@@ -293,7 +293,7 @@ func take_hit(dmg: int, from_pos: Vector2) -> bool:
 	if (kind == "charger" or kind == "guard") and state == "windup":
 		state = "idle"
 		_t = 0.6
-	FX.burst(get_parent(), global_position, DATA[kind]["color"], 5, 120.0)
+	FX.spark(get_parent(), global_position, Vector2(away if away != 0.0 else 1.0, -0.2).normalized(), DATA[kind]["color"])
 	if hp <= 0:
 		_die()
 	return true
@@ -303,7 +303,7 @@ func _die() -> void:
 	n = maxi(1, n)
 	STATE.geo += n
 	FX.float_text(get_parent(), global_position, "+%d" % n, Color(1.0, 0.9, 0.4))
-	FX.burst(get_parent(), global_position, DATA[kind]["color"], 12, 220.0)
+	FX.death(get_parent(), global_position, DATA[kind]["color"])
 	sfx.emit("enemy_die")
 	died.emit(global_position)
 	queue_free()
@@ -317,6 +317,10 @@ func _draw() -> void:
 	var look: Dictionary = LOOK[kind]
 	var jitter := Vector2(randf_range(-3.0, 3.0), 0.0) if state == "shake" else Vector2.ZERO
 	SPRITES.draw_body(self, String(look["anim"]), Vector2(0, _size.y * 0.5) + jitter, float(look["scale"]), dir < 0, tint)
+	if state == "windup" and (kind == "charger" or kind == "guard"):   # vạch báo trước đường húc: charger 520x0.55s, guard 340x0.25s
+		var reach: float = 286.0 if kind == "charger" else 85.0
+		var a: float = 0.12 + 0.2 * (1.0 - clampf(_t / 0.5, 0.0, 1.0))
+		draw_rect(Rect2(minf(float(dir) * _size.x * 0.5, float(dir) * (_size.x * 0.5 + reach)), -_size.y * 0.5, reach, _size.y), Color(1, 0.25, 0.2, a))
 	if kind == "guard":   # khiên: dựng đứng phía trước, hạ thấp khi recover
 		var up: bool = state != "recover"
 		var sh := Rect2(float(dir) * (_size.x * 0.5 + 2.0) - 3.0, -_size.y * (0.4 if up else 0.05), 6.0, _size.y * (0.8 if up else 0.4))
