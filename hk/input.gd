@@ -12,6 +12,7 @@ const KEYS: Dictionary = {
 	"hk_spell": [KEY_F, KEY_I],
 	"hk_map": [KEY_M],
 	"hk_charms": [KEY_TAB, KEY_E],
+	"hk_memories": [KEY_N],
 	"hk_pause": [KEY_ESCAPE],
 	"hk_pin": [KEY_P],
 	"hk_debug": [KEY_F3],
