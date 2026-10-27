@@ -48,6 +48,7 @@ const DEFS: Dictionary = {
 	"ability": {"total": 0.75, "layers": [{"wave": "sine", "freq": 440.0, "vol": 0.22, "dur": 0.3}, {"wave": "sine", "freq": 550.0, "vol": 0.22, "dur": 0.3, "delay": 0.1}, {"wave": "sine", "freq": 660.0, "vol": 0.22, "dur": 0.3, "delay": 0.2}, {"wave": "sine", "freq": 880.0, "vol": 0.22, "dur": 0.4, "delay": 0.3}]},
 	"charm": {"total": 0.35, "layers": [{"wave": "sine", "freq": 700.0, "vol": 0.22, "dur": 0.15}, {"wave": "sine", "freq": 1050.0, "vol": 0.22, "dur": 0.2, "delay": 0.12}]},
 	"buy": {"total": 0.25, "layers": [{"wave": "sine", "freq": 900.0, "vol": 0.2, "dur": 0.08}, {"wave": "sine", "freq": 1350.0, "vol": 0.2, "dur": 0.14, "delay": 0.07}]},
+	"clang": {"total": 0.2, "layers": [{"wave": "square", "freq": 1250.0, "vol": 0.16, "dur": 0.05}, {"wave": "sine", "freq": 1870.0, "vol": 0.16, "dur": 0.16}]},
 	"deny": {"total": 0.15, "layers": [{"wave": "square", "freq": 150.0, "vol": 0.2, "dur": 0.12}]},
 	"spit": {"total": 0.15, "layers": [{"wave": "noise", "lp": 0.5, "vol": 0.25, "dur": 0.12}, {"wave": "sine", "freq": 300.0, "slide": -150.0, "vol": 0.15, "dur": 0.1}]},
 	"charge": {"total": 0.25, "layers": [{"wave": "saw", "freq": 120.0, "slide": 160.0, "vol": 0.15, "dur": 0.22, "swell": 0.8}]},

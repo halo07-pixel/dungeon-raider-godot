@@ -9,6 +9,7 @@ func ck(c: bool, m: String) -> void:
 
 func _init() -> void:
 	await process_frame
+	load("res://hk/input.gd").ensure()
 	var St = load("res://hk/state.gd")
 	var WD = load("res://hk/world_data.gd")
 	var EN = load("res://hk/enemy.gd")

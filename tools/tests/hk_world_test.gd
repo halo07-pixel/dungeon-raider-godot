@@ -58,7 +58,7 @@ func _init() -> void:
 	ck(benches >= 6, "đủ bench (%d)" % benches)
 	for a in ["dash", "double_jump", "wall_cling"]:
 		ck(a in altars, "có bàn thờ " + a)
-	for b in ["warden", "wraith", "lord"]:
+	for b in ["warden", "wraith", "lord", "brute", "hexer"]:
 		ck(b in bosses, "có boss " + b)
 	for c in charms:
 		ck(St.CHARMS.has(c), "bùa " + c + " tồn tại")
