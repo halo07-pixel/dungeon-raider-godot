@@ -4,6 +4,7 @@ const COLORS: Dictionary = {
 	"gate": {"clear": Color(0.04, 0.045, 0.07), "far": Color(0.07, 0.085, 0.13), "near": Color(0.1, 0.12, 0.18)},
 	"catacomb": {"clear": Color(0.05, 0.03, 0.045), "far": Color(0.1, 0.06, 0.08), "near": Color(0.15, 0.09, 0.11)},
 	"vault": {"clear": Color(0.02, 0.04, 0.06), "far": Color(0.04, 0.09, 0.12), "near": Color(0.06, 0.13, 0.17)},
+	"archive": {"clear": Color(0.04, 0.03, 0.07), "far": Color(0.09, 0.07, 0.15), "near": Color(0.13, 0.10, 0.21)},
 }
 const PERIOD: float = 2400.0
 var _layers: Array = []

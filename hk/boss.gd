@@ -16,6 +16,7 @@ const LOOK: Dictionary = {
 	"lord": {"anim": "big_demon_idle_anim", "scale": 3.0},
 	"brute": {"anim": "frost_big_zombie_anim", "scale": 2.5},
 	"hexer": {"anim": "hell_acolyte_anim", "scale": 3.0},
+	"colossus": {"anim": "hell_ogre_idle_anim", "scale": 2.5},
 }
 const FLYERS: Array = ["wraith", "hexer"]
 const GRAVITY: float = 2400.0
@@ -26,6 +27,7 @@ const DATA: Dictionary = {
 	"lord": {"title": "Dungeon Lord", "hp": 420, "color": Color(0.82, 0.36, 0.30), "speed": 115.0},
 	"brute": {"title": "Bone Brute", "hp": 110, "color": Color(0.55, 0.75, 0.85), "speed": 85.0},
 	"hexer": {"title": "Ash Hexer", "hp": 90, "color": Color(0.85, 0.45, 0.35), "speed": 170.0},
+	"colossus": {"title": "Drowned Colossus", "hp": 130, "color": Color(0.6, 0.5, 0.8), "speed": 100.0},
 }
 
 var kind: String = "warden"

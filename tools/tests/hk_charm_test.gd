@@ -92,5 +92,10 @@ func _init() -> void:
 		ids.append(String(it["id"]))
 	for id in ["second_wind", "shade_cloak", "frugal_soul", "spring_nail"]:
 		ck(id in ids, "shop bán %s" % id)
+	ck("swift_current" not in ids, "Swift Current không bán (chỉ rơi từ Drowned Colossus)")
+	St.reset()
+	ck(is_equal_approx(St.dash_cooldown(), 0.4), "dash mặc định hồi 0.4s")
+	St.give_charm("swift_current")
+	ck(St.toggle_charm("swift_current") and is_equal_approx(St.dash_cooldown(), 0.2), "Swift Current: hồi 0.2s")
 	print("DONE fails=", fails)
 	quit(1 if fails > 0 else 0)

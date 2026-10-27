@@ -100,7 +100,7 @@ func _init() -> void:
 		ck(w.boss == null, "%s: đã hạ boss thì không xuất hiện lại" % id)
 		ck(not w.room.locked, "%s: vào lại sau khi hạ không bị khoá" % id)
 		St.flags.erase("boss_" + bid)
-	ck(bosses == 5, "5 phòng boss gồm 2 mini-boss (%d)" % bosses)
+	ck(bosses == 6, "6 phòng boss gồm 3 mini-boss (%d)" % bosses)
 	# chết giữa trận boss: về bench, phòng mới không khoá
 	St.flags.erase("boss_warden")
 	for id in rooms:

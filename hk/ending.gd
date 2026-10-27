@@ -1,6 +1,7 @@
 extends CanvasLayer
 ## Màn kết thúc sau khi hạ Dungeon Lord. Hiện thống kê, Jump/Enter để về màn hình tiêu đề (signal `finished`).
 const STATE = preload("res://hk/state.gd")
+const WorldData = preload("res://hk/world_data.gd")
 signal finished
 var _a: float = 0.0
 var _view: Control
@@ -10,7 +11,7 @@ var _stats: String = ""
 func _ready() -> void:
 	layer = 40
 	process_mode = Node.PROCESS_MODE_ALWAYS
-	_stats = "Rooms explored: %d / 24     Charms: %d     Geo: %d     Time: %s" % [STATE.visited.size(), STATE.charms_owned.size(), STATE.geo, STATE.fmt_time(STATE.play_time)]
+	_stats = "Rooms explored: %d / %d     Charms: %d     Geo: %d     Time: %s" % [STATE.visited.size(), WorldData.load_all().size(), STATE.charms_owned.size(), STATE.geo, STATE.fmt_time(STATE.play_time)]
 	_view = Control.new()
 	_view.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_view.mouse_filter = Control.MOUSE_FILTER_IGNORE

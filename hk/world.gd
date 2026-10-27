@@ -8,7 +8,7 @@ const MUSIC = preload("res://hk/music.gd")
 const SFX = preload("res://hk/sfx.gd")
 const BACKDROP = preload("res://hk/backdrop.gd")
 const DEBUG_BOXES = preload("res://hk/debug_boxes.gd")
-const AREA_NAMES: Dictionary = {"gate": "Gate Ruins", "catacomb": "Weeping Catacombs", "vault": "Ashen Vaults"}
+const AREA_NAMES: Dictionary = {"gate": "Gate Ruins", "catacomb": "Weeping Catacombs", "vault": "Ashen Vaults", "archive": "Drowned Archive"}
 const ZOOM: float = 1.5
 
 signal ending_reached   # báo lên main sau khi hạ Dungeon Lord
