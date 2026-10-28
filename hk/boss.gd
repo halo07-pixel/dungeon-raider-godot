@@ -23,6 +23,7 @@ const LOOK: Dictionary = {
 }
 const FLYERS: Array = ["wraith", "hexer"]
 const GRAVITY: float = 2400.0
+const PERCH_WAIT: float = 1.0   # giây người chơi đứng cao hơn boss trước khi boss nhảy lên
 
 const DATA: Dictionary = {
 	"warden": {"title": "Gate Warden", "hp": 220, "color": Color(0.55, 0.62, 0.78), "speed": 95.0},
@@ -62,6 +63,7 @@ var _rain_t: float = 0.0
 var _dive_x: float = 0.0
 var _alpha: float = 1.0
 var _was_air: bool = false
+var _perch_t: float = 0.0
 
 func _ready() -> void:
 	var d: Dictionary = DATA[kind]
@@ -172,7 +174,14 @@ func _ground(delta: float, p: Node2D) -> void:
 		"walk":
 			_face(p)
 			velocity.x = float(dir) * speed
-			if _t <= 0.0 and not _maybe_shift():
+			_perch_t = _perch_t + delta if (is_on_floor() and p.global_position.y < global_position.y - 90.0) else 0.0
+			if _perch_t >= PERCH_WAIT:   # người chơi nấp trên bục cao: boss nhảy lên đuổi (đáp xuống gây sóng đập)
+				_perch_t = 0.0
+				var dy: float = global_position.y - p.global_position.y
+				velocity = Vector2(clampf((p.global_position.x - global_position.x) / 0.9, -360.0, 360.0), -minf(sqrt(2.0 * GRAVITY * (dy + 48.0)), 1400.0))
+				state = "air"
+				_was_air = false
+			elif _t <= 0.0 and not _maybe_shift():
 				_pick_attack()
 		"wind_slash":
 			velocity.x = 0.0

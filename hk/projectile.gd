@@ -33,7 +33,7 @@ func _on_body(b: Node) -> void:
 	elif not friendly and b.has_method("take_damage"):
 		b.take_damage(global_position.x)
 		queue_free()
-	elif b is StaticBody2D:
+	elif b is StaticBody2D and not b.has_meta("oneway"):   # bục một chiều không chặn đạn
 		queue_free()
 
 func _draw() -> void:
