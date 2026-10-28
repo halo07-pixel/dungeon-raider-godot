@@ -337,11 +337,27 @@ for x in (20, 28):
 r.ground_door("1", "L", "arc_4", "2")
 r.extra += ["charm: id=swift_current needs=boss_colossus", "boss: id=colossus"]
 
+def add_torches():
+    """Lò lửa: cạnh mỗi bench (3 ô bên phải, nếu trống) và hai bên phòng boss. Chỉ trang trí."""
+    for r in rooms:
+        cols = []
+        for y, row in enumerate(r.g):
+            for x, ch in enumerate(row):
+                if ch == "B":
+                    cols.append(x + 3)
+        if any(e.startswith("boss:") for e in r.extra):
+            cols += [3, r.w - 4]
+        for x in cols:
+            if 1 < x < r.w - 2 and r.g[r.F - 1][x] == "." and r.g[r.F - 2][x] == "." and r.g[r.F][x] in "#=":
+                r.extra.append("torch: %d %d" % (x, r.F - 1))
+
+
 if __name__ == "__main__":
     os.makedirs(OUT, exist_ok=True)
     for f in os.listdir(OUT):
         if f.endswith(".txt"):
             os.remove(os.path.join(OUT, f))
+    add_torches()
     for r in rooms:
         r.save()
     print("wrote", len(rooms), "rooms")

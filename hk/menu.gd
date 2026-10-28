@@ -70,15 +70,17 @@ func _process(_d: float) -> void:
 	elif Input.is_action_just_pressed("hk_memories") and tab != "memories":
 		tab = "memories"
 	if tab == "pause":
-		sel = (sel + int(Input.is_action_just_pressed("hk_down")) - int(Input.is_action_just_pressed("hk_up")) + 3) % 3
+		sel = (sel + int(Input.is_action_just_pressed("hk_down")) - int(Input.is_action_just_pressed("hk_up")) + 4) % 4
 		var step: int = int(Input.is_action_just_pressed("hk_right")) - int(Input.is_action_just_pressed("hk_left"))
 		if step != 0:
 			if sel == 0:
 				STATE.music_vol = clampi(STATE.music_vol + step, 0, 10)
 			elif sel == 1:
 				STATE.sfx_vol = clampi(STATE.sfx_vol + step, 0, 10)
-			else:
+			elif sel == 2:
 				STATE.shake_on = step > 0
+			else:
+				STATE.atmosphere_on = step > 0
 			volume_changed.emit()
 	if tab == "map":
 		_pan -= Vector2(Input.get_axis("hk_left", "hk_right"), Input.get_axis("hk_up", "hk_down")) * 420.0 * _d
@@ -249,16 +251,16 @@ func _draw_pause(v: Control, font: Font, sz: Vector2) -> void:
 	for i in lines.size():
 		v.draw_string(font, Vector2(sz.x * 0.5 - 380, 150.0 + i * 36.0), String(lines[i]), HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Color(0.9, 0.93, 1))
 	var y0: float = 150.0 + lines.size() * 36.0 + 30.0
-	var rows: Array = [["Music", STATE.music_vol], ["Effects", STATE.sfx_vol], ["Screen shake", -1]]
+	var rows: Array = [["Music", STATE.music_vol], ["Effects", STATE.sfx_vol], ["Screen shake", STATE.shake_on], ["Atmosphere", STATE.atmosphere_on]]
 	for i in rows.size():
 		var y: float = y0 + i * 40.0
 		var col := Color(1, 1, 1) if i == sel else Color(0.6, 0.65, 0.75)
 		if i == sel:
 			v.draw_rect(Rect2(sz.x * 0.5 - 390, y - 26, 560, 38), Color(1, 1, 1, 0.1))
 		v.draw_string(font, Vector2(sz.x * 0.5 - 380, y), String(rows[i][0]), HORIZONTAL_ALIGNMENT_LEFT, -1, 20, col)
-		if int(rows[i][1]) < 0:
-			v.draw_string(font, Vector2(sz.x * 0.5 - 200, y), "On" if STATE.shake_on else "Off", HORIZONTAL_ALIGNMENT_LEFT, -1, 20, col)
+		if rows[i][1] is bool:
+			v.draw_string(font, Vector2(sz.x * 0.5 - 200, y), "On" if rows[i][1] else "Off", HORIZONTAL_ALIGNMENT_LEFT, -1, 20, col)
 			continue
 		for k in 10:
 			v.draw_rect(Rect2(sz.x * 0.5 - 200 + k * 22, y - 18, 18, 20), col if k < int(rows[i][1]) else Color(1, 1, 1, 0.12))
-	v.draw_string(font, Vector2(sz.x * 0.5 - 380, y0 + 140), "Up/Down choose   Left/Right change", HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.6, 0.65, 0.75))
+	v.draw_string(font, Vector2(sz.x * 0.5 - 380, y0 + 160), "Up/Down choose   Left/Right change", HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.6, 0.65, 0.75))

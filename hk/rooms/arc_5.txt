@@ -4,6 +4,8 @@ map: 78,21
 door 1: arc_4 2
 charm: id=swift_current needs=boss_colossus
 boss: id=colossus
+torch: 3 19
+torch: 44 19
 ---
 ################################################
 #...................##......##.................#

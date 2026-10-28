@@ -4,6 +4,8 @@ map: 30,10
 door 1: cat_5 3
 charm: id=heavy_blow needs=boss_brute
 boss: id=brute
+torch: 3 13
+torch: 26 13
 ---
 ##############################
 #............................#
