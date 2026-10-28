@@ -7,6 +7,7 @@ signal engaged
 signal defeated
 signal shake(strength: float)
 signal sfx(name: String)
+signal darkness(on: bool)   # Wraith tối phòng; world nối vào Atmosphere
 
 const PROJECTILE = preload("res://hk/projectile.gd")
 const ENEMY = preload("res://hk/enemy.gd")
@@ -23,6 +24,12 @@ const LOOK: Dictionary = {
 	"sovereign": {"anim": "big_demon_idle_anim", "scale": 3.6},
 }
 const FLYERS: Array = ["wraith", "hexer"]
+const ZONE = preload("res://hk/zone.gd")
+## Đòn riêng của mỗi dạng (tương tác với biom của boss): state báo trước -> hàm tung đòn trong `_cast`.
+const SKILL: Dictionary = {
+	"warden": "wind_pillar", "brute": "wind_fissure", "wraith": "wind_veil", "hexer": "wind_torch",
+	"lord": "wind_heat", "sovereign": "wind_heat", "colossus": "wind_tide",
+}
 const GRAVITY: float = 2400.0
 const PERCH_WAIT: float = 1.0   # giây người chơi đứng cao hơn boss trước khi boss nhảy lên
 
@@ -66,6 +73,9 @@ var _alpha: float = 1.0
 var _was_air: bool = false
 var _perch_t: float = 0.0
 var _prev_state: String = ""
+var braziers: Array = []     # chân các lò lửa trong phòng (world gán) — nguồn sóng lửa của Hexer
+var platforms: Array = []    # Rect2 các bục một chiều trong phòng (world gán) — Lord làm nóng bục
+var _dark_t: float = 0.0
 
 func _ready() -> void:
 	var d: Dictionary = DATA[kind]
@@ -91,7 +101,15 @@ func _player() -> Node2D:
 	var ps := get_tree().get_nodes_in_group("hk_player")
 	return ps[0] if not ps.is_empty() else null
 
+func _exit_tree() -> void:
+	if _dark_t > 0.0:
+		darkness.emit(false)
+
 func _physics_process(delta: float) -> void:
+	if _dark_t > 0.0:
+		_dark_t -= delta
+		if _dark_t <= 0.0:
+			darkness.emit(false)
 	_time += delta
 	_flash = maxf(0.0, _flash - delta)
 	_t -= delta
@@ -236,6 +254,13 @@ func _ground(delta: float, p: Node2D) -> void:
 				_summon()
 				state = "recover"
 				_t = 0.6
+		"wind_pillar", "wind_fissure", "wind_heat", "wind_tide":
+			velocity.x = 0.0
+			_face(p)
+			if _t <= 0.0:
+				_cast(p)
+				state = "recover"
+				_t = 0.9
 		"rain":
 			velocity.x = 0.0
 			_rain_t -= delta
@@ -265,6 +290,10 @@ func _pick_attack() -> void:
 			opts.append("rain")
 	elif phase >= 2:
 		opts.append("combo")
+	if SKILL.has(form):   # đòn riêng của dạng này (nhiều hơn ở pha 2)
+		opts.append("skill")
+		if phase >= 2:
+			opts.append("skill")
 	if kind == "many_faced" and phase >= 2:   # đòn lai: mọi dạng đi bộ biết bắn quạt từ pha 2
 		opts.append("bolt")
 		if form == "sovereign":
@@ -290,6 +319,68 @@ func _pick_attack() -> void:
 			state = "rain"
 			_t = 3.0
 			_rain_t = 0.1
+		"skill":
+			state = String(SKILL[form])
+			_t = 0.8
+
+# ------------------------------------------------------------ đòn riêng theo biom
+func _floor_y() -> float:
+	return global_position.y + _size.y * 0.5 if not (form in FLYERS) else arena.end.y - 64.0
+
+func _zone(k: String, r: Rect2, delay: float, life: float, v: Vector2 = Vector2.ZERO) -> Node2D:
+	var z := Node2D.new()
+	z.set_script(ZONE)
+	z.kind = k
+	z.rect = r
+	z.delay = delay
+	z.life = life
+	z.vel = v
+	z.fx_parent = get_parent()
+	add_child.call_deferred(z)
+	return z
+
+func _dust(pos: Vector2) -> void:   # tín hiệu thay vùng cảnh báo: bụi/tia lửa + âm rung tại chỗ sắp có đòn
+	FX.burst(get_parent(), pos, Color(0.6, 0.55, 0.5), 6, 70.0)
+	sfx.emit("rumble")
+
+func _cast(p: Node2D) -> void:
+	var fy: float = _floor_y()
+	match state:
+		"wind_pillar":   # Gate Warden: đập sập cột ngay chỗ người chơi; rơi gây sát thương, đáp xuống thành vật cản/chỗ nấp 6s
+			var x: float = clampf(p.global_position.x, arena.position.x + 60.0, arena.end.x - 60.0)
+			_dust(Vector2(x, arena.position.y + 40.0))
+			_zone("pillar", Rect2(x - 16.0, arena.position.y + 40.0, 32.0, 96.0), 0.7, 6.0).floor_y = fy
+		"wind_fissure":   # Bone Brute: nền nứt, gai xương trồi lên quanh người chơi và tồn tại 3.5s
+			for dx in [-120.0, 0.0, 120.0]:
+				var x2: float = clampf(p.global_position.x + dx, arena.position.x + 60.0, arena.end.x - 60.0)
+				_dust(Vector2(x2, fy))
+				_zone("spikes", Rect2(x2 - 20.0, fy - 44.0, 40.0, 44.0), 0.6, 3.5)
+			shake.emit(2.0)
+		"wind_torch":   # Ash Hexer: nhóm lửa từ các lò chạy dọc sàn vào giữa phòng
+			var src: Array = braziers if not braziers.is_empty() else [Vector2(arena.position.x + 60.0, fy), Vector2(arena.end.x - 60.0, fy)]
+			for b in src:
+				var dirx: float = 1.0 if float(b.x) < arena.get_center().x else -1.0
+				FX.burst(get_parent(), Vector2(b.x, b.y - 20.0), Color(1.0, 0.6, 0.2), 10, 120.0)
+				_zone("firewave", Rect2(float(b.x) - 20.0, float(b.y) - 48.0, 40.0, 48.0), 0.5, 3.2, Vector2(dirx * 230.0, 0.0))
+		"wind_veil":   # Hollow Wraith: tắt đèn phòng, biến mất rồi hiện sau lưng người chơi
+			_dark_t = 5.0
+			darkness.emit(true)
+			state = "fade_out"
+			_t = 0.3
+		"wind_heat":   # Dungeon Lord: một số bục nóng đỏ gây sát thương, buộc phải đổi chỗ đứng
+			if platforms.is_empty():
+				_summon()
+				return
+			var pool: Array = platforms.duplicate()
+			pool.shuffle()
+			for i in maxi(1, int(ceil(pool.size() * 0.6))):
+				var r: Rect2 = pool[i]
+				_dust(Vector2(r.get_center().x, r.position.y))
+				_zone("heat", Rect2(r.position.x, r.position.y - 40.0, r.size.x, 44.0), 0.9, 3.0)
+		"wind_tide":   # Drowned Colossus: nước dâng 80px trong 0.8s, giữ rồi rút; làm chậm người chơi, bục cao thì an toàn
+			sfx.emit("rumble")
+			_zone("water", Rect2(arena.position.x + 32.0, fy - 80.0, arena.size.x - 64.0, 80.0), 0.6, 4.5)
+			shake.emit(1.5)
 
 func _shockwave() -> void:
 	shake.emit(3.0)
@@ -342,6 +433,8 @@ func _wraith(delta: float, p: Node2D) -> void:
 				var r: int = randi() % 3
 				if form == "hexer" and r == 1:   # hexer không bổ nhào: thay bằng triệu hồi
 					r = 3
+				if SKILL.has(form) and _dark_t <= 0.0 and randf() < (0.45 if phase >= 2 else 0.3):   # đòn riêng
+					r = 4
 				if r == 0:
 					state = "wind_bolt"
 					_t = 0.55
@@ -350,6 +443,9 @@ func _wraith(delta: float, p: Node2D) -> void:
 					_t = 0.75
 					_dive_x = p.global_position.x
 					_markers.append({"x": _dive_x, "t": 0.75})
+				elif r == 4:
+					state = String(SKILL[form])
+					_t = 0.8
 				elif r == 3:
 					state = "wind_conjure"
 					_t = 0.8
@@ -363,6 +459,14 @@ func _wraith(delta: float, p: Node2D) -> void:
 				_conjure()
 				state = "hover"
 				_t = 1.4
+		"wind_torch", "wind_veil":
+			velocity = Vector2.ZERO
+			_face(p)
+			if _t <= 0.0:
+				_cast(p)
+				if state != "fade_out":
+					state = "hover"
+					_t = 1.4
 		"wind_bolt":
 			velocity = Vector2.ZERO
 			_face(p)

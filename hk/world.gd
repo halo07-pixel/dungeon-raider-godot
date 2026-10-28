@@ -204,7 +204,17 @@ func _spawn_boss(bid: String, pos: Vector2) -> void:
 	boss.engaged.connect(_on_boss_engaged)
 	boss.shake.connect(cam.shake)
 	boss.sfx.connect(sfx.play)
+	boss.darkness.connect(atmosphere.set_dark)
+	boss.braziers = _braziers()
+	boss.platforms = room.oneways.duplicate()
 	boss.shake.connect(_on_boss_shake)
+
+## Chân các lò lửa của phòng hiện tại (đòn lửa của Ash Hexer dùng chúng làm điểm xuất phát).
+func _braziers() -> Array:
+	var out: Array = []
+	for t in room.data.get("torches", []):
+		out.append(Vector2((float(t["col"]) + 0.5) * room.TILE, (float(t["row"]) + 1.0) * room.TILE))
+	return out
 
 func _on_boss_shake(strength: float) -> void:
 	if strength >= 2.0:
