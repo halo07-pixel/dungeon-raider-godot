@@ -490,7 +490,9 @@ func _draw_telegraph(h: Vector2) -> void:
 	match state:
 		"wind_slash":   # lao tới: quãng đường 470x0.28s + tầm chém 90
 			var reach: float = 470.0 * 0.28 + 90.0
-			draw_rect(Rect2(minf(float(dir) * h.x, float(dir) * (h.x + reach)), -h.y * 0.8, reach, _size.y * 0.8), Color(1, 0.25, 0.2, a))
+			var band := Rect2(minf(float(dir) * h.x, float(dir) * (h.x + reach)), -h.y * 0.8, reach, _size.y * 0.8)
+			draw_rect(band, Color(1, 0.25, 0.2, a * 0.5))
+			draw_rect(band, Color(1, 0.35, 0.3, 0.35 + 0.4 * k), false, 2.0)
 		"wind_slam":   # nhảy đập: rơi gần chỗ người chơi (tối đa 240px), vòng co lại ở chỗ rơi
 			if p:
 				var lx: float = clampf(p.global_position.x - global_position.x, -240.0, 240.0)

@@ -223,9 +223,21 @@ func _draw_charms(v: Control, font: Font, sz: Vector2) -> void:
 		i += 1
 	var ids: Array = STATE.CHARMS.keys()
 	var cid: String = String(ids[clampi(sel, 0, ids.size() - 1)])
-	var desc: String = String(STATE.CHARMS[cid]["desc"]) if cid in STATE.charms_owned else "Not found yet."
+	var desc: String = String(STATE.CHARMS[cid]["desc"]) if cid in STATE.charms_owned else charm_hint(cid)
 	v.draw_string(font, Vector2(sz.x * 0.5 - 300, sz.y - 70), desc, HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Color(0.85, 0.9, 1))
 	v.draw_string(font, Vector2(sz.x * 0.5 - 300, sz.y - 40), "Up/Down choose   Jump equip/unequip", HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.6, 0.65, 0.75))
+
+## Gợi ý nơi tìm bùa chưa có: bùa nằm trong phòng đã đến thì nói tên phòng, bùa không nằm trong phòng nào thì do thương nhân bán.
+func charm_hint(cid: String) -> String:
+	var placed: bool = false
+	for rid in rooms:
+		var c: Dictionary = rooms[rid].get("charm", {})
+		if String(c.get("id", "")) != cid:
+			continue
+		placed = true
+		if rid in STATE.visited:
+			return "Seen in %s%s." % [String(rooms[rid]["name"]), " (a boss guards it)" if String(c.get("needs", "")) != "" else ""]
+	return "Not found yet." if placed else "Sold by a wandering merchant."
 
 func _draw_memories(v: Control, font: Font, sz: Vector2) -> void:
 	v.draw_string(font, Vector2(sz.x * 0.5 - 380, 118.0), "Memories  %d / %d" % [LORE.count(), LORE.MEMORIES.size()], HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Color(0.95, 0.9, 0.7))
@@ -238,29 +250,44 @@ func _draw_memories(v: Control, font: Font, sz: Vector2) -> void:
 	v.draw_string(font, Vector2(sz.x * 0.5 - 380, sz.y - 40), "N or Esc: close", HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.6, 0.65, 0.75))
 
 func _draw_pause(v: Control, font: Font, sz: Vector2) -> void:
-	v.draw_string(font, Vector2(sz.x * 0.5 - 380, 118.0), "Play time  " + STATE.fmt_time(STATE.play_time), HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Color(0.95, 0.9, 0.7))
+	# cột trái: hướng dẫn phím; cột phải: thời gian, kỹ năng, cài đặt
+	var lx: float = 80.0
+	var rx: float = sz.x * 0.5 + 60.0
+	v.draw_string(font, Vector2(lx, 118.0), "Controls", HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Color(0.95, 0.9, 0.7))
 	var lines: Array = [
-		"Move: A/D or arrows      Jump: Z or Space (hold = higher)",
-		"Nail: X or J (hold Up/Down to aim; hit enemies below you to bounce)",
-		"Dash: C or K (needs Shadow Dash)      Focus (hold, heal): V or L",
-		"Soul Bolt: F or I      Interact: Up arrow / W (benches, altars, shop)",
-		"Map: M (arrows pan, P pin)      Charms: E or Tab      Memories: N      Close: Esc",
-		"",
-		"Abilities: " + (", ".join(STATE.abilities.map(func(a): return STATE.ABILITIES[a]["name"])) if not STATE.abilities.is_empty() else "none yet"),
+		"Move: A/D or arrows",
+		"Jump: Z or Space (hold = higher)",
+		"Nail: X or J (hold Up/Down to aim)",
+		"   hit enemies below you to bounce",
+		"Dash: C or K (needs Shadow Dash)",
+		"Focus (hold, heal): V or L",
+		"Soul Bolt: F or I",
+		"Interact: Up arrow / W (benches, altars, shop)",
+		"Map: M (arrows pan, P pin)",
+		"Charms: E or Tab      Memories: N",
+		"Close: Esc",
 	]
 	for i in lines.size():
-		v.draw_string(font, Vector2(sz.x * 0.5 - 380, 150.0 + i * 36.0), String(lines[i]), HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Color(0.9, 0.93, 1))
-	var y0: float = 150.0 + lines.size() * 36.0 + 30.0
+		v.draw_string(font, Vector2(lx, 156.0 + i * 32.0), String(lines[i]), HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Color(0.9, 0.93, 1))
+	v.draw_string(font, Vector2(rx, 118.0), "Play time  " + STATE.fmt_time(STATE.play_time), HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Color(0.95, 0.9, 0.7))
+	v.draw_string(font, Vector2(rx, 156.0), "Abilities", HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Color(0.7, 0.75, 0.9))
+	var names: Array = STATE.abilities.map(func(a): return STATE.ABILITIES[a]["name"])
+	for i in names.size():
+		v.draw_string(font, Vector2(rx + 16.0, 186.0 + i * 28.0), String(names[i]), HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Color(0.9, 0.93, 1))
+	if names.is_empty():
+		v.draw_string(font, Vector2(rx + 16.0, 186.0), "none yet", HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Color(0.5, 0.55, 0.65))
+	var y0: float = 330.0
+	v.draw_string(font, Vector2(rx, y0 - 36.0), "Settings", HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Color(0.7, 0.75, 0.9))
 	var rows: Array = [["Music", STATE.music_vol], ["Effects", STATE.sfx_vol], ["Screen shake", STATE.shake_on], ["Atmosphere", STATE.atmosphere_on]]
 	for i in rows.size():
 		var y: float = y0 + i * 40.0
 		var col := Color(1, 1, 1) if i == sel else Color(0.6, 0.65, 0.75)
 		if i == sel:
-			v.draw_rect(Rect2(sz.x * 0.5 - 390, y - 26, 560, 38), Color(1, 1, 1, 0.1))
-		v.draw_string(font, Vector2(sz.x * 0.5 - 380, y), String(rows[i][0]), HORIZONTAL_ALIGNMENT_LEFT, -1, 20, col)
+			v.draw_rect(Rect2(rx - 10.0, y - 26, 470, 38), Color(1, 1, 1, 0.1))
+		v.draw_string(font, Vector2(rx, y), String(rows[i][0]), HORIZONTAL_ALIGNMENT_LEFT, -1, 20, col)
 		if rows[i][1] is bool:
-			v.draw_string(font, Vector2(sz.x * 0.5 - 200, y), "On" if rows[i][1] else "Off", HORIZONTAL_ALIGNMENT_LEFT, -1, 20, col)
+			v.draw_string(font, Vector2(rx + 170.0, y), "On" if rows[i][1] else "Off", HORIZONTAL_ALIGNMENT_LEFT, -1, 20, col)
 			continue
 		for k in 10:
-			v.draw_rect(Rect2(sz.x * 0.5 - 200 + k * 22, y - 18, 18, 20), col if k < int(rows[i][1]) else Color(1, 1, 1, 0.12))
-	v.draw_string(font, Vector2(sz.x * 0.5 - 380, y0 + 160), "Up/Down choose   Left/Right change", HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.6, 0.65, 0.75))
+			v.draw_rect(Rect2(rx + 170.0 + k * 28.0 * 0.8, y - 18, 18 * 0.8, 20), col if k < int(rows[i][1]) else Color(1, 1, 1, 0.12))
+	v.draw_string(font, Vector2(rx, y0 + 170.0), "Up/Down choose   Left/Right change", HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.6, 0.65, 0.75))

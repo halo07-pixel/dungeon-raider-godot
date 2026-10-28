@@ -49,6 +49,6 @@ func _draw() -> void:
 	draw_string(font, Vector2(138, 94), str(geo), HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Color(0.95, 0.9, 0.7))
 	if banner_a > 0.01:
 		var w: float = size.x
-		draw_string(font, Vector2(0, size.y * 0.78), banner_text, HORIZONTAL_ALIGNMENT_CENTER, w, 42, Color(1, 1, 1, banner_a))
+		draw_string(font, Vector2(0, size.y * 0.2), banner_text, HORIZONTAL_ALIGNMENT_CENTER, w, 42, Color(1, 1, 1, banner_a))
 		if banner_sub != "":
-			draw_string(font, Vector2(0, size.y * 0.78 + 34), banner_sub, HORIZONTAL_ALIGNMENT_CENTER, w, 20, Color(0.8, 0.85, 0.95, banner_a))
+			draw_string(font, Vector2(0, size.y * 0.2 + 34), banner_sub, HORIZONTAL_ALIGNMENT_CENTER, w, 20, Color(0.8, 0.85, 0.95, banner_a))

@@ -10,6 +10,7 @@ const STATE = preload("res://hk/state.gd")
 const SPRITES = preload("res://hk/sprites.gd")
 const PLAYER = preload("res://hk/player.gd")
 const REACH: float = 28.0   # đệm quanh vật thể tương tác (px): đứng sát hình là tương tác được
+const WALL_DIM: Dictionary = {"catacomb": 0.7}   # gạch tường tối đi cho khu có hoạ tiết gắt (hạt tàn lửa)
 const BG_DIM: Dictionary = {"gate": 0.3, "catacomb": 0.13, "vault": 0.3, "archive": 0.25}   # độ sáng gạch nền
 const TILESET: Dictionary = {"gate": "", "catacomb": "_hell", "vault": "_ice", "archive": ""}   # hậu tố bộ gạch theo khu
 const PALETTES: Dictionary = {
@@ -266,13 +267,15 @@ func _draw() -> void:
 				continue
 			var top: bool = not _is_solid(x, y - 1)
 			var name: String = ("wall_mid" + sfx) if top else ("floor_%d%s" % [1 + (x * 5 + y * 11) % 8, sfx])
-			draw_texture_rect(SPRITES.tex(name), Rect2(x * TILE, y * TILE, TILE, TILE), false, Color.WHITE if top else Color(0.62, 0.62, 0.7))
+			var wd: float = float(WALL_DIM.get(String(data.get("area", "gate")), 1.0))
+			draw_texture_rect(SPRITES.tex(name), Rect2(x * TILE, y * TILE, TILE, TILE), false, Color.WHITE if top else Color(0.62 * wd, 0.62 * wd, 0.7 * wd))
 			if top:
 				draw_rect(Rect2(x * TILE, y * TILE, TILE, 3), _pal["edge"])
 	for r in oneways:
 		for k in int(r.size.x / TILE):
 			# dải nhìn thấy của wall_top_mid nằm ở đáy ảnh (4px gốc = 8px): kéo lên để trùng 8px va chạm ở đỉnh ô
 			draw_texture_rect(SPRITES.tex("wall_top_mid" + sfx), Rect2(r.position.x + k * TILE, r.position.y - (TILE - r.size.y), TILE, TILE), false)
+		draw_rect(Rect2(r.position.x, r.position.y, r.size.x, 2.0), _pal["edge"].lightened(0.3))   # viền sáng: bục một chiều dễ thấy
 	for r in hazards:
 		# gai vẽ đúng trong vùng gây sát thương r: 3 tam giác (đỉnh ở mép trên r)
 		var sw: float = r.size.x / 3.0
