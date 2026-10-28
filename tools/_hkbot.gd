@@ -35,7 +35,7 @@ func _init() -> void:
 	var kind: String = args[0]
 	var runs: int = int(args[1]) if args.size() > 1 else 6
 	var St = load("res://hk/state.gd")
-	var boss_kinds: Array = ["warden", "wraith", "lord", "brute", "hexer"]
+	var boss_kinds: Array = ["warden", "wraith", "lord", "brute", "hexer", "colossus", "many_faced"]
 	var is_boss: bool = kind in boss_kinds
 	var tot_hits: int = 0
 	var tot_time: float = 0.0

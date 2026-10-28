@@ -66,7 +66,7 @@ func _draw_view() -> void:
 		if _confirm == i:
 			txt = "Slot %d   Press P again to erase" % (i + 1)
 		elif not inf.is_empty():
-			txt = "Slot %d   %s   %d rooms%s" % [i + 1, STATE.fmt_time(float(inf["time"])), int(inf["rooms"]), "   Complete" if inf["done"] else ""]
+			txt = "Slot %d   %s   %d rooms%s" % [i + 1, STATE.fmt_time(float(inf["time"])), int(inf["rooms"]), ("   True End" if inf["true_end"] else ("   Complete" if inf["done"] else ""))]
 		var col := Color(0.95, 0.95, 1.0) if not inf.is_empty() else Color(0.6, 0.65, 0.8)
 		if i == _sel:
 			v.draw_rect(Rect2(sz.x * 0.5 - 260, y - 30, 520, 42), Color(1, 1, 1, 0.1))

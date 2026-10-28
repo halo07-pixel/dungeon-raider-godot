@@ -243,7 +243,8 @@ static func slot_info(i: int) -> Dictionary:
 	var fl = data.get("flags", {})
 	return {"time": maxf(0.0, float(tm)) if (tm is float or tm is int) else 0.0,
 		"rooms": (vis as Array).size() if vis is Array else 0,
-		"done": fl is Dictionary and bool(fl.get("ending", false))}
+		"done": fl is Dictionary and bool(fl.get("ending", false)),
+		"true_end": fl is Dictionary and bool(fl.get("ending_true", false))}
 
 static func fmt_time(sec: float) -> String:
 	var s: int = int(sec)

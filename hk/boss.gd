@@ -1,6 +1,7 @@
 extends CharacterBody2D
 ## Boss: warden / lord (đi bộ, chém lao, nhảy đập, triệu hồi, mưa đá) và wraith (bay, bắn quạt, bổ nhào, chớp dịch chuyển).
 ## Mini-boss: brute (đi bộ, đập đất + chém, như warden nhẹ) và hexer (bay, bắn quạt, chớp dịch chuyển, triệu hồi quỷ nhỏ).
+## Boss bí mật many_faced: biến hình (`form`) qua các bộ đòn của boss khác, 3 pha; pha 3 là dạng thật `sovereign`.
 ## Mỗi đòn có thời gian báo trước (nhấp nháy). Gán `kind` TRƯỚC khi add_child, `arena` sau khi add.
 signal engaged
 signal defeated
@@ -17,6 +18,8 @@ const LOOK: Dictionary = {
 	"brute": {"anim": "frost_big_zombie_anim", "scale": 2.5},
 	"hexer": {"anim": "hell_acolyte_anim", "scale": 3.0},
 	"colossus": {"anim": "hell_ogre_idle_anim", "scale": 2.5},
+	"many_faced": {"anim": "ogre_idle_anim", "scale": 3.0},   # hộp ban đầu = dạng warden; hộp thật theo `form`
+	"sovereign": {"anim": "big_demon_idle_anim", "scale": 3.6},
 }
 const FLYERS: Array = ["wraith", "hexer"]
 const GRAVITY: float = 2400.0
@@ -28,9 +31,16 @@ const DATA: Dictionary = {
 	"brute": {"title": "Bone Brute", "hp": 110, "color": Color(0.55, 0.75, 0.85), "speed": 85.0},
 	"hexer": {"title": "Ash Hexer", "hp": 90, "color": Color(0.85, 0.45, 0.35), "speed": 170.0},
 	"colossus": {"title": "Drowned Colossus", "hp": 130, "color": Color(0.6, 0.5, 0.8), "speed": 100.0},
+	"many_faced": {"title": "The Many-Faced", "hp": 480, "color": Color(0.7, 0.45, 0.9), "speed": 0.0},
+	"sovereign": {"title": "The Many-Faced", "hp": 0, "color": Color(0.7, 0.45, 0.9), "speed": 125.0},
 }
+const SHIFT_P1: Array = ["warden", "brute", "wraith", "hexer"]
+const SHIFT_P2: Array = ["warden", "brute", "wraith", "hexer", "colossus", "lord"]
 
 var kind: String = "warden"
+var form: String = ""             # dạng đang dùng (= kind với boss thường); quyết định bộ đòn, hộp, bay/đi
+var _shape: RectangleShape2D
+var _form_t: float = 0.0          # còn bao lâu thì đổi dạng (chỉ many_faced)
 
 ## Hộp va chạm = phần nhìn thấy của sprite (hk/bodies.gd).
 static func body_size(k: String) -> Vector2:
@@ -57,13 +67,16 @@ func _ready() -> void:
 	var d: Dictionary = DATA[kind]
 	max_hp = int(d["hp"])
 	hp = max_hp
-	_size = body_size(kind)
+	form = "warden" if kind == "many_faced" else kind
+	_form_t = 7.0
+	_size = body_size(form)
 	collision_layer = 4
-	collision_mask = 0 if kind in FLYERS else 1
+	collision_mask = 0 if form in FLYERS else 1
 	add_to_group("hk_boss")
 	var cs := CollisionShape2D.new()
 	var sh := RectangleShape2D.new()
 	sh.size = _size
+	_shape = sh
 	cs.shape = sh
 	add_child(cs)
 
@@ -83,7 +96,7 @@ func _physics_process(delta: float) -> void:
 		return
 	if state == "dormant":
 		velocity = Vector2(0, velocity.y)
-		if not (kind in FLYERS):
+		if not (form in FLYERS):
 			velocity.y = minf(velocity.y + GRAVITY * delta, 900.0)
 			move_and_slide()
 		if absf(p.global_position.x - global_position.x) < 480.0 and absf(p.global_position.y - global_position.y) < 260.0:
@@ -92,14 +105,23 @@ func _physics_process(delta: float) -> void:
 			engaged.emit()
 		queue_redraw()
 		return
+	if kind == "many_faced" and state != "wind_shift" and state != "intro":
+		_form_t -= delta
 	if state == "intro":
-		if not (kind in FLYERS):
+		if not (form in FLYERS):
 			velocity.y = minf(velocity.y + GRAVITY * delta, 900.0)
 			velocity.x = 0.0
 			move_and_slide()
 		if _t <= 0.0:
 			_next()
-	elif kind in FLYERS:
+	elif state == "wind_shift":
+		velocity = Vector2(0, minf(velocity.y + GRAVITY * delta, 900.0)) if not (form in FLYERS) else Vector2.ZERO
+		if not (form in FLYERS):
+			move_and_slide()
+		if _t <= 0.0:
+			_set_form(_pick_form())
+			_next()
+	elif form in FLYERS:
 		_wraith(delta, p)
 	else:
 		_ground(delta, p)
@@ -107,21 +129,50 @@ func _physics_process(delta: float) -> void:
 	_update_markers(delta)
 	queue_redraw()
 
+func _lordlike() -> bool:
+	return form == "lord" or form == "sovereign"
+
+## many_faced: hết giờ dạng thì báo trước ~0.9s (vòng + nhấp nháy, không nhận đòn, không gây chạm) rồi đổi dạng. Pha 3 giữ dạng thật.
+func _maybe_shift() -> bool:
+	if kind != "many_faced" or phase >= 3 or _form_t > 0.0:
+		return false
+	state = "wind_shift"
+	_t = 0.9
+	velocity = Vector2.ZERO
+	shake.emit(1.0)
+	return true
+
+func _pick_form() -> String:
+	var pool: Array = (SHIFT_P1 if phase == 1 else SHIFT_P2).duplicate()
+	pool.erase(form)
+	return String(pool[randi() % pool.size()])
+
+func _set_form(f: String) -> void:
+	var old_h: float = _size.y
+	form = f
+	_size = body_size(f)
+	_shape.set_deferred("size", _size)
+	set_deferred("collision_mask", 0 if f in FLYERS else 1)
+	global_position.y += (old_h - _size.y) * 0.5   # chân giữ nguyên chỗ khi đổi cỡ hộp
+	velocity = Vector2.ZERO
+	_alpha = 1.0
+	_form_t = (6.5 if phase == 1 else 4.0) + randf_range(0.0, 1.5)
+
 func _face(p: Node2D) -> void:
 	dir = 1 if p.global_position.x > global_position.x else -1
 
 func _next() -> void:
-	state = "hover" if kind in FLYERS else "walk"
-	_t = randf_range(1.0, 1.6) if kind in FLYERS else randf_range(0.5, 1.0)
+	state = "hover" if form in FLYERS else "walk"
+	_t = randf_range(1.0, 1.6) if form in FLYERS else randf_range(0.5, 1.0)
 
 # ------------------------------------------------------------ đi bộ (warden, lord)
 func _ground(delta: float, p: Node2D) -> void:
-	var speed: float = float(DATA[kind]["speed"]) * (1.25 if phase == 2 else 1.0)
+	var speed: float = float(DATA[form]["speed"]) * (1.25 if phase >= 2 else 1.0)
 	match state:
 		"walk":
 			_face(p)
 			velocity.x = float(dir) * speed
-			if _t <= 0.0:
+			if _t <= 0.0 and not _maybe_shift():
 				_pick_attack()
 		"wind_slash":
 			velocity.x = 0.0
@@ -158,6 +209,13 @@ func _ground(delta: float, p: Node2D) -> void:
 				_shockwave()
 				state = "recover"
 				_t = 0.8
+		"wind_bolt":
+			velocity.x = 0.0
+			_face(p)
+			if _t <= 0.0:
+				_fire_fan(p)
+				state = "recover"
+				_t = 0.6
 		"wind_summon":
 			velocity.x = 0.0
 			if _t <= 0.0:
@@ -179,17 +237,21 @@ func _ground(delta: float, p: Node2D) -> void:
 
 func _pick_attack() -> void:
 	var opts: Array = ["slash", "slam"]
-	if kind == "brute":   # nhiều đập đất hơn chém: đòn chậm, báo trước dài
+	if form == "brute":   # nhiều đập đất hơn chém: đòn chậm, báo trước dài
 		opts = ["slam", "slam", "slash"]
-		if phase == 2:
+		if phase >= 2:
 			opts.append("combo")
-	elif kind == "lord":
+	elif _lordlike():
 		opts.append("summon")
-		if phase == 2:
+		if phase >= 2:
 			opts.append("rain")
 			opts.append("rain")
-	elif phase == 2:
+	elif phase >= 2:
 		opts.append("combo")
+	if kind == "many_faced" and phase >= 2:   # đòn lai: mọi dạng đi bộ biết bắn quạt từ pha 2
+		opts.append("bolt")
+		if form == "sovereign":
+			opts.append("bolt")
 	match String(opts[randi() % opts.size()]):
 		"slash":
 			state = "wind_slash"
@@ -204,6 +266,9 @@ func _pick_attack() -> void:
 		"summon":
 			state = "wind_summon"
 			_t = 1.0
+		"bolt":
+			state = "wind_bolt"
+			_t = 0.55
 		"rain":
 			state = "rain"
 			_t = 3.0
@@ -249,16 +314,16 @@ func _summon() -> void:
 
 # ------------------------------------------------------------ bay (wraith)
 func _wraith(delta: float, p: Node2D) -> void:
-	var speed: float = float(DATA[kind]["speed"]) * (1.3 if phase == 2 else 1.0)
+	var speed: float = float(DATA[form]["speed"]) * (1.3 if phase >= 2 else 1.0)
 	match state:
 		"hover":
 			_face(p)
 			var target := Vector2(p.global_position.x + sin(_time * 1.3) * 200.0, p.global_position.y - 140.0)   # cũ 150 với hộp 70 cao; hộp mới thấp hơn nên hạ 10 để đáy giữ nguyên tầm nhảy-chém (~-115)
 			target = _clamp_arena(target)
 			velocity = (target - global_position).limit_length(speed)
-			if _t <= 0.0:
+			if _t <= 0.0 and not _maybe_shift():
 				var r: int = randi() % 3
-				if kind == "hexer" and r == 1:   # hexer không bổ nhào: thay bằng triệu hồi
+				if form == "hexer" and r == 1:   # hexer không bổ nhào: thay bằng triệu hồi
 					r = 3
 				if r == 0:
 					state = "wind_bolt"
@@ -305,7 +370,7 @@ func _wraith(delta: float, p: Node2D) -> void:
 		"dive_land":
 			velocity = Vector2.ZERO
 			if _t <= 0.0:
-				if phase == 2 and randf() < 0.5:
+				if phase >= 2 and randf() < 0.5:
 					_dive_x = p.global_position.x
 					_markers.append({"x": _dive_x, "t": 0.5})
 					state = "wind_dive"
@@ -360,7 +425,7 @@ func _update_markers(delta: float) -> void:
 	for m in _markers.duplicate():
 		if float(m["t"]) <= 0.0:
 			_markers.erase(m)
-			if kind == "lord":
+			if _lordlike():
 				var s := Area2D.new()
 				s.set_script(PROJECTILE)
 				s.friendly = false
@@ -383,7 +448,7 @@ func _attack_rect() -> Rect2:
 	return Rect2()
 
 func _touch_damage(p: Node2D) -> void:
-	if state == "dormant" or state == "intro" or _alpha < 0.9:
+	if state == "dormant" or state == "intro" or state == "wind_shift" or _alpha < 0.9:
 		return
 	var pr := Rect2(p.global_position - p.BODY * 0.5, p.BODY)
 	var body := Rect2(global_position - _size * 0.5, _size)
@@ -391,16 +456,26 @@ func _touch_damage(p: Node2D) -> void:
 		p.take_damage(global_position.x)
 
 func take_hit(dmg: int, _from: Vector2) -> void:
-	if hp <= 0 or state == "dormant" or state == "intro":
+	if hp <= 0 or state == "dormant" or state == "intro" or state == "wind_shift":
 		return
 	hp -= dmg
 	_flash = 0.08
-	if phase == 1 and hp <= max_hp / 2:
-		phase = 2
+	var want: int = phase
+	if kind == "many_faced":   # 3 pha: 66% và 33% máu
+		want = 3 if hp * 3 <= max_hp else (2 if hp * 3 <= max_hp * 2 else 1)
+	elif hp <= max_hp / 2:
+		want = 2
+	if want > phase:
+		phase = want
 		state = "intro"
 		_t = 0.7
 		shake.emit(3.0)
 		_markers.clear()
+		if kind == "many_faced":
+			if phase == 3:
+				_set_form("sovereign")
+			else:
+				_form_t = 0.0
 	if hp <= 0:
 		FX.death(get_parent(), global_position, DATA[kind]["color"], true)
 		shake.emit(5.0)
@@ -426,6 +501,9 @@ func _draw_telegraph(h: Vector2) -> void:
 			if p:
 				var d: Vector2 = (p.global_position - global_position).normalized()
 				draw_line(d * h.x, d * 320.0, Color(0.7, 0.85, 1.0, a * 2.0), 2.0)
+		"wind_shift":   # vòng nở ra quanh người: sắp đổi dạng
+			var ks: float = 1.0 - clampf(_t / 0.9, 0.0, 1.0)
+			draw_arc(Vector2.ZERO, lerpf(24.0, maxf(h.x, h.y) + 50.0, ks), 0.0, TAU, 32, Color(0.75, 0.5, 1.0, 0.3 + 0.5 * ks), 3.0)
 		"wind_conjure":
 			draw_arc(Vector2(float(-dir) * 70.0, 20.0), lerpf(40.0, 10.0, k), 0.0, TAU, 16, Color(0.9, 0.5, 0.3, 0.6), 2.0)
 
@@ -438,9 +516,9 @@ func _draw() -> void:
 	else:
 		tint.a = _alpha
 	var h: Vector2 = _size * 0.5
-	var look: Dictionary = LOOK[kind]
+	var look: Dictionary = LOOK[form]
 	SPRITES.draw_body(self, String(look["anim"]), Vector2(0, h.y), float(look["scale"]), dir < 0, tint, 6.0)
-	if not (kind in FLYERS) and state == "lunge":
+	if not (form in FLYERS) and state == "lunge":
 		draw_rect(Rect2(float(dir) * (h.x + 45.0) - 45.0, -h.y * 0.8, 90, _size.y * 0.8), Color(1, 1, 1, 0.55))
 	_draw_telegraph(h)
 	for m in _markers:

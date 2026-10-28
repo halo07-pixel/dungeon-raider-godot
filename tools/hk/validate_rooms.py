@@ -50,7 +50,7 @@ class Room:
             k, v = line.split(":", 1)
             k, v = k.strip(), v.strip()
             if k.startswith("door "):
-                to, td = v.split()
+                to, td = v.split()[:2]
                 self.doors[k[5:].strip()] = (to, td)
             elif k in ("altar", "charm", "boss"):
                 setattr(self, k, dict(kv.split("=") for kv in v.split()))
