@@ -8,6 +8,7 @@ const LORE = preload("res://hk/lore.gd")
 const MUSIC = preload("res://hk/music.gd")
 const SFX = preload("res://hk/sfx.gd")
 const BACKDROP = preload("res://hk/backdrop.gd")
+const ATMOSPHERE = preload("res://hk/atmosphere.gd")
 const DEBUG_BOXES = preload("res://hk/debug_boxes.gd")
 const AREA_NAMES: Dictionary = {"gate": "Gate Ruins", "catacomb": "Weeping Catacombs", "vault": "Ashen Vaults", "archive": "Drowned Archive"}
 const ZOOM: float = 1.5
@@ -24,6 +25,7 @@ var shop: Node
 var music: Node
 var sfx: Node
 var backdrop: Node
+var atmosphere: Node2D
 var debug_boxes: Node2D
 var busy: bool = false
 var entry_spawn: Vector2 = Vector2.ZERO
@@ -60,6 +62,8 @@ func _ready() -> void:
 	add_child(sfx)
 	backdrop = BACKDROP.new()
 	add_child(backdrop)
+	atmosphere = ATMOSPHERE.new()
+	add_child(atmosphere)
 	debug_boxes = DEBUG_BOXES.new()
 	debug_boxes.world = self
 	add_child(debug_boxes)
@@ -118,6 +122,7 @@ func _build_ui() -> void:
 
 func _on_volume_changed() -> void:
 	music.apply_volume()
+	atmosphere.apply()
 	sfx.play("buy")
 
 func _process(d: float) -> void:
@@ -126,6 +131,7 @@ func _process(d: float) -> void:
 		debug_boxes.toggle()
 	if is_instance_valid(player):
 		cam.global_position = player.global_position
+		atmosphere.follow(cam.global_position, player.global_position)
 	menu.enabled = not busy and not shop.is_open() and not player.is_dead()
 
 func _fade_to(a: float, dur: float = 0.2) -> void:
@@ -174,6 +180,7 @@ func load_room(id: String) -> void:
 		_last_area = area
 		hud.banner(AREA_NAMES.get(area, area))
 		backdrop.set_area(area)
+	atmosphere.set_room(data, room.interactables)
 	music.play(String(MUSIC.AREA_TRACK.get(area, "explore_stone")))
 
 func _spawn_enemy(ch: String, pos: Vector2) -> void:

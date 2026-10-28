@@ -12,7 +12,7 @@ var _area: String = "gate"
 
 func _ready() -> void:
 	layer = -10
-	for k in [0.25, 0.5]:
+	for k in [0.12, 0.25, 0.5]:
 		var pl := ParallaxLayer.new()
 		pl.motion_scale = Vector2(k, 0.15)
 		pl.motion_mirroring = Vector2(PERIOD, 0.0)
@@ -30,6 +30,8 @@ func set_area(area: String) -> void:
 
 func _draw_layer(d: Node2D, k: float) -> void:
 	var col: Color = COLORS[_area]["far" if k < 0.4 else "near"]
+	if k < 0.2:   # lớp xa nhất: chìm gần màu nền
+		col = COLORS[_area]["clear"].lerp(COLORS[_area]["far"], 0.5)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash(_area) + int(k * 100.0)
 	var x: float = 0.0
