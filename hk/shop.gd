@@ -7,6 +7,7 @@ var _view: Control
 var _sel: int = 0
 var _msg: String = ""
 var _items: Array = []
+var _area: String = ""   # khu của thương nhân ("" = bán tất cả, dùng cho test)
 var _opened_frame: int = -1   # phím mở shop (Up) còn "just pressed" trong khung này: bỏ qua để không dịch lựa chọn
 
 func _init() -> void:
@@ -24,8 +25,9 @@ func _ready() -> void:
 func is_open() -> bool:
 	return _open
 
-func open(_player: Node = null) -> void:
-	_items = _stock()
+func open(_player: Node = null, area: String = "") -> void:
+	_area = area
+	_items = _stock(_area)
 	_sel = 0
 	_msg = ""
 	_open = true
@@ -40,16 +42,34 @@ func close() -> void:
 	_view.visible = false
 	STATE.save()
 
+## Hàng theo khu: mỗi thương nhân bán bộ bùa riêng; mặt nạ/ô bùa bán theo cấp (khu sau bán cấp cao hơn).
+const AREA_CHARMS: Dictionary = {
+	"gate": ["swift_edge", "soul_siphon", "fortune"],
+	"vault": ["frugal_soul", "spring_nail"],
+	"archive": ["second_wind", "shade_cloak"],
+}
+const AREA_TIER: Dictionary = {"gate": 1, "vault": 2, "archive": 2}   # mặt nạ/notch tối đa mua được ở khu này
+
+## Giá (đã hạ so với bản cũ 120+40*cost / mặt nạ 250+200n / notch 300+250n vì quái chỉ rơi vài Geo).
+static func charm_price(cid: String) -> int:
+	return 50 + 30 * int(STATE.CHARMS[cid]["cost"])
+static func mask_price() -> int:
+	return 120 + 100 * STATE.hp_bonus
+static func notch_price() -> int:
+	return 150 + 120 * STATE.notch_bonus
+
 ## Danh sách hàng còn bán, tính lại mỗi lần mở.
-func _stock() -> Array:
+func _stock(area: String = "") -> Array:
 	var out: Array = []
-	if STATE.hp_bonus < 2:
-		out.append({"id": "mask", "name": "Extra Mask", "price": 250 + 200 * STATE.hp_bonus, "desc": "+1 mask permanently."})
-	if STATE.notch_bonus < 2:
-		out.append({"id": "notch", "name": "Charm Notch", "price": 300 + 250 * STATE.notch_bonus, "desc": "+1 charm notch."})
-	for cid in ["swift_edge", "soul_siphon", "fortune", "second_wind", "frugal_soul", "spring_nail", "shade_cloak"]:
+	var tier: int = int(AREA_TIER.get(area, 2))
+	if STATE.hp_bonus < tier:
+		out.append({"id": "mask", "name": "Extra Mask", "price": mask_price(), "desc": "+1 mask permanently."})
+	if STATE.notch_bonus < tier:
+		out.append({"id": "notch", "name": "Charm Notch", "price": notch_price(), "desc": "+1 charm notch."})
+	var list: Array = AREA_CHARMS.get(area, ["swift_edge", "soul_siphon", "fortune", "second_wind", "frugal_soul", "spring_nail", "shade_cloak"])
+	for cid in list:
 		if not (cid in STATE.charms_owned):
-			out.append({"id": cid, "name": "Charm: " + String(STATE.CHARMS[cid]["name"]), "price": 120 + 40 * int(STATE.CHARMS[cid]["cost"]), "desc": String(STATE.CHARMS[cid]["desc"])})
+			out.append({"id": cid, "name": "Charm: " + String(STATE.CHARMS[cid]["name"]), "price": charm_price(cid), "desc": String(STATE.CHARMS[cid]["desc"])})
 	return out
 
 func _buy(it: Dictionary) -> void:

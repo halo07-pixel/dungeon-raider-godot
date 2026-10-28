@@ -43,6 +43,8 @@ const DATA: Dictionary = {
 	"many_faced": {"title": "The Many-Faced", "hp": 480, "color": Color(0.7, 0.45, 0.9), "speed": 0.0},
 	"sovereign": {"title": "The Many-Faced", "hp": 0, "color": Color(0.7, 0.45, 0.9), "speed": 125.0},
 }
+## Geo thưởng một lần khi hạ boss lần đầu (cờ boss_<id> chưa đặt).
+const BOUNTY: Dictionary = {"warden": 60, "hexer": 40, "brute": 40, "wraith": 80, "colossus": 50, "lord": 150, "many_faced": 0}
 const SHIFT_P1: Array = ["warden", "brute", "wraith", "hexer"]
 const SHIFT_P2: Array = ["warden", "brute", "wraith", "hexer", "colossus", "lord"]
 

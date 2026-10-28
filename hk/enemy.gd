@@ -19,12 +19,12 @@ const LOOK: Dictionary = {   # sprite + hệ số phóng; đáy sprite khớp đ
 	"dropper": {"anim": "hell_acolyte_anim", "scale": 2.0},
 }
 const DATA: Dictionary = {
-	"crawler": {"hp": 12, "geo": 1, "color": Color(0.75, 0.35, 0.3)},
-	"flyer": {"hp": 10, "geo": 2, "color": Color(0.6, 0.4, 0.8)},
-	"spitter": {"hp": 14, "geo": 2, "color": Color(0.5, 0.65, 0.3)},
-	"charger": {"hp": 24, "geo": 3, "color": Color(0.85, 0.5, 0.2)},
-	"guard": {"hp": 22, "geo": 4, "color": Color(0.6, 0.65, 0.78)},
-	"dropper": {"hp": 12, "geo": 3, "color": Color(0.55, 0.35, 0.6)},
+	"crawler": {"hp": 12, "geo": 2, "color": Color(0.75, 0.35, 0.3)},
+	"flyer": {"hp": 10, "geo": 3, "color": Color(0.6, 0.4, 0.8)},
+	"spitter": {"hp": 14, "geo": 3, "color": Color(0.5, 0.65, 0.3)},
+	"charger": {"hp": 24, "geo": 5, "color": Color(0.85, 0.5, 0.2)},
+	"guard": {"hp": 22, "geo": 6, "color": Color(0.6, 0.65, 0.78)},
+	"dropper": {"hp": 12, "geo": 5, "color": Color(0.55, 0.35, 0.6)},
 }
 
 var kind: String = "crawler"
