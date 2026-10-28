@@ -35,6 +35,7 @@ static func body_size(k: String) -> Vector2:
 	return SPRITES.BODIES.rect(String(look["anim"]), float(look["scale"])).size
 var hp: int = 10
 var dir: int = -1
+var _prev_state: String = ""
 var state: String = "idle"     # charger/spitter: idle | windup | lunge | recover
 var _t: float = 0.0
 var _kb_t: float = 0.0
@@ -73,6 +74,9 @@ func _player() -> Node2D:
 	return ps[0] if not ps.is_empty() else null
 
 func _physics_process(delta: float) -> void:
+	if state == "windup" and _prev_state != "windup":
+		sfx.emit("tell")   # âm báo trước đòn (không còn vùng cảnh báo màu); sprite vẫn nhấp nháy lúc windup
+	_prev_state = state
 	_time += delta
 	_flash = maxf(0.0, _flash - delta)
 	_block_flash = maxf(0.0, _block_flash - delta)
@@ -317,12 +321,6 @@ func _draw() -> void:
 	var look: Dictionary = LOOK[kind]
 	var jitter := Vector2(randf_range(-3.0, 3.0), 0.0) if state == "shake" else Vector2.ZERO
 	SPRITES.draw_body(self, String(look["anim"]), Vector2(0, _size.y * 0.5) + jitter, float(look["scale"]), dir < 0, tint)
-	if state == "windup" and (kind == "charger" or kind == "guard"):   # vạch báo trước đường húc: charger 520x0.55s, guard 340x0.25s
-		var reach: float = 286.0 if kind == "charger" else 85.0
-		var k: float = 1.0 - clampf(_t / 0.5, 0.0, 1.0)
-		var band := Rect2(minf(float(dir) * _size.x * 0.5, float(dir) * (_size.x * 0.5 + reach)), -_size.y * 0.5, reach, _size.y)
-		draw_rect(band, Color(1, 0.25, 0.2, 0.06 + 0.12 * k))
-		draw_rect(band, Color(1, 0.35, 0.3, 0.35 + 0.4 * k), false, 2.0)   # viền giữ vùng nguy hiểm rõ dù nền nhạt
 	if kind == "guard":   # khiên: dựng đứng phía trước, hạ thấp khi recover
 		var up: bool = state != "recover"
 		var sh := Rect2(float(dir) * (_size.x * 0.5 + 2.0) - 3.0, -_size.y * (0.4 if up else 0.05), 6.0, _size.y * (0.8 if up else 0.4))

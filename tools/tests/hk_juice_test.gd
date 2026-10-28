@@ -1,6 +1,6 @@
 extends SceneTree
 ## Test hiệu ứng: vòng/tia/chết tạo node rồi tự dọn, cài đặt rung màn hình (tắt thì camera không rung; lưu/đọc; menu Pause bật/tắt),
-## vạch báo trước đòn của boss/quái vẽ không lỗi.
+## boss/quái vẽ không lỗi (không còn vùng cảnh báo màu).
 var fails: int = 0
 
 func ck(c: bool, m: String) -> void:
@@ -82,7 +82,7 @@ func _init() -> void:
 	await press("hk_right")
 	ck(St.shake_on == true, "menu: Right -> bật")
 	menu.close()
-	# vạch báo trước vẽ không lỗi (SCRIPT ERROR sẽ làm run_all báo FAIL)
+	# vẽ boss/quái không lỗi (SCRIPT ERROR sẽ làm run_all báo FAIL)
 	var room := Node2D.new()
 	room.set_script(load("res://hk/room.gd"))
 	root.add_child(room)

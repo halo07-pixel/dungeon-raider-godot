@@ -6,6 +6,7 @@ extends CharacterBody2D
 signal engaged
 signal defeated
 signal shake(strength: float)
+signal sfx(name: String)
 
 const PROJECTILE = preload("res://hk/projectile.gd")
 const ENEMY = preload("res://hk/enemy.gd")
@@ -64,6 +65,7 @@ var _dive_x: float = 0.0
 var _alpha: float = 1.0
 var _was_air: bool = false
 var _perch_t: float = 0.0
+var _prev_state: String = ""
 
 func _ready() -> void:
 	var d: Dictionary = DATA[kind]
@@ -127,6 +129,9 @@ func _physics_process(delta: float) -> void:
 		_wraith(delta, p)
 	else:
 		_ground(delta, p)
+	if state != _prev_state and state.begins_with("wind"):   # báo hiệu đòn bằng âm riêng (thay vùng cảnh báo màu)
+		sfx.emit("tell_" + state.substr(5))
+	_prev_state = state
 	_touch_damage(p)
 	_update_markers(delta)
 	queue_redraw()
@@ -236,7 +241,10 @@ func _ground(delta: float, p: Node2D) -> void:
 			_rain_t -= delta
 			if _rain_t <= 0.0:
 				_rain_t = 0.4
-				_markers.append({"x": randf_range(arena.position.x + 70.0, arena.end.x - 70.0), "t": 0.8})
+				var rx: float = randf_range(arena.position.x + 70.0, arena.end.x - 70.0)
+				_markers.append({"x": rx, "t": 0.8})
+				FX.burst(get_parent(), Vector2(rx, arena.position.y + 36.0), Color(0.6, 0.55, 0.5), 5, 60.0)   # bụi rơi từ trần báo hiệu đá sắp rụng
+				sfx.emit("rumble")
 			if _t <= 0.0:
 				state = "recover"
 				_t = 0.7
@@ -491,32 +499,11 @@ func take_hit(dmg: int, _from: Vector2) -> void:
 		defeated.emit()
 		queue_free()
 
-## Vạch báo trước đòn (chỉ vẽ trong lúc "wind_*"), khớp với cách đòn thật di chuyển/ra đòn.
-func _draw_telegraph(h: Vector2) -> void:
-	var p := _player()
-	var k: float = 1.0 - clampf(_t / 0.5, 0.0, 1.0)   # tiến độ báo trước (0 -> 1)
-	var a: float = 0.12 + 0.25 * k
-	match state:
-		"wind_slash":   # lao tới: quãng đường 470x0.28s + tầm chém 90
-			var reach: float = 470.0 * 0.28 + 90.0
-			var band := Rect2(minf(float(dir) * h.x, float(dir) * (h.x + reach)), -h.y * 0.8, reach, _size.y * 0.8)
-			draw_rect(band, Color(1, 0.25, 0.2, a * 0.5))
-			draw_rect(band, Color(1, 0.35, 0.3, 0.35 + 0.4 * k), false, 2.0)
-		"wind_slam":   # nhảy đập: rơi gần chỗ người chơi (tối đa 240px), vòng co lại ở chỗ rơi
-			if p:
-				var lx: float = clampf(p.global_position.x - global_position.x, -240.0, 240.0)
-				var fy: float = h.y
-				draw_arc(Vector2(lx, fy - 4.0), lerpf(70.0, 24.0, k), 0.0, TAU, 24, Color(1, 0.3, 0.2, 0.35 + 0.4 * k), 3.0)
-				draw_line(Vector2(lx - 36.0, fy - 2.0), Vector2(lx + 36.0, fy - 2.0), Color(1, 0.3, 0.2, 0.5), 4.0)
-		"wind_bolt":   # nhắm người chơi
-			if p:
-				var d: Vector2 = (p.global_position - global_position).normalized()
-				draw_line(d * h.x, d * 320.0, Color(0.7, 0.85, 1.0, a * 2.0), 2.0)
-		"wind_shift":   # vòng nở ra quanh người: sắp đổi dạng
-			var ks: float = 1.0 - clampf(_t / 0.9, 0.0, 1.0)
-			draw_arc(Vector2.ZERO, lerpf(24.0, maxf(h.x, h.y) + 50.0, ks), 0.0, TAU, 32, Color(0.75, 0.5, 1.0, 0.3 + 0.5 * ks), 3.0)
-		"wind_conjure":
-			draw_arc(Vector2(float(-dir) * 70.0, 20.0), lerpf(40.0, 10.0, k), 0.0, TAU, 16, Color(0.9, 0.5, 0.3, 0.6), 2.0)
+## Báo hiệu "đổi dạng" của many_faced: vòng nở quanh người (không phải vùng cảnh báo đòn đánh; các vùng/vạch đỏ đã bỏ).
+func _draw_shift_ring(h: Vector2) -> void:
+	if state == "wind_shift":
+		var ks: float = 1.0 - clampf(_t / 0.9, 0.0, 1.0)
+		draw_arc(Vector2.ZERO, lerpf(24.0, maxf(h.x, h.y) + 50.0, ks), 0.0, TAU, 32, Color(0.75, 0.5, 1.0, 0.3 + 0.5 * ks), 3.0)
 
 func _draw() -> void:
 	var tint := Color.WHITE
@@ -531,11 +518,7 @@ func _draw() -> void:
 	SPRITES.draw_body(self, String(look["anim"]), Vector2(0, h.y), float(look["scale"]), dir < 0, tint, 6.0)
 	if not (form in FLYERS) and state == "lunge":
 		draw_rect(Rect2(float(dir) * (h.x + 45.0) - 45.0, -h.y * 0.8, 90, _size.y * 0.8), Color(1, 1, 1, 0.55))
-	_draw_telegraph(h)
-	for m in _markers:
-		var gx: float = float(m["x"]) - global_position.x
-		var a: float = 0.25 + 0.35 * (1.0 - float(m["t"]))
-		draw_rect(Rect2(gx - 14.0, -global_position.y + arena.position.y, 28.0, arena.size.y), Color(1, 0.3, 0.3, a * 0.5))
+	_draw_shift_ring(h)
 	if state != "dormant":
 		var w: float = clampf(_size.x * 1.6, 120.0, 220.0)   # thanh máu ngay trên đỉnh phần nhìn thấy, rộng theo cỡ boss
 		draw_rect(Rect2(-w * 0.5, -h.y - 18, w, 8), Color(0.05, 0.05, 0.1, 0.85))

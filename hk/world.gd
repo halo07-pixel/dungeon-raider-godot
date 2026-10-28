@@ -203,6 +203,7 @@ func _spawn_boss(bid: String, pos: Vector2) -> void:
 	boss.arena = room.bounds()
 	boss.engaged.connect(_on_boss_engaged)
 	boss.shake.connect(cam.shake)
+	boss.sfx.connect(sfx.play)
 	boss.shake.connect(_on_boss_shake)
 
 func _on_boss_shake(strength: float) -> void:
