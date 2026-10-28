@@ -4,6 +4,12 @@ map: 0,10
 door 1: gate_8 2
 door 2: cat_2 1
 torch: 9 17
+deco: skull 30 17
+deco: hole 25 8
+deco: skull 16 17
+deco: skull 13 17
+deco: hole 33 5
+deco: hole 22 3
 ---
 ########################################
 #.........#..........d..#........#.....#

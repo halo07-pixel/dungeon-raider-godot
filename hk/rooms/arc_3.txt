@@ -4,6 +4,12 @@ map: 66,21
 door 1: arc_2 2
 door 2: arc_4 1
 torch: 9 17
+deco: fountain_blue 20 17
+deco: tome 27 17
+deco: banner_blue 6 12
+deco: banner_green 31 3
+deco: tome 24 17
+deco: banner_green 34 5
 ---
 ########################################
 #........##.................##.........#

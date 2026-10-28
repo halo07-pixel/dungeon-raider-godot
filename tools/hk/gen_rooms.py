@@ -363,12 +363,76 @@ def add_torches():
                 r.extra.append("torch: %d %d" % (x, r.F - 1))
 
 
+# Trang trí (chỉ vẽ, không va chạm): tên sprite, số ô cao, đứng sàn hay treo tường
+DECO = {
+    "column": (3, "floor"), "column_wall": (3, "floor"), "crate": (2, "floor"), "skull": (1, "floor"),
+    "fountain_red": (3, "floor"), "fountain_blue": (3, "floor"), "tome": (1, "floor"), "sigil": (1, "floor"),
+    "banner_red": (1, "wall"), "banner_blue": (1, "wall"), "banner_green": (1, "wall"), "banner_yellow": (1, "wall"),
+    "hole": (1, "wall"), "goo": (2, "wall"),
+}
+DECO_THEME = {  # (đứng sàn, treo tường) theo khu
+    "gate": (["column", "crate", "column_wall"], ["banner_red", "banner_blue", "hole"]),
+    "catacomb": (["skull", "crate", "skull"], ["goo", "hole", "banner_red"]),
+    "vault": (["fountain_red", "column", "fountain_red"], ["banner_yellow", "banner_yellow", "hole"]),
+    "archive": (["fountain_blue", "tome", "tome"], ["banner_green", "banner_blue", "banner_green"]),
+}
+DECO_MAX = 6
+
+
+def add_decor():
+    """Rải trang trí: ô phủ phải trống và hai cột bên cạnh cũng trống (không đè quái/bench/bàn thờ/cửa/lò lửa)."""
+    import random
+    for r in rooms:
+        rng = random.Random(r.id)
+        boss = any(e.startswith("boss:") for e in r.extra)
+        taken = {int(e.split()[1]) for e in r.extra if e.startswith("torch:")}
+        used = []
+
+        def clear(x, y0, y1):
+            return all(r.g[y][xx] == "." for y in range(y0, y1 + 1) for xx in (x - 1, x, x + 1))
+
+        def place(kind, x, row):
+            h, mode = DECO[kind]
+            if not (4 <= x <= r.w - 5) or any(abs(x - u) < 3 for u in used + list(taken)):
+                return False
+            y0 = row - h + 1
+            if y0 < 2 or not clear(x, y0, row):
+                return False
+            if mode == "floor" and r.g[r.F][x] not in "#=":
+                return False
+            used.append(x)
+            r.extra.append("deco: %s %d %d" % (kind, x, row))
+            return True
+
+        floor, wall = DECO_THEME[r.area]
+        n = 0
+        if boss:   # cặp cột + cờ hai bên phòng boss
+            fl = "column_wall" if r.area != "archive" else "column"
+            for x in (7, r.w - 8):
+                n += place(fl, x, r.F - 1)
+            for x in (11, r.w - 12):
+                n += place(wall[0], x, 4)
+            if r.id == "sov_1":
+                n += place("sigil", r.w // 2, r.F - 1)
+            continue
+        xs = list(range(5, r.w - 5))
+        rng.shuffle(xs)
+        for i, x in enumerate(xs):
+            if n >= DECO_MAX:
+                break
+            if i % 2 == 0:
+                n += place(rng.choice(floor), x, r.F - 1)
+            else:
+                n += place(rng.choice(wall), x, rng.randint(3, max(3, r.F - 6)))
+
+
 if __name__ == "__main__":
     os.makedirs(OUT, exist_ok=True)
     for f in os.listdir(OUT):
         if f.endswith(".txt"):
             os.remove(os.path.join(OUT, f))
     add_torches()
+    add_decor()
     for r in rooms:
         r.save()
     print("wrote", len(rooms), "rooms")

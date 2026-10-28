@@ -7,6 +7,8 @@ boss: id=lord
 hint: 36 14 A sealed way. Remember everything.
 torch: 3 19
 torch: 44 19
+deco: banner_yellow 11 4
+deco: banner_yellow 36 4
 ---
 ################################################
 #.............##.................##............#

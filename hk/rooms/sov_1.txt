@@ -5,6 +5,10 @@ door 1: vault_7 2
 boss: id=many_faced
 torch: 3 23
 torch: 52 23
+deco: column_wall 7 23
+deco: column_wall 48 23
+deco: banner_yellow 11 4
+deco: banner_yellow 44 4
 ---
 ########################################################
 #................##...................##...............#

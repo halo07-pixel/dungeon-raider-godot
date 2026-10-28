@@ -4,6 +4,12 @@ map: 18,0
 door 1: gate_3 2
 door 2: gate_5 1
 torch: 17 17
+deco: banner_blue 30 11
+deco: hole 10 10
+deco: column_wall 27 17
+deco: crate 34 17
+deco: crate 20 17
+deco: banner_blue 24 5
 ---
 ########################################
 #.......##.....................##......#
