@@ -1,14 +1,14 @@
 extends RefCounted
 ## Đọc các phòng từ hk/rooms/*.txt. Mỗi file: phần đầu là khai báo "khoá: giá trị", dòng '---', rồi lưới ký tự.
 ##   area: gate|catacomb|vault     name: Tên hiển thị     map: x,y (toạ độ trên bản đồ, đơn vị ô bản đồ)
-##   hint: cột hàng chữ   torch: cột hàng   door N: phòng_đích cửa_đích [needs=cờ]   altar: id=... needs=...   charm: id=...   boss: id=...   gate_flag: cờ
+##   hint: cột hàng chữ   torch: cột hàng   deco: loại cột hàng   door N: phòng_đích cửa_đích [needs=cờ]   altar: id=... needs=...   charm: id=...   boss: id=...   gate_flag: cờ
 ## Ký tự lưới: # tường  = bục một chiều  ^ gai  1-9 cửa  @ điểm xuất phát  B bench  M thương nhân  $ rương geo
 ##   A bàn thờ kỹ năng  C bùa  X boss  G cổng mở khi có cờ  c f s h = quái bò/bay/bắn/húc
 const DIR: String = "res://hk/rooms"
 const MAP_CELL_TILES: float = 8.0   # 1 ô bản đồ = 8x8 ô lưới
 
 static func parse_room(text: String) -> Dictionary:
-	var out: Dictionary = {"area": "gate", "name": "", "map": Vector2(0, 0), "doors": {}, "grid": [], "hints": [], "torches": []}
+	var out: Dictionary = {"area": "gate", "name": "", "map": Vector2(0, 0), "doors": {}, "grid": [], "hints": [], "torches": [], "decor": []}
 	var in_grid: bool = false
 	for raw in text.split("\n"):
 		var line: String = raw.trim_suffix("\r")
@@ -42,6 +42,10 @@ static func parse_room(text: String) -> Dictionary:
 			var tp: PackedStringArray = val.split(" ", false)
 			if tp.size() == 2:
 				out["torches"].append({"col": int(tp[0]), "row": int(tp[1])})
+		elif key == "deco":   # deco: loại cột hàng — trang trí chỉ để vẽ; (cột, hàng) = ô chứa chân sprite
+			var dp: PackedStringArray = val.split(" ", false)
+			if dp.size() == 3:
+				out["decor"].append({"kind": dp[0], "col": int(dp[1]), "row": int(dp[2])})
 		elif key == "map":
 			var xy: PackedStringArray = val.split(",")
 			out["map"] = Vector2(float(xy[0]), float(xy[1]))

@@ -6,6 +6,8 @@ charm: id=long_reach needs=boss_hexer
 boss: id=hexer
 torch: 3 25
 torch: 26 25
+deco: banner_red 11 4
+deco: banner_red 18 4
 ---
 ##############111#############
 #............................#

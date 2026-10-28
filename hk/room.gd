@@ -9,6 +9,7 @@ const TILE: int = 32
 const STATE = preload("res://hk/state.gd")
 const SPRITES = preload("res://hk/sprites.gd")
 const PLAYER = preload("res://hk/player.gd")
+const DECOR = preload("res://hk/decor.gd")
 const REACH: float = 28.0   # đệm quanh vật thể tương tác (px): đứng sát hình là tương tác được
 const WALL_DIM: Dictionary = {"catacomb": 0.7}   # gạch tường tối đi cho khu có hoạ tiết gắt (hạt tàn lửa)
 const BG_DIM: Dictionary = {"gate": 0.3, "catacomb": 0.13, "vault": 0.3, "archive": 0.25}   # độ sáng gạch nền
@@ -51,6 +52,11 @@ func build(room_id: String, room_data: Dictionary) -> void:
 		_cells.append(row)
 	_parse()
 	_make_bodies()
+	if not data.get("decor", []).is_empty():
+		var dn := Node2D.new()   # trang trí vẽ lại mỗi khung để hoạt ảnh (đài phun, sách) chạy; không va chạm
+		dn.set_script(DECOR)
+		dn.set("items", data["decor"])
+		add_child(dn)
 
 func bounds() -> Rect2:
 	return Rect2(0, 0, cols * TILE, rows * TILE)

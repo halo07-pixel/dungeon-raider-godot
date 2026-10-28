@@ -25,3 +25,6 @@ Dẫn xuất từ sprite imp / ogre / orc_shaman / frost_tiny của bộ 0x72 Du
 ## Art pass (Lò Rèn, Cổng, Tome, Sigil, lính)
 - `forge_anim_f*`, `portal_anim_f*`, `council_portal_anim_f*`, `tome_anim_f*`, `sigil_anim_f*`, `minion_<loại>_f*`: pixel-art tự tạo hoàn toàn bằng script `tools/gen_art_pass.py` (không lấy từ nguồn ngoài), bảng màu khớp tileset 0x72.
 - Lính và Sigil vẽ sắc xám-trắng để game nhân màu theo loại/độ hiếm. Xem trước bằng `tools/art_shot.gd` (cần màn hình ảo).
+
+## Trang trí phòng (cờ, đài phun, lỗ tường, nhớt, cột tường, sọ)
+- `decor_*.png`: cắt từ atlas gốc của 0x72 DungeonTilesetII v1.3 (CC0, bản sao trên GitHub `yujqiao/DungeonRush`) bằng `tools/gen_decor_sprites.py <đường dẫn atlas.png>`. Atlas không nằm trong repo. Cột và thùng dùng lại `column.png`, `crate.png`.
