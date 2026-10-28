@@ -3,7 +3,7 @@ extends Node
 const STATE = preload("res://hk/state.gd")
 const DIR: String = "res://assets/music/"
 const AREA_TRACK: Dictionary = {"gate": "explore_stone", "catacomb": "explore_hell", "vault": "explore_ice", "archive": "explore_ice"}
-const BOSS_TRACK: Dictionary = {"warden": "boss_warden", "wraith": "boss_necromancer", "lord": "lord_fight", "brute": "boss_warden", "hexer": "boss_necromancer", "colossus": "boss_warden"}
+const BOSS_TRACK: Dictionary = {"warden": "boss_warden", "wraith": "boss_necromancer", "lord": "lord_fight", "brute": "boss_warden", "hexer": "boss_necromancer", "colossus": "boss_warden", "many_faced": "lord_fight"}
 const VOLUME_DB: float = -9.0
 var current: String = ""
 var _player: AudioStreamPlayer

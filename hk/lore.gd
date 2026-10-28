@@ -26,14 +26,24 @@ const DEATH: Dictionary = {
 	"vault": "Ash settles where you fell.",
 	"archive": "A page turns. Your name is still missing.",
 }
+## Boss bí mật (không phải ký ức): câu vào trận / câu khi hạ.
+const SECRET: Dictionary = {"many_faced": {"intro": "I wear every face you buried.", "memory": "Then close the gate, Gatekeeper. This time, stay."}}
 const ENDING_NORMAL: Array = ["The Dungeon Lord has fallen", "The vaults fall silent. Thank you for playing."]
-const ENDING_FULL: Array = ["The Gatekeeper remembers", "You held the gate, and you burned it. Both were you."]
+const ENDING_TRUE: Array = ["The gate is closed", "Every face you buried is at rest. So are you.", "Thank you for playing."]
+const ENDING_FULL: Array = ["The Gatekeeper remembers", "You held the gate, and you burned it. Both were you.", "Something still waits beyond the throne."]
 
 static func memory(id: String) -> Dictionary:
 	for m in MEMORIES:
 		if m["id"] == id:
 			return m
 	return {}
+
+## Chữ của boss (ký ức hoặc boss bí mật); key = "intro" | "memory".
+static func line(id: String, key: String) -> String:
+	var d: Dictionary = memory(id)
+	if d.is_empty():
+		d = SECRET.get(id, {})
+	return String(d.get(key, ""))
 
 static func has_memory(id: String) -> bool:
 	return STATE.flag("boss_" + id)
@@ -55,4 +65,6 @@ static func death_line(area: String) -> String:
 	return String(DEATH.get(area, DEATH["gate"]))
 
 static func ending_lines() -> Array:
+	if STATE.flag("boss_many_faced"):
+		return ENDING_TRUE
 	return ENDING_FULL if is_complete() else ENDING_NORMAL

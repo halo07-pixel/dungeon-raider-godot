@@ -1,7 +1,7 @@
 extends RefCounted
 ## Đọc các phòng từ hk/rooms/*.txt. Mỗi file: phần đầu là khai báo "khoá: giá trị", dòng '---', rồi lưới ký tự.
 ##   area: gate|catacomb|vault     name: Tên hiển thị     map: x,y (toạ độ trên bản đồ, đơn vị ô bản đồ)
-##   hint: cột hàng chữ   torch: cột hàng   door N: phòng_đích cửa_đích   altar: id=... needs=...   charm: id=...   boss: id=...   gate_flag: cờ
+##   hint: cột hàng chữ   torch: cột hàng   door N: phòng_đích cửa_đích [needs=cờ]   altar: id=... needs=...   charm: id=...   boss: id=...   gate_flag: cờ
 ## Ký tự lưới: # tường  = bục một chiều  ^ gai  1-9 cửa  @ điểm xuất phát  B bench  M thương nhân  $ rương geo
 ##   A bàn thờ kỹ năng  C bùa  X boss  G cổng mở khi có cờ  c f s h = quái bò/bay/bắn/húc
 const DIR: String = "res://hk/rooms"
@@ -29,8 +29,11 @@ static func parse_room(text: String) -> Dictionary:
 		var val: String = line.substr(idx + 1).strip_edges()
 		if key.begins_with("door "):
 			var p: PackedStringArray = val.split(" ", false)
-			if p.size() == 2:
-				out["doors"][key.substr(5).strip_edges()] = {"to": p[0], "door": p[1]}
+			if p.size() >= 2:   # door N: phòng cửa [needs=cờ]
+				var dd: Dictionary = {"to": p[0], "door": p[1]}
+				if p.size() > 2 and p[2].begins_with("needs="):
+					dd["needs"] = p[2].substr(6)
+				out["doors"][key.substr(5).strip_edges()] = dd
 		elif key == "hint":   # hint: cột hàng nội dung — chữ gợi ý vẽ trong phòng
 			var hp: PackedStringArray = val.split(" ", false, 2)
 			if hp.size() == 3:

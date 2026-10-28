@@ -34,7 +34,10 @@ func _draw_view() -> void:
 	var sz: Vector2 = v.size
 	v.draw_rect(Rect2(Vector2.ZERO, sz), Color(0.02, 0.02, 0.05, _a))
 	v.draw_string(font, Vector2(0, sz.y * 0.36), String(LORE.ending_lines()[0]), HORIZONTAL_ALIGNMENT_CENTER, sz.x, 44, Color(1, 1, 1, _a))
-	v.draw_string(font, Vector2(0, sz.y * 0.36 + 44), String(LORE.ending_lines()[1]), HORIZONTAL_ALIGNMENT_CENTER, sz.x, 20, Color(0.75, 0.8, 0.95, _a))
+	var lines: Array = LORE.ending_lines()
+	v.draw_string(font, Vector2(0, sz.y * 0.36 + 44), String(lines[1]), HORIZONTAL_ALIGNMENT_CENTER, sz.x, 20, Color(0.75, 0.8, 0.95, _a))
+	if lines.size() > 2:
+		v.draw_string(font, Vector2(0, sz.y * 0.36 + 76), String(lines[2]), HORIZONTAL_ALIGNMENT_CENTER, sz.x, 20, Color(0.75, 0.8, 0.95, _a))
 	v.draw_string(font, Vector2(0, sz.y * 0.56), _stats, HORIZONTAL_ALIGNMENT_CENTER, sz.x, 20, Color(0.95, 0.9, 0.7, _a))
 	if _t > 2.5:
 		v.draw_string(font, Vector2(0, sz.y - 50), "Jump/Enter: title", HORIZONTAL_ALIGNMENT_CENTER, sz.x, 16, Color(0.6, 0.65, 0.75, 0.6 + 0.4 * sin(_t * 3.0)))

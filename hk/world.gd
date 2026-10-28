@@ -213,7 +213,7 @@ func _on_boss_engaged() -> void:
 	room.locked = true
 	sfx.play("roar")
 	music.play(String(MUSIC.BOSS_TRACK.get(boss.kind, "boss_warden")))
-	hud.banner(boss.title(), String(LORE.memory(boss.kind).get("intro", "")))
+	hud.banner(boss.title(), LORE.line(boss.kind, "intro"))
 
 func _on_boss_defeated(bid: String) -> void:
 	sfx.play("boss_die")
@@ -221,8 +221,16 @@ func _on_boss_defeated(bid: String) -> void:
 	room.locked = false
 	music.play(String(MUSIC.AREA_TRACK.get(String(rooms[room.id].get("area", "gate")), "explore_stone")))
 	STATE.save()
-	hud.banner("%s defeated" % String(boss.title() if is_instance_valid(boss) else bid), String(LORE.memory(bid).get("memory", "")))
-	if bid == "lord":
+	hud.banner("%s defeated" % String(boss.title() if is_instance_valid(boss) else bid), LORE.line(bid, "memory"))
+	_refresh_unlocks()
+	if bid == "many_faced":   # ending bí mật
+		STATE.set_flag("ending_true")
+		STATE.save()
+		busy = true
+		player.controls_enabled = false
+		await get_tree().create_timer(3.0, true, false, true).timeout
+		ending_reached.emit()
+	elif bid == "lord":
 		STATE.set_flag("ending")
 		STATE.save()
 		hud.banner("The Dungeon Lord falls", String(LORE.memory("lord")["memory"]))
@@ -231,11 +239,21 @@ func _on_boss_defeated(bid: String) -> void:
 		await get_tree().create_timer(3.0, true, false, true).timeout
 		ending_reached.emit()
 
+## Cờ mở khoá suy ra từ trạng thái ván (không lưu thêm dữ liệu): đủ 6 ký ức -> mở lối tới boss bí mật.
+func _refresh_unlocks() -> void:
+	if LORE.is_complete():
+		STATE.set_flag("sovereign_open")
+
 func _on_door(door_id: String) -> void:
 	if busy:
 		return
 	var link: Dictionary = rooms[room.id]["doors"].get(door_id, {})
 	if link.is_empty() or not rooms.has(link["to"]):
+		return
+	_refresh_unlocks()
+	var need: String = String(link.get("needs", ""))
+	if need != "" and not STATE.flag(need):
+		hud.banner("Sealed", "The way answers only to one who remembers everything.")
 		return
 	await transition(String(link["to"]), String(link["door"]))
 

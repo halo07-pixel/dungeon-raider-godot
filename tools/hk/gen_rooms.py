@@ -45,7 +45,7 @@ class R:
         if spikes:
             self.fill(x0, self.h - 2, x1, self.h - 2, "^")
 
-    def door(self, ch, side, pos, to, to_door):
+    def door(self, ch, side, pos, to, to_door, needs=None):
         """side L/R: pos = dòng đầu (3 ô). side T/B: pos = cột đầu (3 ô), B khoét sàn bên trên."""
         if side == "L":
             self.fill(0, pos, 0, pos + 2, ch)
@@ -56,18 +56,18 @@ class R:
         elif side == "B":
             self.fill(pos, self.F, pos + 2, self.h - 2, ".")
             self.fill(pos, self.h - 1, pos + 2, self.h - 1, ch)
-        self.doors[ch] = (to, to_door)
+        self.doors[ch] = (to, to_door, needs)
 
-    def ground_door(self, ch, side, to, to_door):
-        self.door(ch, side, self.F - 3, to, to_door)
+    def ground_door(self, ch, side, to, to_door, needs=None):
+        self.door(ch, side, self.F - 3, to, to_door, needs)
 
     def enemy(self, ch, x, y=None):
         self.put(x, (self.F - 1) if y is None else y, ch)
 
     def save(self):
         lines = ["area: " + self.area, "name: " + self.name, "map: %d,%d" % self.mp]
-        for ch, (to, td) in sorted(self.doors.items()):
-            lines.append("door %s: %s %s" % (ch, to, td))
+        for ch, (to, td, needs) in sorted(self.doors.items()):
+            lines.append("door %s: %s %s%s" % (ch, to, td, (" needs=" + needs) if needs else ""))
         lines += self.extra
         lines.append("---")
         lines += ["".join(r) for r in self.g]
@@ -293,7 +293,18 @@ r.plat(6, 10, 17); r.plat(37, 41, 17)
 for x in (14, 33):
     r.block(x, 1, x + 1, 3)
 r.ground_door("1", "L", "vault_6", "2")
-r.extra.append("boss: id=lord")
+r.ground_door("2", "R", "sov_1", "1", "sovereign_open")   # lối tới boss bí mật: chỉ mở khi đủ 6 ký ức
+r.extra += ["boss: id=lord", "hint: 36 14 A sealed way. Remember everything."]
+
+# ====================================================== BOSS BÍ MẬT
+r = new("sov_1", 56, 28, 24, "vault", "The Hollow Throne", (75, 16))
+r.put(28, 23, "X")
+r.plat(8, 13, 20); r.plat(42, 47, 20)
+r.plat(19, 25, 16); r.plat(31, 37, 16)
+for x in (17, 38):
+    r.block(x, 1, x + 1, 4)
+r.ground_door("1", "L", "vault_7", "2")
+r.extra.append("boss: id=many_faced")
 
 # ====================================================== DROWNED ARCHIVE (khu 4, nhánh phụ từ Hearth)
 r = new("arc_1", 30, 30, 26, "archive", "Flooded Stair", (56, 21))
