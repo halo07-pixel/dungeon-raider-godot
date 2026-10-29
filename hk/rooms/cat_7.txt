@@ -4,12 +4,10 @@ map: 24,14
 door 1: cat_5 2
 door 2: cat_8 1
 torch: 37 17
-deco: banner_red 13 4
-deco: goo 29 7
-deco: skull 7 17
-deco: hole 34 7
-deco: skull 26 17
-deco: skull 22 17
+deco: skull 12 17
+deco: skull 16 17
+deco: skull 8 17
+deco: goo 23 8
 ---
 ########################################
 #..............................d.......#

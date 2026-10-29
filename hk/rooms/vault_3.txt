@@ -3,10 +3,8 @@ name: Chimney
 map: 50,21
 door 1: vault_2 2
 door 2: vault_4 1
-deco: fountain_red 15 35
-deco: banner_yellow 19 20
-deco: column 7 35
-deco: fountain_red 10 35
+deco: fountain_red 17 35
+deco: hole 20 30
 ---
 ###################222########
 ##################....########

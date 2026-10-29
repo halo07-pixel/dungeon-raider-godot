@@ -4,12 +4,6 @@ map: 24,10
 door 1: cat_4 2
 door 2: cat_7 1
 door 3: cat_6 1
-deco: goo 33 15
-deco: hole 22 3
-deco: crate 29 21
-deco: hole 8 13
-deco: crate 19 21
-deco: hole 11 10
 ---
 ########################################
 #......................................#

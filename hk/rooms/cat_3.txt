@@ -3,12 +3,11 @@ name: Weeping Hall
 map: 12,10
 door 1: cat_2 2
 door 2: cat_4 1
-deco: skull 8 25
-deco: hole 27 7
-deco: goo 23 20
-deco: banner_red 11 10
-deco: skull 34 25
-deco: hole 17 10
+deco: crate 21 25
+deco: crate 18 25
+deco: crate 24 25
+deco: banner_red 10 18
+deco: banner_red 14 12
 ---
 ########################################
 #...........#.............#............#

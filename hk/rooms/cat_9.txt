@@ -4,8 +4,9 @@ map: 38,14
 door 1: cat_8 2
 door 2: vault_1 1
 altar: id=wall_cling needs=boss_wraith
-deco: crate 11 39
-deco: banner_red 15 31
+deco: crate 14 39
+deco: crate 10 39
+deco: crate 7 39
 ---
 ##############222#############
 ##############....############

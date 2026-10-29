@@ -3,11 +3,11 @@ name: Flooded Stair
 map: 56,21
 door 1: vault_5 3
 door 2: arc_2 1
-deco: tome 17 25
-deco: banner_blue 8 16
-deco: banner_green 13 8
-deco: banner_green 22 17
-deco: fountain_blue 5 25
+deco: tome 16 25
+deco: tome 11 25
+deco: tome 20 25
+deco: banner_blue 6 12
+deco: banner_blue 23 15
 ---
 ##############111#############
 #............................#

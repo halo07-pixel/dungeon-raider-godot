@@ -6,12 +6,10 @@ hint: 4 14 Up / W at the bench: rest and save
 hint: 9 13 A / D or arrows: move     Z / Space: jump (hold = higher)
 hint: 15 11 X / J: nail (hold Up/Down to aim)
 hint: 29 13 Esc: pause, volume and controls
-deco: crate 26 17
-deco: hole 30 9
-deco: banner_blue 6 9
-deco: hole 23 8
-deco: hole 14 7
-deco: crate 34 17
+deco: column 22 17
+deco: column 26 17
+deco: banner_blue 15 4
+deco: banner_blue 30 10
 ---
 ########################################
 #...........##......#......##..........#

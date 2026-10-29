@@ -3,12 +3,10 @@ name: Bone Walk
 map: 6,10
 door 1: cat_1 2
 door 2: cat_3 1
-deco: banner_red 16 5
-deco: banner_red 20 11
-deco: skull 29 17
-deco: skull 6 17
-deco: hole 34 10
-deco: hole 25 3
+deco: skull 14 17
+deco: skull 7 17
+deco: skull 17 17
+deco: goo 33 5
 ---
 ########################################
 #...............#...d.........#........#

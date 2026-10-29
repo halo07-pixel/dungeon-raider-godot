@@ -376,7 +376,7 @@ DECO_THEME = {  # (đứng sàn, treo tường) theo khu
     "vault": (["fountain_red", "column", "fountain_red"], ["banner_yellow", "banner_yellow", "hole"]),
     "archive": (["fountain_blue", "tome", "tome"], ["banner_green", "banner_blue", "banner_green"]),
 }
-DECO_MAX = 6
+DECO_BARE = 0.25   # xác suất một phòng thường không có trang trí
 
 
 def add_decor():
@@ -415,16 +415,29 @@ def add_decor():
             if r.id == "sov_1":
                 n += place("sigil", r.w // 2, r.F - 1)
             continue
+        if rng.random() < DECO_BARE:   # một số phòng để trống cho thưa mắt
+            continue
+        # mỗi phòng: MỘT loại đứng sàn gom thành cụm quanh một điểm + MỘT loại treo tường (ít, không rải đều)
+        fk = rng.choice(sorted(set(floor)))
+        wk = rng.choice(sorted(set(wall)))
+        anchor = rng.randint(8, max(8, r.w - 9))
+        near = sorted(range(5, r.w - 5), key=lambda x: abs(x - anchor) + rng.random() * 3)
+        cap_f = 1 if fk.startswith("fountain") else 3
+        got = 0
+        for x in near:
+            if got >= cap_f or abs(x - anchor) > 10:
+                break
+            if place(fk, x, r.F - 1):
+                got += 1
         xs = list(range(5, r.w - 5))
         rng.shuffle(xs)
-        for i, x in enumerate(xs):
-            if n >= DECO_MAX:
+        cap_w = 1 if wk in ("hole", "goo") else 2
+        got = 0
+        for x in xs:
+            if got >= cap_w:
                 break
-            if i % 2 == 0:
-                n += place(rng.choice(floor), x, r.F - 1)
-            else:
-                n += place(rng.choice(wall), x, rng.randint(3, max(3, r.F - 6)))
-
+            if place(wk, x, rng.randint(3, max(3, r.F - 6))):
+                got += 1
 
 if __name__ == "__main__":
     os.makedirs(OUT, exist_ok=True)
