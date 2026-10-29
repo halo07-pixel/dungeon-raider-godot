@@ -96,7 +96,7 @@ func _init() -> void:
 	await frames(2)
 	b.take_hit(1, p.global_position)
 	b.hp = b.max_hp * 2 / 3 - 1
-	b.state = "walk"
+	b.state = "hover" if b.form in B.FLYERS else "walk"   # "walk" không có trong vòng lặp của dạng bay: boss đứng im mãi
 	b.take_hit(1, p.global_position)
 	ck(b.phase == 2, "pha 2 khi còn dưới 66%% máu (phase=%d hp=%d)" % [b.phase, b.hp])
 	await frames(60)
