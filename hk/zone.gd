@@ -61,7 +61,7 @@ func _physics_process(delta: float) -> void:
 	var pr := Rect2(p.global_position - p.BODY * 0.5, p.BODY)
 	if pr.intersects(current()):
 		if kind == "water":
-			p.velocity.x *= 0.55   # nước làm chậm: đứng bục cao thì an toàn
+			p.slow_t = 0.1   # nước làm chậm (player áp dụng ở di chuyển): đứng bục cao thì an toàn
 		else:
 			p.take_damage(rect.get_center().x)
 	queue_redraw()

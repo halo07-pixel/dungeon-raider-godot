@@ -1,0 +1,20 @@
+name: hk-tests
+on:
+  pull_request:
+  push:
+    branches: [main]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Cài Godot 4.7
+        # shortcut: cố định tên bản phát hành; nếu 4.7 stable đổi tên tệp thì sửa GODOT_URL
+        run: |
+          GODOT_URL="https://github.com/godotengine/godot-builds/releases/download/4.7-stable/Godot_v4.7-stable_linux.x86_64.zip"
+          curl -fsSL "$GODOT_URL" -o godot.zip
+          unzip -q godot.zip
+          sudo mv Godot_v4.7-stable_linux.x86_64 /usr/local/bin/godot
+          sudo chmod +x /usr/local/bin/godot
+      - name: Chạy test headless + validator phòng
+        run: xvfb-run -a bash tools/tests/run_all.sh

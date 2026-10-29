@@ -50,6 +50,7 @@ func _init() -> void:
 	shop._buy(shop._items[idx])
 	ck(St.geo == 100 - price and "swift_edge" in St.charms_owned, "mua bùa: trừ %d Geo và nhận bùa" % price)
 	ck(not ("swift_edge" in ids(shop._items)), "mua rồi thì hết hàng đó")
+	ck(not ("frugal_soul" in ids(shop._items)) and not ("mask" in ids(shop._items) and St.hp_bonus >= 1), "mua xong hàng vẫn theo khu gate (không lộ bùa khu khác)")
 	St.geo = 0
 	var n0: int = St.charms_owned.size()
 	shop._buy(shop._items[0])

@@ -21,7 +21,7 @@ func _process(delta: float) -> void:
 	_t += delta
 	queue_redraw()
 
-func take_hit(_dmg: int, _from: Vector2) -> void:
+func take_hit(_dmg: int, _from: Vector2) -> bool:
 	hp -= 1
 	FX.burst(get_parent(), global_position, Color(0.7, 0.8, 1.0), 6, 120.0)
 	if hp <= 0:
@@ -30,6 +30,7 @@ func take_hit(_dmg: int, _from: Vector2) -> void:
 		FX.float_text(get_parent(), global_position, "+%d" % amount, Color(1, 0.9, 0.4))
 		recovered.emit(amount)
 		queue_free()
+	return true
 
 func _draw() -> void:
 	# bóng ma = bóng hiệp sĩ mờ, nhấp nhô nhẹ; chân nằm ở đáy hộp va chạm
