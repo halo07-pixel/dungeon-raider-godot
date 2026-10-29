@@ -46,6 +46,8 @@ var soul: int:
 var facing: int = 1
 var can_dash: bool = true
 var invuln: float = 0.0
+var slow_t: float = 0.0   # >0: đang trong nước (zone đặt mỗi khung), chạy chậm SLOW_MULT; player tự áp dụng
+const SLOW_MULT: float = 0.55
 var attack_dir: Vector2 = Vector2.RIGHT
 var controls_enabled: bool = true
 var focusing: bool = false
@@ -132,7 +134,8 @@ func _physics_process(delta: float) -> void:
 		_stun -= delta
 		velocity.x = move_toward(velocity.x, 0.0, 900.0 * delta)
 	elif _wall_lock <= 0.0:
-		var target: float = move * RUN_SPEED
+		slow_t = maxf(0.0, slow_t - delta)
+		var target: float = move * RUN_SPEED * (SLOW_MULT if slow_t > 0.0 else 1.0)
 		velocity.x = move_toward(velocity.x, target, GROUND_ACCEL * delta) if is_on_floor() else target
 		if move != 0.0:
 			facing = 1 if move > 0.0 else -1

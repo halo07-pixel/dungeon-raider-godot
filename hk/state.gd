@@ -49,6 +49,7 @@ static var bench_id: String = "start"
 static var shade: Dictionary = {}       # {room, x, y, geo}
 static var pins: Array = []             # ghim bản đồ do người chơi đặt: {room, x, y}
 const MAX_PINS: int = 10
+const MAX_GEO: int = 99999   # trần khi đọc save (chống số hỏng/quá lớn)
 # Âm lượng 0..10: không bị reset() xoá (là cài đặt, không phải tiến trình); lưu cùng file save.
 # shortcut: chỉ lưu khi có save, màn tiêu đề dùng mặc định tới khi vào ván; tách file cài đặt khi có thêm cài đặt khác.
 static var music_vol: int = 10
@@ -184,7 +185,7 @@ static func from_dict(d: Dictionary) -> void:
 	sfx_vol = clampi(int(d.get("sfx_vol", sfx_vol)), 0, 10)
 	atmosphere_on = bool(d.get("atmosphere_on", atmosphere_on)) if d.get("atmosphere_on", true) is bool else atmosphere_on
 	shake_on = bool(d.get("shake_on", shake_on)) if d.get("shake_on", true) is bool else shake_on
-	geo = maxi(0, int(d.get("geo", 0)))
+	geo = clampi(int(d.get("geo", 0)), 0, MAX_GEO)
 	var tm = d.get("time", 0.0)
 	play_time = maxf(0.0, float(tm)) if (tm is float or tm is int) else 0.0
 	notch_bonus = clampi(int(d.get("notch_bonus", 0)), 0, 4)
@@ -196,13 +197,19 @@ static func from_dict(d: Dictionary) -> void:
 		if c in charms_owned and not (c in charms_equipped) and notches_used() + int(CHARMS[c]["cost"]) <= notches():
 			charms_equipped.append(String(c))
 	var f = d.get("flags", {})
-	flags = f if f is Dictionary else {}
+	flags = {}
+	if f is Dictionary:   # chỉ nhận cờ khoá chuỗi, giá trị bool
+		for k in f:
+			if k is String and f[k] is bool:
+				flags[k] = f[k]
 	for r in d.get("visited", []):
 		visited.append(String(r))
 	bench_room = String(d.get("bench_room", START_ROOM))
 	bench_id = String(d.get("bench_id", "start"))
 	var s = d.get("shade", {})
-	shade = s if s is Dictionary else {}
+	shade = {}
+	if s is Dictionary and s.get("room") is String and (s.get("x") is float or s.get("x") is int) and (s.get("y") is float or s.get("y") is int) and (s.get("geo") is float or s.get("geo") is int):
+		shade = {"room": String(s["room"]), "x": float(s["x"]), "y": float(s["y"]), "geo": clampi(int(s["geo"]), 0, MAX_GEO)}
 	for p in d.get("pins", []):   # dữ liệu save có thể hỏng: chỉ nhận ghim đúng kiểu, tối đa MAX_PINS
 		if p is Dictionary and p.get("room") is String and (p.get("x") is float or p.get("x") is int) and (p.get("y") is float or p.get("y") is int) and pins.size() < MAX_PINS:
 			pins.append({"room": String(p["room"]), "x": float(p["x"]), "y": float(p["y"])})
@@ -251,5 +258,6 @@ static func fmt_time(sec: float) -> String:
 	return "%d:%02d:%02d" % [s / 3600, (s / 60) % 60, s % 60]
 
 static func delete_save() -> void:
-	if FileAccess.file_exists(save_path):
-		DirAccess.remove_absolute(save_path)
+	for p in [save_path, save_path + ".tmp"]:
+		if FileAccess.file_exists(p):
+			DirAccess.remove_absolute(p)

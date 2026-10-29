@@ -578,9 +578,9 @@ func _touch_damage(p: Node2D) -> void:
 	if pr.intersects(body) or (state == "lunge" and pr.intersects(_attack_rect())):
 		p.take_damage(global_position.x)
 
-func take_hit(dmg: int, _from: Vector2) -> void:
+func take_hit(dmg: int, _from: Vector2) -> bool:   # luôn true (không có khiên); thống nhất chữ ký với enemy.take_hit
 	if hp <= 0 or state == "dormant" or state == "intro" or state == "wind_shift":
-		return
+		return true
 	hp -= dmg
 	_flash = 0.08
 	var want: int = phase
@@ -604,6 +604,7 @@ func take_hit(dmg: int, _from: Vector2) -> void:
 		shake.emit(5.0)
 		defeated.emit()
 		queue_free()
+	return true
 
 ## Báo hiệu "đổi dạng" của many_faced: vòng nở quanh người (không phải vùng cảnh báo đòn đánh; các vùng/vạch đỏ đã bỏ).
 func _draw_shift_ring(h: Vector2) -> void:

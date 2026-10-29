@@ -122,7 +122,7 @@ func _init() -> void:
 					p.global_position = Vector2(900, floor_y - 22.0)
 					p.velocity = Vector2(300, 0)
 					await frames(1)
-					ck(p.velocity.x < 300.0, "colossus: nước làm chậm người chơi")
+					ck(p.slow_t > 0.0, "colossus: nước làm chậm người chơi (slow_t do zone đặt, player áp dụng)")
 					var fast: float = p.velocity.x
 					p.global_position = Vector2(900, floor_y - 22.0 - 200.0)
 					p.velocity = Vector2(300, 0)

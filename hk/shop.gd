@@ -88,7 +88,7 @@ func _buy(it: Dictionary) -> void:
 			STATE.give_charm(String(it["id"]))
 	_msg = "Thank you."
 	sfx.emit("buy")
-	_items = _stock()
+	_items = _stock(_area)
 	_sel = clampi(_sel, 0, maxi(0, _items.size() - 1))
 	var pl := get_tree().get_nodes_in_group("hk_player")
 	if not pl.is_empty():
