@@ -198,6 +198,12 @@ func _spawn_boss(bid: String, pos: Vector2) -> void:
 	boss = CharacterBody2D.new()
 	boss.set_script(preload("res://hk/boss.gd"))
 	boss.kind = bid
+	if bid == "lord" and LORE.count() >= LORE.MEMORIES.size() - 1:   # đã có 5 ký ức kia => Gatekeeper
+		boss.empowered = true
+		boss.lanterns = LORE.count()
+		for k in ["warden", "brute", "colossus"]:
+			if STATE.flag("boss_" + k):
+				boss.echoes.append(String(boss.SKILL[k]))
 	boss.position = pos - Vector2(0, boss.body_size(bid).y * 0.5 + 1.0)   # chân boss đứng trên sàn của ô X
 	_content.add_child(boss)
 	boss.defeated.connect(_on_boss_defeated.bind(bid))
@@ -206,6 +212,7 @@ func _spawn_boss(bid: String, pos: Vector2) -> void:
 	boss.shake.connect(cam.shake)
 	boss.sfx.connect(sfx.play)
 	boss.darkness.connect(atmosphere.set_dark)
+	boss.tinted.connect(atmosphere.set_tint)
 	boss.braziers = _braziers()
 	boss.platforms = room.oneways.duplicate()
 	boss.shake.connect(_on_boss_shake)
@@ -225,7 +232,7 @@ func _on_boss_engaged() -> void:
 	room.locked = true
 	sfx.play("roar")
 	music.play(String(MUSIC.BOSS_TRACK.get(boss.kind, "boss_warden")))
-	hud.banner(boss.title(), LORE.line(boss.kind, "intro"))
+	hud.banner(boss.title(), LORE.INTRO_GATEKEEPER if boss.empowered else LORE.line(boss.kind, "intro"))
 
 func _on_boss_defeated(bid: String) -> void:
 	sfx.play("boss_die")

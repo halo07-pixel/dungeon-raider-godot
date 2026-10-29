@@ -28,12 +28,21 @@ func _process(delta: float) -> void:
 		return
 	_view.queue_redraw()
 
+## Màu tiêu đề theo ending: thường trắng, hoàn chỉnh vàng nhạt, True tím.
+func _title_color() -> Color:
+	match LORE.ending_kind():
+		"true":
+			return Color(0.85, 0.7, 1.0, _a)
+		"full":
+			return Color(1.0, 0.92, 0.65, _a)
+	return Color(1, 1, 1, _a)
+
 func _draw_view() -> void:
 	var v: Control = _view
 	var font: Font = ThemeDB.fallback_font
 	var sz: Vector2 = v.size
 	v.draw_rect(Rect2(Vector2.ZERO, sz), Color(0.02, 0.02, 0.05, _a))
-	v.draw_string(font, Vector2(0, sz.y * 0.36), String(LORE.ending_lines()[0]), HORIZONTAL_ALIGNMENT_CENTER, sz.x, 44, Color(1, 1, 1, _a))
+	v.draw_string(font, Vector2(0, sz.y * 0.36), String(LORE.ending_lines()[0]), HORIZONTAL_ALIGNMENT_CENTER, sz.x, 44, _title_color())
 	var lines: Array = LORE.ending_lines()
 	v.draw_string(font, Vector2(0, sz.y * 0.36 + 44), String(lines[1]), HORIZONTAL_ALIGNMENT_CENTER, sz.x, 20, Color(0.75, 0.8, 0.95, _a))
 	if lines.size() > 2:
