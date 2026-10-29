@@ -201,7 +201,7 @@ func _spawn_boss(bid: String, pos: Vector2) -> void:
 	if bid == "lord" and LORE.count() >= LORE.MEMORIES.size() - 1:   # đã có 5 ký ức kia => Gatekeeper
 		boss.empowered = true
 		boss.lanterns = LORE.count()
-		for k in ["warden", "brute", "colossus"]:
+		for k in boss.ECHO_FROM:
 			if STATE.flag("boss_" + k):
 				boss.echoes.append(String(boss.SKILL[k]))
 	boss.position = pos - Vector2(0, boss.body_size(bid).y * 0.5 + 1.0)   # chân boss đứng trên sàn của ô X
