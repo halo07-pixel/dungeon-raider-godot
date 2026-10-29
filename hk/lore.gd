@@ -28,6 +28,7 @@ const DEATH: Dictionary = {
 }
 ## Boss bí mật (không phải ký ức): câu vào trận / câu khi hạ.
 const SECRET: Dictionary = {"many_faced": {"intro": "I wear every face you buried.", "memory": "Then close the gate, Gatekeeper. This time, stay."}}
+const INTRO_GATEKEEPER: String = "You remember it all. Then hold the gate."   # câu vào trận của Lord khi đã có 5 ký ức kia
 const ENDING_NORMAL: Array = ["The Dungeon Lord has fallen", "The vaults fall silent. Thank you for playing."]
 const ENDING_TRUE: Array = ["The gate is closed", "Every face you buried is at rest. So are you.", "Thank you for playing."]
 const ENDING_FULL: Array = ["The Gatekeeper remembers", "You held the gate, and you burned it. Both were you.", "Something still waits beyond the throne."]
@@ -64,7 +65,16 @@ static func bench_line() -> String:
 static func death_line(area: String) -> String:
 	return String(DEATH.get(area, DEATH["gate"]))
 
-static func ending_lines() -> Array:
+## "true" | "full" | "normal"
+static func ending_kind() -> String:
 	if STATE.flag("boss_many_faced"):
-		return ENDING_TRUE
-	return ENDING_FULL if is_complete() else ENDING_NORMAL
+		return "true"
+	return "full" if is_complete() else "normal"
+
+static func ending_lines() -> Array:
+	match ending_kind():
+		"true":
+			return ENDING_TRUE
+		"full":
+			return ENDING_FULL
+	return ENDING_NORMAL

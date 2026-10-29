@@ -8,6 +8,7 @@ signal defeated
 signal shake(strength: float)
 signal sfx(name: String)
 signal darkness(on: bool)   # Wraith tối phòng; world nối vào Atmosphere
+signal tinted(c: Color)     # Many-Faced pha 3 nhuộm màu phòng (tím); Color.WHITE = bỏ nhuộm
 
 const PROJECTILE = preload("res://hk/projectile.gd")
 const ENEMY = preload("res://hk/enemy.gd")
@@ -78,6 +79,10 @@ var _prev_state: String = ""
 var braziers: Array = []     # chân các lò lửa trong phòng (world gán) — nguồn sóng lửa của Hexer
 var platforms: Array = []    # Rect2 các bục một chiều trong phòng (world gán) — Lord làm nóng bục
 var _dark_t: float = 0.0
+var empowered: bool = false  # world gán: Lord khi đã có 5 ký ức kia ("The Gatekeeper": đổi sắc, vầng sáng, đèn ký ức, đòn Echo)
+var echoes: Array = []       # world gán: state đòn của các boss mặt đất đã hạ (warden/brute/colossus) — Echo dùng lại
+var lanterns: int = 0        # world gán: số ký ức đã có (đèn sáng trên tường phòng Lord)
+var _tinted: bool = false
 
 func _ready() -> void:
 	var d: Dictionary = DATA[kind]
@@ -97,6 +102,8 @@ func _ready() -> void:
 	add_child(cs)
 
 func title() -> String:
+	if empowered:
+		return "The Gatekeeper"
 	return String(DATA[kind]["title"])
 
 func _player() -> Node2D:
@@ -104,6 +111,8 @@ func _player() -> Node2D:
 	return ps[0] if not ps.is_empty() else null
 
 func _exit_tree() -> void:
+	if _tinted:
+		tinted.emit(Color.WHITE)
 	if _dark_t > 0.0:
 		darkness.emit(false)
 
@@ -296,6 +305,8 @@ func _pick_attack() -> void:
 		opts.append("skill")
 		if phase >= 2:
 			opts.append("skill")
+	if empowered and phase >= 2 and not echoes.is_empty():   # Echo: Lord dùng lại đòn riêng của boss đã hạ (tối đa một đòn mỗi lượt, như mọi đòn khác)
+		opts.append("echo")
 	if kind == "many_faced" and phase >= 2:   # đòn lai: mọi dạng đi bộ biết bắn quạt từ pha 2
 		opts.append("bolt")
 		if form == "sovereign":
@@ -323,6 +334,9 @@ func _pick_attack() -> void:
 			_rain_t = 0.1
 		"skill":
 			state = String(SKILL[form])
+			_t = 0.8
+		"echo":
+			state = String(echoes[randi() % echoes.size()])
 			_t = 0.8
 
 # ------------------------------------------------------------ đòn riêng theo biom
@@ -597,6 +611,8 @@ func take_hit(dmg: int, _from: Vector2) -> bool:   # luôn true (không có khi�
 		if kind == "many_faced":
 			if phase == 3:
 				_set_form("sovereign")
+				_tinted = true
+				tinted.emit(Color(0.9, 0.78, 1.0))
 			else:
 				_form_t = 0.0
 	if hp <= 0:
@@ -612,8 +628,33 @@ func _draw_shift_ring(h: Vector2) -> void:
 		var ks: float = 1.0 - clampf(_t / 0.9, 0.0, 1.0)
 		draw_arc(Vector2.ZERO, lerpf(24.0, maxf(h.x, h.y) + 50.0, ks), 0.0, TAU, 32, Color(0.75, 0.5, 1.0, 0.3 + 0.5 * ks), 3.0)
 
+## Sắc riêng của hai boss cuối để phân biệt: Gatekeeper (Lord đủ ký ức) trắng-vàng, dạng sovereign tím. Chỉ vẽ.
+func _look_tint() -> Color:
+	if empowered:
+		return Color(1.35, 1.25, 0.95)
+	if form == "sovereign":
+		return Color(1.0, 0.8, 1.35)
+	return Color.WHITE
+
+func _draw_aura(h: Vector2) -> void:
+	var r: float = maxf(h.x, h.y)
+	if empowered:   # vầng sáng + 6 đèn ký ức trên tường (sáng = ký ức đã có; đèn cuối là ký ức của chính Lord)
+		draw_circle(Vector2.ZERO, r * 1.15, Color(1.0, 0.92, 0.6, 0.08 + 0.03 * sin(_time * 3.0)))
+		for k in 6:
+			var c: Vector2 = to_local(Vector2(arena.position.x + arena.size.x * float(k + 1) / 7.0, arena.position.y + 90.0))
+			var lit: bool = k < lanterns
+			draw_circle(c, 14.0 if lit else 8.0, Color(0.4, 0.9, 1.0, 0.18) if lit else Color(0.3, 0.35, 0.45, 0.12))
+			draw_circle(c, 6.0 if lit else 4.0, Color(0.6, 0.95, 1.0, 0.95) if lit else Color(0.35, 0.4, 0.5, 0.7))
+	elif form == "sovereign":   # sáu "gương mặt" nhạt xoay quanh thân
+		for k in 6:
+			var a: float = _time * 0.8 + TAU * float(k) / 6.0
+			var c: Vector2 = Vector2(cos(a), sin(a) * 0.7) * (r * 1.05 + 18.0)
+			draw_circle(c, 11.0, Color(0.8, 0.65, 1.0, 0.55))
+			draw_circle(c + Vector2(-3.5, -2.0), 1.8, Color(0.1, 0.05, 0.2))
+			draw_circle(c + Vector2(3.5, -2.0), 1.8, Color(0.1, 0.05, 0.2))
+
 func _draw() -> void:
-	var tint := Color.WHITE
+	var tint := _look_tint()
 	if _flash > 0.0:
 		tint = Color(3, 3, 3, _alpha)
 	elif (state.begins_with("wind") or state == "fade_out") and int(_time * 30.0) % 2 == 0:
@@ -621,6 +662,7 @@ func _draw() -> void:
 	else:
 		tint.a = _alpha
 	var h: Vector2 = _size * 0.5
+	_draw_aura(h)
 	var look: Dictionary = LOOK[form]
 	SPRITES.draw_body(self, String(look["anim"]), Vector2(0, h.y), float(look["scale"]), dir < 0, tint, 6.0)
 	if not (form in FLYERS) and state == "lunge":
