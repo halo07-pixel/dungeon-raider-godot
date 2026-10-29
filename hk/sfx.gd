@@ -31,6 +31,22 @@ func play(name: String, pitch: float = 1.0) -> void:
 
 ## Mỗi lớp: freq, slide (Hz trượt hết lớp), vol, dur, wave (sine|square|saw|noise), delay, decay, lp (noise 0..1), swell.
 const DEFS: Dictionary = {
+	# báo hiệu đòn (thay vùng cảnh báo màu): mỗi loại đòn một âm khác hẳn nhau để nghe là biết đòn gì
+	"tell": {"total": 0.18, "layers": [{"wave": "saw", "freq": 200.0, "slide": 260.0, "vol": 0.14, "dur": 0.16, "swell": 0.6}]},
+	"tell_slash": {"total": 0.22, "layers": [{"wave": "saw", "freq": 300.0, "slide": 500.0, "vol": 0.16, "dur": 0.2, "swell": 0.7}]},
+	"tell_slam": {"total": 0.4, "layers": [{"wave": "sine", "freq": 110.0, "slide": 60.0, "vol": 0.3, "dur": 0.38, "swell": 0.6}, {"wave": "noise", "lp": 0.1, "vol": 0.12, "dur": 0.3}]},
+	"tell_bolt": {"total": 0.2, "layers": [{"wave": "sine", "freq": 1100.0, "slide": 700.0, "vol": 0.16, "dur": 0.08}, {"wave": "sine", "freq": 1100.0, "slide": 700.0, "vol": 0.16, "dur": 0.08, "delay": 0.1}]},
+	"tell_summon": {"total": 0.45, "layers": [{"wave": "saw", "freq": 80.0, "slide": 40.0, "vol": 0.2, "dur": 0.4, "swell": 0.5}, {"wave": "sine", "freq": 240.0, "slide": 120.0, "vol": 0.12, "dur": 0.4}]},
+	"tell_conjure": {"total": 0.3, "layers": [{"wave": "sine", "freq": 600.0, "slide": 300.0, "vol": 0.14, "dur": 0.25, "swell": 0.4}, {"wave": "noise", "lp": 0.7, "vol": 0.08, "dur": 0.2}]},
+	"tell_shift": {"total": 0.5, "layers": [{"wave": "sine", "freq": 300.0, "slide": 700.0, "vol": 0.18, "dur": 0.45, "swell": 0.7}, {"wave": "sine", "freq": 450.0, "slide": 900.0, "vol": 0.1, "dur": 0.45, "swell": 0.7}]},
+	"tell_pillar": {"total": 0.4, "layers": [{"wave": "sine", "freq": 90.0, "slide": 50.0, "vol": 0.3, "dur": 0.38, "swell": 0.7}, {"wave": "noise", "lp": 0.08, "vol": 0.15, "dur": 0.35}]},
+	"tell_fissure": {"total": 0.35, "layers": [{"wave": "noise", "lp": 0.05, "vol": 0.3, "dur": 0.3, "swell": 0.5}, {"wave": "saw", "freq": 70.0, "slide": 30.0, "vol": 0.15, "dur": 0.3}]},
+	"tell_veil": {"total": 0.5, "layers": [{"wave": "sine", "freq": 700.0, "slide": 150.0, "vol": 0.14, "dur": 0.45}, {"wave": "noise", "lp": 0.3, "vol": 0.08, "dur": 0.4, "swell": 0.6}]},
+	"tell_torch": {"total": 0.35, "layers": [{"wave": "noise", "lp": 0.4, "vol": 0.25, "dur": 0.3, "swell": 0.4}, {"wave": "saw", "freq": 220.0, "slide": 120.0, "vol": 0.1, "dur": 0.3}]},
+	"tell_heat": {"total": 0.4, "layers": [{"wave": "saw", "freq": 140.0, "slide": 260.0, "vol": 0.14, "dur": 0.38, "swell": 0.8}, {"wave": "noise", "lp": 0.6, "vol": 0.1, "dur": 0.3}]},
+	"tell_tide": {"total": 0.5, "layers": [{"wave": "sine", "freq": 140.0, "slide": 220.0, "vol": 0.22, "dur": 0.45, "swell": 0.7}, {"wave": "noise", "lp": 0.2, "vol": 0.12, "dur": 0.4}]},
+	"tell_dive": {"total": 0.3, "layers": [{"wave": "saw", "freq": 600.0, "slide": -400.0, "vol": 0.14, "dur": 0.25}]},
+	"rumble": {"total": 0.25, "layers": [{"wave": "noise", "lp": 0.06, "vol": 0.25, "dur": 0.22}]},
 	"jump": {"total": 0.14, "layers": [{"wave": "sine", "freq": 330.0, "slide": 280.0, "vol": 0.25, "dur": 0.12}]},
 	"double_jump": {"total": 0.2, "layers": [{"wave": "sine", "freq": 440.0, "slide": 420.0, "vol": 0.25, "dur": 0.16}, {"wave": "noise", "lp": 0.3, "vol": 0.12, "dur": 0.14}]},
 	"wall_jump": {"total": 0.12, "layers": [{"wave": "square", "freq": 260.0, "slide": 200.0, "vol": 0.14, "dur": 0.09}, {"wave": "noise", "lp": 0.4, "vol": 0.15, "dur": 0.08}]},

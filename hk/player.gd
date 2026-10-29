@@ -273,13 +273,26 @@ func _tick_attack(delta: float) -> void:
 	q.collision_mask = 4
 	for r in get_world_2d().direct_space_state.intersect_shape(q, 8):
 		var c = r["collider"]
-		if c in _hit_set or not c.has_method("take_hit"):
+		if c in _hit_set or not c.has_method("take_hit") or _wall_between(c.global_position):
 			continue
 		_hit_set.append(c)
 		if c.take_hit(STATE.nail_damage(), global_position) == false:
 			_on_blocked()
 		else:
 			_on_nail_hit()
+
+## Tường đặc nằm giữa người chơi và mục tiêu thì nhát chém không tới; bục một chiều chỉ chắn khi mục tiêu ở bên dưới
+## (hết chém xuyên sàn từ bục lơ lửng, nhưng chém từ dưới lên qua bục vẫn được, đúng nghĩa "một chiều").
+func _wall_between(target: Vector2) -> bool:
+	var space := get_world_2d().direct_space_state
+	var q := PhysicsRayQueryParameters2D.create(global_position, target, 1)
+	if target.y > global_position.y:
+		return not space.intersect_ray(q).is_empty()
+	var skip: Array[RID] = []
+	for n in get_tree().get_nodes_in_group("hk_oneway"):
+		skip.append((n as CollisionObject2D).get_rid())
+	q.exclude = skip
+	return not space.intersect_ray(q).is_empty()
 
 func _on_blocked() -> void:   # khiên chặn: bật lùi như chém trúng nhưng không cộng Soul/pogo
 	if attack_dir.y == 0.0:

@@ -144,6 +144,11 @@ func _make_bodies() -> void:
 		cs.shape = sh
 		cs.position = r.position + r.size * 0.5
 		body.add_child(cs)
+	var ow := StaticBody2D.new()   # bục một chiều tách riêng: đạn bay xuyên (xem projectile), người/quái vẫn đứng được
+	ow.collision_layer = 1
+	ow.set_meta("oneway", true)
+	ow.add_to_group("hk_oneway")
+	add_child(ow)
 	for r in oneways:
 		var cs2 := CollisionShape2D.new()
 		var sh2 := RectangleShape2D.new()
@@ -151,7 +156,7 @@ func _make_bodies() -> void:
 		cs2.shape = sh2
 		cs2.position = r.position + r.size * 0.5
 		cs2.one_way_collision = true
-		body.add_child(cs2)
+		ow.add_child(cs2)
 
 ## Điểm đứng khi đi vào bằng cửa `door_id`: lùi vào trong phòng, phía sau cửa.
 func spawn_for_door(door_id: String) -> Vector2:

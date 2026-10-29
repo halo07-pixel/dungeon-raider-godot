@@ -10,6 +10,7 @@ const AREAS: Dictionary = {   # ambient không tối hơn ~0.72 mỗi kênh đ�
 }
 const TILE: float = 32.0
 var _mod: CanvasModulate
+var _dark: bool = false   # boss Wraith tối phòng (chỉ có tác dụng khi Atmosphere bật)
 var _dust: CPUParticles2D
 var _player_light: PointLight2D
 var _lights: Array = []      # đèn của phòng hiện tại: {l: PointLight2D, base: float, flicker: bool}
@@ -58,11 +59,16 @@ func _make_light(col: Color, energy: float, scale_: float) -> PointLight2D:
 func is_on() -> bool:
 	return STATE.atmosphere_on
 
+## Boss bật/tắt bóng tối trong phòng.
+func set_dark(on: bool) -> void:
+	_dark = on
+	apply()
+
 ## Áp lại cài đặt bật/tắt và màu theo khu.
 func apply() -> void:
 	var on: bool = STATE.atmosphere_on
 	var cfg: Dictionary = AREAS[_area]
-	_mod.color = cfg["ambient"] if on else Color.WHITE
+	_mod.color = (cfg["ambient"] * (0.4 if _dark else 1.0) if on else Color.WHITE)
 	_dust.visible = on
 	_dust.emitting = on
 	_dust.color = cfg["p"]
