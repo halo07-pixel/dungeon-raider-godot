@@ -631,17 +631,18 @@ func _draw_shift_ring(h: Vector2) -> void:
 ## Sắc riêng của hai boss cuối để phân biệt: Gatekeeper (Lord đủ ký ức) trắng-vàng, dạng sovereign tím. Chỉ vẽ.
 func _look_tint() -> Color:
 	if empowered:
-		return Color(1.35, 1.25, 0.95)
+		return Color(1.55, 1.5, 1.15)
 	if form == "sovereign":
 		return Color(1.0, 0.8, 1.35)
 	return Color.WHITE
 
 func _draw_aura(h: Vector2) -> void:
 	var r: float = maxf(h.x, h.y)
-	if empowered:   # vầng sáng + 6 đèn ký ức trên tường (sáng = ký ức đã có; đèn cuối là ký ức của chính Lord)
-		draw_circle(Vector2.ZERO, r * 1.15, Color(1.0, 0.92, 0.6, 0.08 + 0.03 * sin(_time * 3.0)))
-		for k in 6:
-			var c: Vector2 = to_local(Vector2(arena.position.x + arena.size.x * float(k + 1) / 7.0, arena.position.y + 90.0))
+	if empowered:   # vầng sáng + 6 đèn ký ức trên đầu boss (sáng = ký ức đã có; đèn cuối là ký ức của chính Lord)
+		draw_circle(Vector2.ZERO, r * 1.15, Color(1.0, 0.92, 0.6, 0.16 + 0.05 * sin(_time * 3.0)))
+		draw_arc(Vector2.ZERO, r * 1.15, 0.0, TAU, 48, Color(1.0, 0.95, 0.7, 0.55), 2.0)
+		for k in 6:   # hàng đèn lơ lửng trên đầu boss (luôn nằm trong khung hình, trên thanh máu)
+			var c: Vector2 = Vector2((float(k) - 2.5) * 36.0, -h.y - 60.0)
 			var lit: bool = k < lanterns
 			draw_circle(c, 14.0 if lit else 8.0, Color(0.4, 0.9, 1.0, 0.18) if lit else Color(0.3, 0.35, 0.45, 0.12))
 			draw_circle(c, 6.0 if lit else 4.0, Color(0.6, 0.95, 1.0, 0.95) if lit else Color(0.35, 0.4, 0.5, 0.7))
