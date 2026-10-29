@@ -39,7 +39,23 @@ func _init() -> void:
 	w = await _spawn_lord(St, ["warden", "hexer", "wraith", "brute", "colossus"])
 	var b = w.boss
 	ck(b.empowered and b.title() == "The Gatekeeper" and b.lanterns == 5, "đủ 5 ký ức: Gatekeeper, 5 đèn sáng")
-	ck(b.echoes.size() == 3 and "wind_pillar" in b.echoes and "wind_fissure" in b.echoes and "wind_tide" in b.echoes, "Echo có đòn của warden/brute/colossus (%s)" % str(b.echoes))
+	ck(b.echoes.size() == 5 and "wind_pillar" in b.echoes and "wind_fissure" in b.echoes and "wind_tide" in b.echoes and "wind_torch" in b.echoes and "wind_veil" in b.echoes, "Echo có đòn của cả 5 boss đã hạ (%s)" % str(b.echoes))
+	# hexer/wraith echo chạy được cho dạng đi bộ: lửa chạy từ lò; tối phòng nhưng không dịch chuyển
+	var pl = w.player
+	var darks: Array = []
+	b.darkness.connect(func(on: bool): darks.append(on))
+	b.state = "wind_veil"
+	b._cast(pl)
+	ck(b._dark_t > 0.0 and darks == [true] and b.state != "fade_out", "echo wraith: tối phòng, Lord không biến mất (state %s)" % b.state)
+	b.state = "wind_torch"
+	b._cast(pl)
+	await physics_frame
+	var fires: int = 0
+	for c in b.get_children():
+		if c.get("kind") == "firewave":
+			fires += 1
+	ck(fires >= 1, "echo hexer: có sóng lửa (%d)" % fires)
+	b._dark_t = 0.0
 	ck(b._look_tint() != plain_tint, "Gatekeeper khác sắc Lord thường")
 	# Echo chỉ xuất hiện khi đủ điều kiện và từ pha 2
 	var seen: Dictionary = {}

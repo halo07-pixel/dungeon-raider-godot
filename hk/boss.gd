@@ -26,6 +26,7 @@ const LOOK: Dictionary = {
 }
 const FLYERS: Array = ["wraith", "hexer"]
 const ZONE = preload("res://hk/zone.gd")
+const ECHO_FROM: Array = ["warden", "brute", "colossus", "hexer", "wraith"]   # boss có đòn Echo cho Gatekeeper (Lord và sovereign không tự echo)
 ## Đòn riêng của mỗi dạng (tương tác với biom của boss): state báo trước -> hàm tung đòn trong `_cast`.
 const SKILL: Dictionary = {
 	"warden": "wind_pillar", "brute": "wind_fissure", "wraith": "wind_veil", "hexer": "wind_torch",
@@ -80,7 +81,7 @@ var braziers: Array = []     # chân các lò lửa trong phòng (world gán) �
 var platforms: Array = []    # Rect2 các bục một chiều trong phòng (world gán) — Lord làm nóng bục
 var _dark_t: float = 0.0
 var empowered: bool = false  # world gán: Lord khi đã có 5 ký ức kia ("The Gatekeeper": đổi sắc, vầng sáng, đèn ký ức, đòn Echo)
-var echoes: Array = []       # world gán: state đòn của các boss mặt đất đã hạ (warden/brute/colossus) — Echo dùng lại
+var echoes: Array = []       # world gán: state đòn riêng của mọi boss đã hạ (warden/brute/colossus/hexer/wraith) — Echo dùng lại
 var lanterns: int = 0        # world gán: số ký ức đã có (đèn sáng trên tường phòng Lord)
 var _tinted: bool = false
 
@@ -265,7 +266,7 @@ func _ground(delta: float, p: Node2D) -> void:
 				_summon()
 				state = "recover"
 				_t = 0.6
-		"wind_pillar", "wind_fissure", "wind_heat", "wind_tide":
+		"wind_pillar", "wind_fissure", "wind_heat", "wind_tide", "wind_torch", "wind_veil":   # torch/veil: chỉ dùng khi Lord echo (boss bay có khối riêng)
 			velocity.x = 0.0
 			_face(p)
 			if _t <= 0.0:
@@ -336,7 +337,10 @@ func _pick_attack() -> void:
 			state = String(SKILL[form])
 			_t = 0.8
 		"echo":
-			state = String(echoes[randi() % echoes.size()])
+			var pool: Array = echoes.duplicate()
+			if _dark_t > 0.0:
+				pool.erase("wind_veil")   # đang tối thì không tối lại
+			state = String(pool[randi() % pool.size()]) if not pool.is_empty() else "wind_slash"
 			_t = 0.8
 
 # ------------------------------------------------------------ đòn riêng theo biom
@@ -381,8 +385,9 @@ func _cast(p: Node2D) -> void:
 		"wind_veil":   # Hollow Wraith: tắt đèn phòng, biến mất rồi hiện sau lưng người chơi
 			_dark_t = 5.0
 			darkness.emit(true)
-			state = "fade_out"
-			_t = 0.3
+			if form in FLYERS:   # dạng đi bộ (Lord echo) chỉ tối phòng, không dịch chuyển
+				state = "fade_out"
+				_t = 0.3
 		"wind_heat":   # Dungeon Lord: một số bục nóng đỏ gây sát thương, buộc phải đổi chỗ đứng
 			if platforms.is_empty():
 				_summon()
