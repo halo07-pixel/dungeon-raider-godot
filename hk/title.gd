@@ -1,9 +1,11 @@
 extends CanvasLayer
 ## Màn hình tiêu đề: 3 ô save. Up/Down chọn, Jump/Enter chơi (ô trống = ván mới), P hai lần để xoá. Báo lên cha bằng signal `chosen("new"|"continue", slot)`.
 const STATE = preload("res://hk/state.gd")
+const RUSH = preload("res://hk/rush.gd")
 signal chosen(mode: String, slot: int)
 var _sel: int = 0
 var _info: Array = []           # tóm tắt từng ô save ({} = trống)
+var _rush_ok: bool = false     # Boss Rush mở sau ending (mục thứ SLOTS+1)
 var _confirm: int = -1          # ô đang chờ bấm P lần nữa để xoá
 var _view: Control
 var _opened_frame: int = -1
@@ -11,6 +13,7 @@ var _opened_frame: int = -1
 func _ready() -> void:
 	layer = 30
 	_refresh()
+	_rush_ok = RUSH.unlocked()
 	for i in STATE.SLOTS:
 		if not _info[i].is_empty():
 			_sel = i
@@ -30,7 +33,7 @@ func _refresh() -> void:
 func _process(_d: float) -> void:
 	if Engine.get_process_frames() == _opened_frame:
 		return
-	var n: int = STATE.SLOTS
+	var n: int = STATE.SLOTS + 1
 	if Input.is_action_just_pressed("hk_down"):
 		_sel = (_sel + 1) % n
 		_confirm = -1
@@ -38,7 +41,7 @@ func _process(_d: float) -> void:
 		_sel = (_sel - 1 + n) % n
 		_confirm = -1
 	elif Input.is_action_just_pressed("hk_pin"):
-		if _info[_sel].is_empty():
+		if _sel >= STATE.SLOTS or _info[_sel].is_empty():
 			pass
 		elif _confirm == _sel:
 			DirAccess.remove_absolute(STATE.slot_path(_sel))
@@ -47,6 +50,11 @@ func _process(_d: float) -> void:
 		else:
 			_confirm = _sel
 	elif Input.is_action_just_pressed("hk_jump") or Input.is_action_just_pressed("ui_accept"):
+		if _sel >= STATE.SLOTS:
+			if _rush_ok:
+				set_process(false)
+				chosen.emit("rush", 0)
+			return
 		set_process(false)
 		chosen.emit("new" if _info[_sel].is_empty() else "continue", _sel)
 		return
@@ -71,4 +79,11 @@ func _draw_view() -> void:
 		if i == _sel:
 			v.draw_rect(Rect2(sz.x * 0.5 - 260, y - 30, 520, 42), Color(1, 1, 1, 0.1))
 		v.draw_string(font, Vector2(0, y), txt, HORIZONTAL_ALIGNMENT_CENTER, sz.x, 26, col)
+	var ry: float = sz.y * 0.55 + STATE.SLOTS * 52.0
+	var rtxt: String = "Boss Rush   locked (finish the game)"
+	if _rush_ok:
+		rtxt = "Boss Rush" + ("   Best %s" % STATE.fmt_time(RUSH.best()) if RUSH.best() > 0.0 else "")
+	if _sel == STATE.SLOTS:
+		v.draw_rect(Rect2(sz.x * 0.5 - 260, ry - 30, 520, 42), Color(1, 1, 1, 0.1))
+	v.draw_string(font, Vector2(0, ry), rtxt, HORIZONTAL_ALIGNMENT_CENTER, sz.x, 26, Color(1.0, 0.8, 0.55) if _rush_ok else Color(0.45, 0.48, 0.58))
 	v.draw_string(font, Vector2(0, sz.y - 40), "Up/Down choose   Jump/Enter play   P erase slot", HORIZONTAL_ALIGNMENT_CENTER, sz.x, 16, Color(0.5, 0.55, 0.65))

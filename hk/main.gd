@@ -27,7 +27,7 @@ func _show_title() -> void:
 	_overlay = t
 
 func _start_game(mode: String, slot: int, title: Node) -> void:
-	STATE.save_path = STATE.slot_path(slot)
+	STATE.save_path = STATE.slot_path(slot)   # Boss Rush: world đổi sang save tạm
 	STATE.boot = mode
 	_music.stop()
 	title.queue_free()
@@ -35,11 +35,20 @@ func _start_game(mode: String, slot: int, title: Node) -> void:
 	_world = Node2D.new()
 	_world.set_script(preload("res://hk/world.gd"))
 	_world.ending_reached.connect(_show_ending)
+	_world.rush_finished.connect(_show_rush_result)
 	add_child(_world)
 
 func _show_ending() -> void:
 	_music.play("stinger_victory", false)
 	var e := preload("res://hk/ending.gd").new()
+	e.finished.connect(_show_title)
+	add_child(e)
+	_overlay = e
+
+func _show_rush_result(time: float, deaths: int, record: bool) -> void:
+	_music.play("stinger_victory", false)
+	var e := preload("res://hk/ending.gd").new()
+	e.rush = [time, deaths, record]
 	e.finished.connect(_show_title)
 	add_child(e)
 	_overlay = e
