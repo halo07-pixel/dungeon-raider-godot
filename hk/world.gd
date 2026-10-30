@@ -91,6 +91,8 @@ func _ready() -> void:
 	entry_spawn = player.global_position
 	cam.global_position = player.global_position
 	cam.reset_smoothing()
+	_fade.color.a = 1.0   # vào game từ màn đen (title mờ ra đen) rồi sáng dần
+	_fade_to(0.0, 0.5)
 
 func _build_ui() -> void:
 	var layer := CanvasLayer.new()

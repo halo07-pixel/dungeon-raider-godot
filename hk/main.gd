@@ -4,7 +4,9 @@ extends Node2D
 const STATE = preload("res://hk/state.gd")
 const InputSetup = preload("res://hk/input.gd")
 const MUSIC = preload("res://hk/music.gd")
+const SFX = preload("res://hk/sfx.gd")
 var _music: Node
+var _sfx: Node
 var _world: Node2D
 var _overlay: Node
 
@@ -12,6 +14,8 @@ func _ready() -> void:
 	InputSetup.ensure()
 	_music = MUSIC.new()
 	add_child(_music)
+	_sfx = SFX.new()
+	add_child(_sfx)
 	_show_title()
 
 func _show_title() -> void:
@@ -23,6 +27,7 @@ func _show_title() -> void:
 	_music.play("menu")
 	var t := preload("res://hk/title.gd").new()
 	t.chosen.connect(_start_game.bind(t))
+	t.sfx.connect(_sfx.play)
 	add_child(t)
 	_overlay = t
 
