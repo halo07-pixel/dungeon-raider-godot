@@ -5,11 +5,9 @@ door 1: vault_5 2
 door 2: vault_7 1
 charm: id=iron_heart
 deco: column 13 17
-deco: hole 27 9
-deco: fountain_red 24 17
-deco: banner_yellow 20 3
-deco: hole 7 3
-deco: banner_yellow 17 6
+deco: column 20 17
+deco: column 7 17
+deco: hole 23 3
 ---
 ########################################
 #.......................d..............#

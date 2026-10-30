@@ -3,12 +3,10 @@ name: Guard Hall
 map: 12,0
 door 1: gate_2 2
 door 2: gate_4 1
-deco: crate 13 17
-deco: banner_blue 19 11
-deco: hole 31 9
-deco: hole 34 8
-deco: banner_red 24 6
-deco: banner_blue 6 10
+deco: crate 15 17
+deco: crate 11 17
+deco: crate 6 17
+deco: hole 34 5
 ---
 ########################################
 #......#.......#.........#........#....#

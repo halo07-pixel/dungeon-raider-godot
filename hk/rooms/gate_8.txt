@@ -5,12 +5,9 @@ door 1: gate_6 2
 door 2: cat_1 1
 altar: id=dash
 torch: 15 17
-deco: crate 10 17
-deco: hole 19 10
-deco: crate 26 17
-deco: crate 7 17
-deco: banner_blue 29 6
-deco: banner_red 33 10
+deco: column_wall 9 17
+deco: banner_blue 23 3
+deco: banner_blue 20 10
 ---
 ########################################
 #........#....................#........#

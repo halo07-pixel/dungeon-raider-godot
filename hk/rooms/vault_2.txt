@@ -4,12 +4,8 @@ map: 44,21
 door 1: vault_1 2
 door 2: vault_3 1
 charm: id=fury
-deco: hole 32 6
-deco: hole 10 6
-deco: banner_yellow 16 5
-deco: banner_yellow 26 3
-deco: hole 29 8
 deco: fountain_red 5 17
+deco: hole 34 3
 ---
 ########################################
 #......................................#

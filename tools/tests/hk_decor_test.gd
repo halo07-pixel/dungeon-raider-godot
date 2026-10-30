@@ -1,5 +1,5 @@
 extends SceneTree
-## Test trang trí phòng: loại hợp lệ + có sprite, ô phủ trống, tối đa 6/phòng, chỉ trang trí (không hộp), bật/tắt theo Atmosphere.
+## Test trang trí phòng: loại hợp lệ + có sprite, ô phủ trống, tối đa 5/phòng (3 đứng sàn + 2 treo tường), chỉ trang trí (không hộp), bật/tắt theo Atmosphere.
 var fails: int = 0
 
 func ck(c: bool, m: String) -> void:
@@ -23,7 +23,12 @@ func _init() -> void:
 	for rid in rooms:
 		var items: Array = rooms[rid]["decor"]
 		total += items.size()
-		ck(items.size() <= 6, "%s: tối đa 6 món (%d)" % [rid, items.size()])
+		ck(items.size() <= 5, "%s: tối đa 5 món (%d)" % [rid, items.size()])
+		var per: Dictionary = {}
+		for d in items:
+			per[d["kind"]] = int(per.get(d["kind"], 0)) + 1
+		for k in per:
+			ck(int(per[k]) <= 3, "%s: loại %s lặp %d lần (tối đa 3)" % [rid, k, per[k]])
 		var g: Array = rooms[rid]["grid"]
 		for d in items:
 			var k: String = String(d["kind"])
@@ -35,7 +40,7 @@ func _init() -> void:
 			for y in range(int(d["row"]) - int(height[k]) + 1, int(d["row"]) + 1):
 				for x in range(int(d["col"]) - 1, int(d["col"]) + 2):
 					ck(String(g[y])[x] == ".", "%s: %s đè ô (%d,%d)" % [rid, k, x, y])
-	ck(total >= 100, "có trang trí trong các phòng (%d)" % total)
+	ck(total >= 40 and total <= 5 * rooms.size(), "có trang trí vừa phải trong các phòng (%d)" % total)
 	# trong phòng thật: là node con chỉ để vẽ, bật/tắt theo STATE.atmosphere_on
 	var w := Node2D.new()
 	w.set_script(load("res://hk/world.gd"))

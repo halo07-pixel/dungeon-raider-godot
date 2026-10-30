@@ -4,12 +4,9 @@ map: 6,0
 door 1: gate_1 1
 door 2: gate_3 1
 door 3: gate_7 1
-deco: hole 8 5
-deco: hole 24 8
-deco: column_wall 15 17
-deco: banner_red 31 6
-deco: banner_red 28 7
-deco: crate 21 17
+deco: column 7 17
+deco: column 15 17
+deco: hole 30 3
 ---
 ########################################
 #.......#...............#.....#........#

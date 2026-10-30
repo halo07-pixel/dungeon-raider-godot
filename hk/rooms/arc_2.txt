@@ -3,12 +3,6 @@ name: Silt Corridor
 map: 60,21
 door 1: arc_1 2
 door 2: arc_3 1
-deco: banner_green 20 11
-deco: banner_green 30 9
-deco: tome 6 17
-deco: banner_green 26 6
-deco: banner_green 14 9
-deco: fountain_blue 23 17
 ---
 ########################################
 #.....d.......................#.....#..#
