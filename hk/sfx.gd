@@ -63,6 +63,7 @@ const DEFS: Dictionary = {
 	"bench": {"total": 0.6, "layers": [{"wave": "sine", "freq": 330.0, "vol": 0.2, "dur": 0.5, "swell": 0.2}, {"wave": "sine", "freq": 495.0, "vol": 0.15, "dur": 0.5, "delay": 0.1, "swell": 0.2}]},
 	"ability": {"total": 0.75, "layers": [{"wave": "sine", "freq": 440.0, "vol": 0.22, "dur": 0.3}, {"wave": "sine", "freq": 550.0, "vol": 0.22, "dur": 0.3, "delay": 0.1}, {"wave": "sine", "freq": 660.0, "vol": 0.22, "dur": 0.3, "delay": 0.2}, {"wave": "sine", "freq": 880.0, "vol": 0.22, "dur": 0.4, "delay": 0.3}]},
 	"charm": {"total": 0.35, "layers": [{"wave": "sine", "freq": 700.0, "vol": 0.22, "dur": 0.15}, {"wave": "sine", "freq": 1050.0, "vol": 0.22, "dur": 0.2, "delay": 0.12}]},
+	"tick": {"total": 0.06, "layers": [{"wave": "sine", "freq": 1300.0, "vol": 0.12, "dur": 0.04}]},
 	"buy": {"total": 0.25, "layers": [{"wave": "sine", "freq": 900.0, "vol": 0.2, "dur": 0.08}, {"wave": "sine", "freq": 1350.0, "vol": 0.2, "dur": 0.14, "delay": 0.07}]},
 	"clang": {"total": 0.2, "layers": [{"wave": "square", "freq": 1250.0, "vol": 0.16, "dur": 0.05}, {"wave": "sine", "freq": 1870.0, "vol": 0.16, "dur": 0.16}]},
 	"deny": {"total": 0.15, "layers": [{"wave": "square", "freq": 150.0, "vol": 0.2, "dur": 0.12}]},
