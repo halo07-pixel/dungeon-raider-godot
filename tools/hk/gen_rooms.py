@@ -140,7 +140,8 @@ for x in (14, 33):
     r.block(x, 1, x + 1, 3)
 r.ground_door("1", "L", "gate_5", "2")
 r.ground_door("2", "R", "gate_8", "1")
-r.extra.append("boss: id=warden")
+r.put(24, 19, "C")
+r.extra += ["charm: id=oath_ward needs=boss_warden", "boss: id=warden"]
 
 r = new("gate_7", 30, 30, 26, "gate", "Sunken Shaft", (6, 4))
 r.put(5, 25, "C"); r.put(22, 25, "X")
@@ -223,7 +224,8 @@ r.put(34, 21, "X")
 r.plat(6, 10, 19); r.plat(37, 41, 19); r.plat(20, 28, 15)
 r.ground_door("1", "L", "cat_7", "2")
 r.ground_door("2", "R", "cat_9", "1")
-r.extra.append("boss: id=wraith")
+r.put(14, 21, "C")
+r.extra += ["charm: id=steady_breath needs=boss_wraith", "boss: id=wraith"]
 
 # giếng rộng 4 ô giữa hai vách đặc: chỉ leo được bằng bám tường
 r = new("cat_9", 30, 44, 40, "catacomb", "Claw Shaft", (38, 14))
@@ -294,7 +296,8 @@ for x in (14, 33):
     r.block(x, 1, x + 1, 3)
 r.ground_door("1", "L", "vault_6", "2")
 r.ground_door("2", "R", "sov_1", "1", "sovereign_open")   # lối tới boss bí mật: chỉ mở khi đủ 6 ký ức
-r.extra += ["boss: id=lord", "hint: 36 14 A sealed way. Remember everything."]
+r.put(24, 19, "C")
+r.extra += ["charm: id=last_light needs=boss_lord", "boss: id=lord", "hint: 36 14 A sealed way. Remember everything."]
 
 # ====================================================== BOSS BÍ MẬT
 r = new("sov_1", 56, 28, 24, "vault", "The Hollow Throne", (75, 16))
@@ -304,7 +307,8 @@ r.plat(19, 25, 16); r.plat(31, 37, 16)
 for x in (17, 38):
     r.block(x, 1, x + 1, 4)
 r.ground_door("1", "L", "vault_7", "2")
-r.extra.append("boss: id=many_faced")
+r.put(22, 23, "C")
+r.extra += ["charm: id=many_faces needs=boss_many_faced", "boss: id=many_faced"]
 
 # ====================================================== DROWNED ARCHIVE (khu 4, nhánh phụ từ Hearth)
 r = new("arc_1", 30, 30, 26, "archive", "Flooded Stair", (56, 21))
