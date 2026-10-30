@@ -10,11 +10,13 @@ const SFX = preload("res://hk/sfx.gd")
 const BACKDROP = preload("res://hk/backdrop.gd")
 const ATMOSPHERE = preload("res://hk/atmosphere.gd")
 const BOSS = preload("res://hk/boss.gd")
+const RUSH = preload("res://hk/rush.gd")
 const DEBUG_BOXES = preload("res://hk/debug_boxes.gd")
 const AREA_NAMES: Dictionary = {"gate": "Gate Ruins", "catacomb": "Weeping Catacombs", "vault": "Ashen Vaults", "archive": "Drowned Archive"}
 const ZOOM: float = 1.5
 
 signal ending_reached   # báo lên main sau khi hạ Dungeon Lord
+signal rush_finished(time: float, deaths: int, record: bool)   # Boss Rush: hạ boss cuối
 
 var rooms: Dictionary = {}
 var room: Node2D
@@ -38,7 +40,11 @@ var _last_area: String = ""
 func _ready() -> void:
 	InputSetup.ensure()
 	rooms = WorldData.load_all()
+	STATE.rush = STATE.boot == "rush"
 	match STATE.boot:
+		"rush":
+			RUSH.setup(RUSH.has_true_end())
+			STATE.bench_room = RUSH.current_room()
 		"new":
 			STATE.reset()
 			STATE.delete_save()
@@ -81,7 +87,7 @@ func _ready() -> void:
 	hud.set_soul(STATE.soul)
 	load_room(STATE.bench_room)
 	var at_start: bool = STATE.bench_id == "start"
-	player.respawn_at(room.default_spawn() if at_start else room.bench_spawn(), true)
+	player.respawn_at(_rush_spawn() if STATE.rush else (room.default_spawn() if at_start else room.bench_spawn()), true)
 	entry_spawn = player.global_position
 	cam.global_position = player.global_position
 	cam.reset_smoothing()
@@ -237,6 +243,11 @@ func _on_boss_engaged() -> void:
 
 func _on_boss_defeated(bid: String) -> void:
 	sfx.play("boss_die")
+	if STATE.rush:
+		STATE.set_flag("boss_" + bid)   # để Lord thành Gatekeeper khi đã hạ đủ 5 boss kia, như ván thường
+		room.locked = false
+		await _rush_next(bid)
+		return
 	if not STATE.flag("boss_" + bid):   # tiền thưởng hạ boss lần đầu
 		var bounty: int = int(BOSS.BOUNTY.get(bid, 0))
 		STATE.geo += bounty
@@ -316,6 +327,13 @@ func _on_player_died() -> void:
 	busy = true
 	player.controls_enabled = false
 	await get_tree().create_timer(0.8, true, false, true).timeout
+	if STATE.rush:   # Boss Rush: hồi sinh ngay tại trận đang đánh, tính số lần chết
+		RUSH.deaths += 1
+		STATE.soul = 0
+		player.soul_changed.emit(0)
+		await _rush_enter()
+		hud.banner("You fall", "Deaths: %d" % RUSH.deaths)
+		return
 	await _fade_to(1.0, 0.5)
 	if STATE.geo > 0:
 		STATE.shade = {"room": room.id, "x": player.global_position.x, "y": player.global_position.y - 4.0, "geo": STATE.geo}
@@ -382,3 +400,38 @@ func rest() -> void:
 	await _fade_to(0.0, 0.3)
 	player.controls_enabled = true
 	busy = false
+
+## Boss Rush: chân người chơi ở cửa đầu tiên của phòng boss hiện tại.
+func _rush_spawn() -> Vector2:
+	var keys: Array = room.doors.keys()
+	keys.sort()
+	return room.spawn_for_door(String(keys[0])) if not keys.is_empty() else room.default_spawn()
+
+## Nạp (lại) phòng boss của lượt Rush: đầy máu, đứng ở cửa vào.
+func _rush_enter() -> void:
+	busy = true
+	player.controls_enabled = false
+	await _fade_to(1.0, 0.4)
+	load_room(RUSH.current_room())
+	var spawn: Vector2 = _rush_spawn()
+	player.respawn_at(spawn, true)
+	entry_spawn = spawn
+	cam.global_position = spawn
+	cam.reset_smoothing()
+	await _fade_to(0.0, 0.4)
+	player.controls_enabled = true
+	busy = false
+
+## Hạ boss trong Rush: hồi đầy máu, chờ 2s, sang boss kế; boss cuối thì báo kết quả lên main.
+func _rush_next(bid: String) -> void:
+	busy = true
+	player.controls_enabled = false
+	hud.banner("%s defeated" % String(boss.title() if is_instance_valid(boss) else bid), "")
+	if RUSH.last():
+		var rec: bool = RUSH.submit(STATE.play_time)
+		await get_tree().create_timer(3.0, true, false, true).timeout
+		rush_finished.emit(STATE.play_time, RUSH.deaths, rec)
+		return
+	await get_tree().create_timer(2.0, true, false, true).timeout
+	RUSH.idx += 1
+	await _rush_enter()

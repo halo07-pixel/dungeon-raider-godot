@@ -8,11 +8,15 @@ var _a: float = 0.0
 var _view: Control
 var _t: float = 0.0
 var _stats: String = ""
+var rush: Array = []   # [thời gian, số lần chết, phá kỷ lục] khi là kết quả Boss Rush
 
 func _ready() -> void:
 	layer = 40
 	process_mode = Node.PROCESS_MODE_ALWAYS
-	_stats = "Rooms explored: %d / %d     Charms: %d     Geo: %d     Time: %s" % [STATE.visited.size(), WorldData.load_all().size(), STATE.charms_owned.size(), STATE.geo, STATE.fmt_time(STATE.play_time)]
+	if not rush.is_empty():
+		_stats = "Time: %s     Deaths: %d%s" % [STATE.fmt_time(float(rush[0])), int(rush[1]), "     NEW RECORD" if rush[2] else ""]
+	else:
+		_stats = "Rooms explored: %d / %d     Charms: %d     Geo: %d     Time: %s" % [STATE.visited.size(), WorldData.load_all().size(), STATE.charms_owned.size(), STATE.geo, STATE.fmt_time(STATE.play_time)]
 	_view = Control.new()
 	_view.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_view.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -42,6 +46,12 @@ func _draw_view() -> void:
 	var font: Font = ThemeDB.fallback_font
 	var sz: Vector2 = v.size
 	v.draw_rect(Rect2(Vector2.ZERO, sz), Color(0.02, 0.02, 0.05, _a))
+	if not rush.is_empty():
+		v.draw_string(font, Vector2(0, sz.y * 0.36), "BOSS RUSH CLEARED", HORIZONTAL_ALIGNMENT_CENTER, sz.x, 44, Color(1.0, 0.85, 0.55, _a))
+		v.draw_string(font, Vector2(0, sz.y * 0.56), _stats, HORIZONTAL_ALIGNMENT_CENTER, sz.x, 20, Color(0.95, 0.9, 0.7, _a))
+		if _t > 2.5:
+			v.draw_string(font, Vector2(0, sz.y - 50), "Jump/Enter: title", HORIZONTAL_ALIGNMENT_CENTER, sz.x, 16, Color(0.6, 0.65, 0.75, 0.6 + 0.4 * sin(_t * 3.0)))
+		return
 	v.draw_string(font, Vector2(0, sz.y * 0.36), String(LORE.ending_lines()[0]), HORIZONTAL_ALIGNMENT_CENTER, sz.x, 44, _title_color())
 	var lines: Array = LORE.ending_lines()
 	v.draw_string(font, Vector2(0, sz.y * 0.36 + 44), String(lines[1]), HORIZONTAL_ALIGNMENT_CENTER, sz.x, 20, Color(0.75, 0.8, 0.95, _a))
