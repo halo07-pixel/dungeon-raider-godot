@@ -46,6 +46,7 @@ var soul: int:
 var facing: int = 1
 var can_dash: bool = true
 var invuln: float = 0.0
+var ward_ready: bool = false   # bùa Oath Ward: còn chặn được một đòn trong phòng này (world đặt lại mỗi lần nạp phòng)
 var slow_t: float = 0.0   # >0: đang trong nước (zone đặt mỗi khung), chạy chậm SLOW_MULT; player tự áp dụng
 const SLOW_MULT: float = 0.55
 var attack_dir: Vector2 = Vector2.RIGHT
@@ -323,13 +324,27 @@ func _cloaked() -> bool:   # bùa Shade Cloak: bất khả xâm phạm trong lú
 func take_damage(from_x: float, dmg: int = 1) -> void:
 	if invuln > 0.0 or _dead or not controls_enabled or _cloaked():
 		return
-	hp = maxi(0, hp - dmg)
+	if ward_ready and STATE.has_charm("oath_ward"):   # Oath Ward: chặn đòn đầu tiên trong phòng, không mất máu
+		ward_ready = false
+		invuln = 0.8
+		sfx.emit("clang")
+		FX.burst(get_parent(), global_position, Color(1.0, 0.95, 0.7), 10, 160.0)
+		return
+	var steady: bool = focusing and STATE.has_charm("steady_breath")   # Steady Breath: bị đánh không đứt Focus
+	if hp - dmg <= 0 and STATE.has_charm("last_light") and not STATE.last_light_used:   # Last Light: đòn chí mạng còn 1 mặt nạ
+		STATE.last_light_used = true
+		hp = 1
+		sfx.emit("heal")
+		FX.burst(get_parent(), global_position, Color(1.0, 0.9, 0.5), 14, 200.0)
+	else:
+		hp = maxi(0, hp - dmg)
 	invuln = IFRAMES + STATE.iframes_bonus()
-	_stun = STUN
 	_dash_t = 0.0
 	_attack_t = 0.0
-	_focus_t = 0.0
-	velocity = Vector2(signf(global_position.x - from_x) * 320.0, -280.0)
+	if not steady:
+		_stun = STUN
+		_focus_t = 0.0
+		velocity = Vector2(signf(global_position.x - from_x) * 320.0, -280.0)
 	health_changed.emit(hp, max_hp)
 	hit_landed.emit(2.0)
 	sfx.emit("hurt" if hp > 0 else "die")
@@ -353,6 +368,7 @@ func respawn_at(pos: Vector2, refill: bool = false) -> void:
 	_dash_t = 0.0
 	_attack_t = 0.0
 	if refill:
+		STATE.last_light_used = false
 		hp = max_hp
 		_dead = false
 		invuln = 1.0
@@ -382,7 +398,7 @@ func _draw() -> void:
 		base = "knight_m_hit_anim"
 	elif is_on_floor() and absf(velocity.x) > 20.0:
 		base = "knight_m_run_anim"
-	var tint := Color(1.6, 1.6, 2.0, a) if _dash_t > 0.0 else Color(1, 1, 1, a)
+	var tint := Color(1.6, 1.6, 2.0, a) if _dash_t > 0.0 else (Color(1.15, 0.85, 1.4, a) if STATE.has_charm("many_faces") else Color(1, 1, 1, a))
 	SPRITES.draw_body(self, base, foot, 2.0, facing < 0, tint, 10.0)
 	if _attack_t > 0.0:
 		# vệt chém = nửa elip nằm trọn trong vùng đánh thật (attack_rect)

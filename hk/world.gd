@@ -158,6 +158,7 @@ func load_room(id: String) -> void:
 	room.hazard_touched.connect(_on_hazard_touch)
 	room.interacted.connect(_on_interacted)
 	player.z_index = 5
+	player.ward_ready = true   # Oath Ward: mỗi phòng một lần chặn
 	boss = null
 	for e in room.entities:
 		match String(e["type"]):

@@ -26,6 +26,10 @@ const CHARMS: Dictionary = {
 	"shade_cloak": {"name": "Shade Cloak", "cost": 2, "desc": "You cannot be hurt while dashing."},
 	"frugal_soul": {"name": "Frugal Soul", "cost": 1, "desc": "Soul Bolt and Focus cost 27 Soul instead of 33."},
 	"swift_current": {"name": "Swift Current", "cost": 1, "desc": "Dash recharges twice as fast."},
+	"oath_ward": {"name": "Oath Ward", "cost": 2, "desc": "Blocks the first hit you take in each room. (Gate Warden)"},
+	"steady_breath": {"name": "Steady Breath", "cost": 2, "desc": "Being hit no longer breaks your Focus. (Hollow Wraith)"},
+	"last_light": {"name": "Last Light", "cost": 2, "desc": "A fatal hit leaves you at 1 mask. Once per rest at a bench. (Dungeon Lord)"},
+	"many_faces": {"name": "Many Faces", "cost": 1, "desc": "Nail hits give +2 Soul, and you wear a different face. (The Many-Faced)"},
 	"spring_nail": {"name": "Spring Nail", "cost": 1, "desc": "Bouncing off enemies with a downward nail launches you 25% higher."},
 }
 
@@ -42,6 +46,7 @@ static var abilities: Array = []
 static var charms_owned: Array = []
 static var charms_equipped: Array = []
 static var notch_bonus: int = 0
+static var last_light_used: bool = false   # bùa Last Light: đã dùng kể từ lần nghỉ/hồi sinh gần nhất (không lưu, reset khi respawn đầy máu)
 static var flags: Dictionary = {}       # cờ một lần: boss đã hạ, bàn thờ đã lấy, ...
 static var visited: Array = []
 static var bench_room: String = START_ROOM
@@ -75,6 +80,7 @@ static func reset() -> void:
 	shade = {}
 	pins = []
 	play_time = 0.0
+	last_light_used = false
 	hp = max_hp()
 
 static func has_ability(id: String) -> bool:
@@ -152,7 +158,7 @@ static func nail_damage() -> int:
 	return maxi(1, roundi(5.0 * m))
 
 static func soul_per_hit() -> int:
-	return 11 + (5 if has_charm("soul_siphon") else 0)
+	return 11 + (5 if has_charm("soul_siphon") else 0) + (2 if has_charm("many_faces") else 0)
 
 static func focus_time() -> float:
 	return 0.9 * (0.55 if has_charm("quick_focus") else 1.0)
