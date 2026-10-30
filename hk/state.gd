@@ -62,6 +62,7 @@ static var music_vol: int = 10
 static var sfx_vol: int = 10
 static var atmosphere_on: bool = true   # ánh sáng + hạt (cài đặt, không bị reset() xoá)
 static var shake_on: bool = true   # rung màn hình (cài đặt, không bị reset() xoá)
+static var zoom_on: bool = true    # hiệu ứng zoom camera (cài đặt, không bị reset() xoá)
 
 static func vol_db(v: int) -> float:
 	return -80.0 if v <= 0 else linear_to_db(float(v) / 10.0)
@@ -183,7 +184,7 @@ static func geo_mult() -> float:
 static func to_dict() -> Dictionary:
 	return {"v": 1, "hp_bonus": hp_bonus, "soul": soul, "geo": geo, "abilities": abilities, "charms_owned": charms_owned,
 		"charms_equipped": charms_equipped, "notch_bonus": notch_bonus, "flags": flags, "visited": visited,
-		"bench_room": bench_room, "bench_id": bench_id, "shade": shade, "music_vol": music_vol, "sfx_vol": sfx_vol, "shake_on": shake_on, "atmosphere_on": atmosphere_on, "pins": pins, "time": play_time}
+		"bench_room": bench_room, "bench_id": bench_id, "shade": shade, "music_vol": music_vol, "sfx_vol": sfx_vol, "shake_on": shake_on, "zoom_on": zoom_on, "atmosphere_on": atmosphere_on, "pins": pins, "time": play_time}
 
 static func from_dict(d: Dictionary) -> void:
 	reset()
@@ -192,6 +193,7 @@ static func from_dict(d: Dictionary) -> void:
 	sfx_vol = clampi(int(d.get("sfx_vol", sfx_vol)), 0, 10)
 	atmosphere_on = bool(d.get("atmosphere_on", atmosphere_on)) if d.get("atmosphere_on", true) is bool else atmosphere_on
 	shake_on = bool(d.get("shake_on", shake_on)) if d.get("shake_on", true) is bool else shake_on
+	zoom_on = bool(d.get("zoom_on", zoom_on)) if d.get("zoom_on", true) is bool else zoom_on
 	geo = clampi(int(d.get("geo", 0)), 0, MAX_GEO)
 	var tm = d.get("time", 0.0)
 	play_time = maxf(0.0, float(tm)) if (tm is float or tm is int) else 0.0
