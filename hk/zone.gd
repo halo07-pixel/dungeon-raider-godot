@@ -1,7 +1,8 @@
 extends Node2D
 ## Vùng nguy hiểm/vật thể tạm do đòn riêng của boss tạo ra (con của boss, top_level => toạ độ thế giới; boss chết thì biến mất).
 ## Gây hại theo hình chữ nhật mỗi khung vật lý (không dùng Area2D nên không dính lỗi "flushing queries").
-## kind: spikes (gai nền nứt) | firewave (sóng lửa chạy từ lò) | heat (bục nóng) | water (nước dâng, làm chậm) | pillar (cột rơi rồi thành vật cản).
+## kind: spikes (gai nền nứt) | firewave (sóng lửa chạy từ lò) | heat (bục nóng) | water (nước dâng, làm chậm) | pillar (cột rơi rồi thành vật cản)
+## | flame (vệt lửa nằm yên trên sàn do quái cinder để lại; con của room, không phải của boss).
 ## Trước khi có hiệu lực (`delay`) không vẽ vùng nào: tín hiệu là âm thanh + bụi/tia lửa do boss phát ra.
 const SPRITES = preload("res://hk/sprites.gd")
 const FX = preload("res://hk/fx.gd")
@@ -95,6 +96,10 @@ func _draw() -> void:
 				var hh: float = r.size.y * (0.7 + 0.3 * sin(Time.get_ticks_msec() * 0.02 + k * 2.0))
 				draw_colored_polygon(PackedVector2Array([Vector2(cx - 10, r.end.y), Vector2(cx, r.end.y - hh), Vector2(cx + 10, r.end.y)]), Color(1.0, 0.45, 0.1, 0.95))
 				draw_colored_polygon(PackedVector2Array([Vector2(cx - 5, r.end.y), Vector2(cx, r.end.y - hh * 0.6), Vector2(cx + 5, r.end.y)]), Color(1.0, 0.85, 0.3))
+		"flame":
+			var hh2: float = r.size.y * (0.75 + 0.25 * sin(Time.get_ticks_msec() * 0.025 + r.position.x))
+			draw_colored_polygon(PackedVector2Array([Vector2(r.position.x, r.end.y), Vector2(r.get_center().x, r.end.y - hh2), Vector2(r.end.x, r.end.y)]), Color(1.0, 0.45, 0.1, 0.9))
+			draw_colored_polygon(PackedVector2Array([Vector2(r.position.x + 7.0, r.end.y), Vector2(r.get_center().x, r.end.y - hh2 * 0.55), Vector2(r.end.x - 7.0, r.end.y)]), Color(1.0, 0.85, 0.3))
 		"heat":   # bục nóng đỏ: vầng sáng trên mặt bục
 			draw_rect(Rect2(r.position.x, r.end.y - 6.0, r.size.x, 6.0), Color(1.0, 0.4, 0.1, flick))
 			draw_rect(Rect2(r.position.x, r.position.y + 12.0, r.size.x, r.size.y - 18.0), Color(1.0, 0.45, 0.15, 0.22 * flick))

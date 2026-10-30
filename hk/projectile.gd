@@ -7,6 +7,7 @@ var life: float = 2.5
 var radius: float = 9.0
 var color: Color = Color(1, 0.6, 0.3)
 var pierce: bool = false
+var slows: bool = false   # bong bóng (bubbler): không sát thương, chỉ làm chậm người chơi
 
 func _ready() -> void:
 	collision_layer = 0
@@ -31,7 +32,10 @@ func _on_body(b: Node) -> void:
 		if not pierce:
 			queue_free()
 	elif not friendly and b.has_method("take_damage"):
-		b.take_damage(global_position.x)
+		if slows:
+			b.slow_t = 2.0
+		else:
+			b.take_damage(global_position.x)
 		queue_free()
 	elif b is StaticBody2D and not b.has_meta("oneway"):   # bục một chiều không chặn đạn
 		queue_free()
