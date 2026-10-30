@@ -82,7 +82,7 @@ func _draw_view() -> void:
 	var ry: float = sz.y * 0.55 + STATE.SLOTS * 52.0
 	var rtxt: String = "Boss Rush   locked (finish the game)"
 	if _rush_ok:
-		rtxt = "Boss Rush" + ("   Best %s" % STATE.fmt_time(RUSH.best()) if RUSH.best() > 0.0 else "")
+		rtxt = "Boss Rush" + ("   Best %s" % RUSH.fmt(RUSH.best()) if RUSH.best() > 0.0 else "")
 	if _sel == STATE.SLOTS:
 		v.draw_rect(Rect2(sz.x * 0.5 - 260, ry - 30, 520, 42), Color(1, 1, 1, 0.1))
 	v.draw_string(font, Vector2(0, ry), rtxt, HORIZONTAL_ALIGNMENT_CENTER, sz.x, 26, Color(1.0, 0.8, 0.55) if _rush_ok else Color(0.45, 0.48, 0.58))

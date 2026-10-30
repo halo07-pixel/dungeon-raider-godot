@@ -87,7 +87,7 @@ func _ready() -> void:
 	hud.set_soul(STATE.soul)
 	load_room(STATE.bench_room)
 	var at_start: bool = STATE.bench_id == "start"
-	player.respawn_at(_rush_spawn() if STATE.rush else (room.default_spawn() if at_start else room.bench_spawn()), true)
+	player.respawn_at(_rush_spawn() if STATE.rush else (room.default_spawn() if at_start else room.bench_spawn()), true)   # Rush: sảnh = bench
 	entry_spawn = player.global_position
 	cam.global_position = player.global_position
 	cam.reset_smoothing()
@@ -133,7 +133,10 @@ func _on_volume_changed() -> void:
 	sfx.play("buy")
 
 func _process(d: float) -> void:
-	STATE.play_time += d
+	if not STATE.rush:
+		STATE.play_time += d
+	elif RUSH.idx >= 0 and not busy:   # Rush: đồng hồ chỉ chạy lúc đang đánh
+		RUSH.time += d
 	if Input.is_action_just_pressed("hk_debug"):
 		debug_boxes.toggle()
 	if is_instance_valid(player):
@@ -283,6 +286,10 @@ func _refresh_unlocks() -> void:
 func _on_door(door_id: String) -> void:
 	if busy:
 		return
+	if STATE.rush and RUSH.idx < 0:   # ra khỏi sảnh = bắt đầu lượt
+		RUSH.start()
+		await _rush_enter()
+		return
 	var link: Dictionary = rooms[room.id]["doors"].get(door_id, {})
 	if link.is_empty() or not rooms.has(link["to"]):
 		return
@@ -401,8 +408,10 @@ func rest() -> void:
 	player.controls_enabled = true
 	busy = false
 
-## Boss Rush: chân người chơi ở cửa đầu tiên của phòng boss hiện tại.
+## Boss Rush: ở sảnh đứng cạnh bench; ở phòng boss đứng ở cửa đầu tiên.
 func _rush_spawn() -> Vector2:
+	if RUSH.idx < 0:
+		return room.bench_spawn()
 	var keys: Array = room.doors.keys()
 	keys.sort()
 	return room.spawn_for_door(String(keys[0])) if not keys.is_empty() else room.default_spawn()
@@ -426,11 +435,14 @@ func _rush_enter() -> void:
 func _rush_next(bid: String) -> void:
 	busy = true
 	player.controls_enabled = false
-	hud.banner("%s defeated" % String(boss.title() if is_instance_valid(boss) else bid), "")
+	var seg: float = RUSH.time - RUSH.mark
+	RUSH.mark = RUSH.time
+	var fresh: bool = RUSH.record_split(bid, seg)
+	hud.banner("%s defeated" % String(boss.title() if is_instance_valid(boss) else bid), RUSH.fmt(seg) + ("   NEW BEST" if fresh else ""))
 	if RUSH.last():
-		var rec: bool = RUSH.submit(STATE.play_time)
+		var rec: bool = RUSH.submit(RUSH.time)
 		await get_tree().create_timer(3.0, true, false, true).timeout
-		rush_finished.emit(STATE.play_time, RUSH.deaths, rec)
+		rush_finished.emit(RUSH.time, RUSH.deaths, rec)
 		return
 	await get_tree().create_timer(2.0, true, false, true).timeout
 	RUSH.idx += 1

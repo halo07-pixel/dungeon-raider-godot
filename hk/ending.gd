@@ -3,6 +3,8 @@ extends CanvasLayer
 const STATE = preload("res://hk/state.gd")
 const WorldData = preload("res://hk/world_data.gd")
 const LORE = preload("res://hk/lore.gd")
+const RUSH = preload("res://hk/rush.gd")
+const BOSS = preload("res://hk/boss.gd")
 signal finished
 var _a: float = 0.0
 var _view: Control
@@ -14,7 +16,7 @@ func _ready() -> void:
 	layer = 40
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	if not rush.is_empty():
-		_stats = "Time: %s     Deaths: %d%s" % [STATE.fmt_time(float(rush[0])), int(rush[1]), "     NEW RECORD" if rush[2] else ""]
+		_stats = "Time: %s     Deaths: %d%s" % [RUSH.fmt(float(rush[0])), int(rush[1]), "     NEW RECORD" if rush[2] else ""]
 	else:
 		_stats = "Rooms explored: %d / %d     Charms: %d     Geo: %d     Time: %s" % [STATE.visited.size(), WorldData.load_all().size(), STATE.charms_owned.size(), STATE.geo, STATE.fmt_time(STATE.play_time)]
 	_view = Control.new()
@@ -48,7 +50,12 @@ func _draw_view() -> void:
 	v.draw_rect(Rect2(Vector2.ZERO, sz), Color(0.02, 0.02, 0.05, _a))
 	if not rush.is_empty():
 		v.draw_string(font, Vector2(0, sz.y * 0.36), "BOSS RUSH CLEARED", HORIZONTAL_ALIGNMENT_CENTER, sz.x, 44, Color(1.0, 0.85, 0.55, _a))
-		v.draw_string(font, Vector2(0, sz.y * 0.56), _stats, HORIZONTAL_ALIGNMENT_CENTER, sz.x, 20, Color(0.95, 0.9, 0.7, _a))
+		v.draw_string(font, Vector2(0, sz.y * 0.36 + 44), _stats, HORIZONTAL_ALIGNMENT_CENTER, sz.x, 22, Color(0.95, 0.9, 0.7, _a))
+		for i in RUSH.splits.size():
+			var sp: Dictionary = RUSH.splits[i]
+			var best_txt: String = "NEW BEST" if sp["new"] else "best " + RUSH.fmt(RUSH.seg_best(String(sp["id"])))
+			var line: String = "%s   %s   %s" % [String(BOSS.DATA[sp["id"]]["title"]), RUSH.fmt(float(sp["seg"])), best_txt]
+			v.draw_string(font, Vector2(0, sz.y * 0.36 + 100 + i * 28.0), line, HORIZONTAL_ALIGNMENT_CENTER, sz.x, 20, Color(1.0, 0.9, 0.5, _a) if sp["new"] else Color(0.8, 0.84, 0.95, _a))
 		if _t > 2.5:
 			v.draw_string(font, Vector2(0, sz.y - 50), "Jump/Enter: title", HORIZONTAL_ALIGNMENT_CENTER, sz.x, 16, Color(0.6, 0.65, 0.75, 0.6 + 0.4 * sin(_t * 3.0)))
 		return
