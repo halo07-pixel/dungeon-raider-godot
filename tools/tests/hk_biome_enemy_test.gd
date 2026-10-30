@@ -140,6 +140,43 @@ func _init() -> void:
 		var g1: int = St.geo
 		minions[0].take_hit(99, Vector2(0, 560))
 		ck(St.geo == g1, "crawler con không rơi Geo")
+	# ---- âm riêng: đúng tên âm cho từng quái (có trong sfx.DEFS)
+	var SFX = load("res://hk/sfx.gd")
+	for n in ["tell_bell", "revive", "tell_ember", "ember", "bubble", "pop"]:
+		ck(SFX.DEFS.has(n), "sfx.DEFS có %s" % n)
+	p.global_position = Vector2(700, 560)
+	var heard: Array = []
+	var s2 = mk(St, "sentry", Vector2(900, 560))
+	s2.sfx.connect(func(n: String): heard.append(n))
+	s2._t = 0.0
+	await frames(40)
+	ck("tell_bell" in heard, "sentry windup: tiếng chuông (%s)" % str(heard))
+	var heard2: Array = []
+	var c2 = mk(St, "cinder", Vector2(1100, 560))
+	c2.sfx.connect(func(n: String): heard2.append(n))
+	c2.dir = -1
+	c2.state = "windup"
+	c2._t = 0.3
+	await frames(60)
+	ck("tell_ember" in heard2 and "ember" in heard2, "cinder: tell_ember + ember khi để lại lửa (%s)" % str(heard2))
+	var heard3: Array = []
+	var z3 = mk(St, "reviver", Vector2(1300, 560))
+	z3.sfx.connect(func(n: String): heard3.append(n))
+	await frames(10)
+	z3.take_hit(99, Vector2(1200, 560))
+	ck(z3.body_rect().size == EN.body_size("reviver"), "reviver nằm: hộp va chạm giữ nguyên")
+	await frames(int(EN.REVIVE_AFTER * 60.0) + 20)
+	ck("revive" in heard3, "reviver đứng dậy phát tiếng revive (%s)" % str(heard3))
+	var heard4: Array = []
+	var b3 = mk(St, "bubbler", Vector2(900, 560))
+	b3.sfx.connect(func(n: String): heard4.append(n))
+	b3._t = 0.0
+	p.global_position = Vector2(560, 560)
+	p.invuln = 0.0
+	await frames(200)
+	ck("bubble" in heard4 and not ("spit" in heard4), "bubbler bắn: tiếng bubble (%s)" % str(heard4))
+	ck("pop" in heard4, "bong bóng trúng người chơi: tiếng pop (%s)" % str(heard4))
+	p.invuln = 9999.0
 	St.delete_save()
 	print("hk_biome_enemy_test: ", "OK" if fails == 0 else "%d lỗi" % fails)
 	quit(1 if fails > 0 else 0)
