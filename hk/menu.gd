@@ -70,7 +70,7 @@ func _process(_d: float) -> void:
 	elif Input.is_action_just_pressed("hk_memories") and tab != "memories":
 		tab = "memories"
 	if tab == "pause":
-		sel = (sel + int(Input.is_action_just_pressed("hk_down")) - int(Input.is_action_just_pressed("hk_up")) + 4) % 4
+		sel = (sel + int(Input.is_action_just_pressed("hk_down")) - int(Input.is_action_just_pressed("hk_up")) + 5) % 5
 		var step: int = int(Input.is_action_just_pressed("hk_right")) - int(Input.is_action_just_pressed("hk_left"))
 		if step != 0:
 			if sel == 0:
@@ -79,8 +79,10 @@ func _process(_d: float) -> void:
 				STATE.sfx_vol = clampi(STATE.sfx_vol + step, 0, 10)
 			elif sel == 2:
 				STATE.shake_on = step > 0
-			else:
+			elif sel == 3:
 				STATE.atmosphere_on = step > 0
+			else:
+				STATE.zoom_on = step > 0
 			volume_changed.emit()
 	if tab == "map":
 		_pan -= Vector2(Input.get_axis("hk_left", "hk_right"), Input.get_axis("hk_up", "hk_down")) * 420.0 * _d
@@ -278,7 +280,7 @@ func _draw_pause(v: Control, font: Font, sz: Vector2) -> void:
 		v.draw_string(font, Vector2(rx + 16.0, 186.0), "none yet", HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Color(0.5, 0.55, 0.65))
 	var y0: float = 330.0
 	v.draw_string(font, Vector2(rx, y0 - 36.0), "Settings", HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Color(0.7, 0.75, 0.9))
-	var rows: Array = [["Music", STATE.music_vol], ["Effects", STATE.sfx_vol], ["Screen shake", STATE.shake_on], ["Atmosphere", STATE.atmosphere_on]]
+	var rows: Array = [["Music", STATE.music_vol], ["Effects", STATE.sfx_vol], ["Screen shake", STATE.shake_on], ["Atmosphere", STATE.atmosphere_on], ["Zoom effects", STATE.zoom_on]]
 	for i in rows.size():
 		var y: float = y0 + i * 40.0
 		var col := Color(1, 1, 1) if i == sel else Color(0.6, 0.65, 0.75)
@@ -290,4 +292,4 @@ func _draw_pause(v: Control, font: Font, sz: Vector2) -> void:
 			continue
 		for k in 10:
 			v.draw_rect(Rect2(rx + 170.0 + k * 28.0 * 0.8, y - 18, 18 * 0.8, 20), col if k < int(rows[i][1]) else Color(1, 1, 1, 0.12))
-	v.draw_string(font, Vector2(rx, y0 + 170.0), "Up/Down choose   Left/Right change", HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.6, 0.65, 0.75))
+	v.draw_string(font, Vector2(rx, y0 + 210.0), "Up/Down choose   Left/Right change", HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.6, 0.65, 0.75))

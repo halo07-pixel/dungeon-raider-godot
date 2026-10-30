@@ -14,6 +14,7 @@ const RUSH = preload("res://hk/rush.gd")
 const DEBUG_BOXES = preload("res://hk/debug_boxes.gd")
 const AREA_NAMES: Dictionary = {"gate": "Gate Ruins", "catacomb": "Weeping Catacombs", "vault": "Ashen Vaults", "archive": "Drowned Archive"}
 const ZOOM: float = 1.5
+const WIDE_BOSSES: Array = ["colossus", "lord", "many_faced", "sovereign"]   # boss lớn: zoom ra khi vào trận
 
 signal ending_reached   # báo lên main sau khi hạ Dungeon Lord
 signal rush_finished(time: float, deaths: int, record: bool)   # Boss Rush: hạ boss cuối
@@ -187,6 +188,7 @@ func load_room(id: String) -> void:
 		sh.recovered.connect(func(_a: int): sfx.play("geo"))
 		_content.add_child(sh)
 	cam.set_bounds(room.bounds())
+	cam.zoom_to(cam.base, 0.0, true)   # vào phòng mới luôn về zoom thường
 	STATE.visit(id)
 	var area: String = String(data.get("area", "gate"))
 	if area != _last_area:
@@ -239,15 +241,18 @@ func _braziers() -> Array:
 func _on_boss_shake(strength: float) -> void:
 	if strength >= 2.0:
 		sfx.play("slam")
+		cam.punch()
 
 func _on_boss_engaged() -> void:
 	room.locked = true
+	cam.zoom_to(cam.WIDE if boss.kind in WIDE_BOSSES else cam.ENGAGE)
 	sfx.play("roar")
 	music.play(String(MUSIC.BOSS_TRACK.get(boss.kind, "boss_warden")))
 	hud.banner(boss.title(), LORE.INTRO_GATEKEEPER if boss.empowered else LORE.line(boss.kind, "intro"))
 
 func _on_boss_defeated(bid: String) -> void:
 	sfx.play("boss_die")
+	cam.zoom_to(cam.base, 2.0)
 	if STATE.rush:
 		STATE.set_flag("boss_" + bid)   # để Lord thành Gatekeeper khi đã hạ đủ 5 boss kia, như ván thường
 		room.locked = false
@@ -269,6 +274,7 @@ func _on_boss_defeated(bid: String) -> void:
 		STATE.save()
 		busy = true
 		player.controls_enabled = false
+		cam.zoom_to(cam.WIDE, 0.7)   # kết thúc: zoom ra dần
 		await get_tree().create_timer(3.0, true, false, true).timeout
 		ending_reached.emit()
 	elif bid == "lord":
@@ -277,6 +283,7 @@ func _on_boss_defeated(bid: String) -> void:
 		hud.banner("The Dungeon Lord falls", String(LORE.memory("lord")["memory"]))
 		busy = true
 		player.controls_enabled = false
+		cam.zoom_to(cam.WIDE, 0.7)   # kết thúc: zoom ra dần
 		await get_tree().create_timer(3.0, true, false, true).timeout
 		ending_reached.emit()
 
@@ -335,6 +342,7 @@ func _on_hazard() -> void:
 func _on_player_died() -> void:
 	busy = true
 	player.controls_enabled = false
+	cam.zoom_to(cam.DEATH, 2.0)   # zoom chậm vào người chơi lúc ngã
 	await get_tree().create_timer(0.8, true, false, true).timeout
 	if STATE.rush:   # Boss Rush: hồi sinh ngay tại trận đang đánh, tính số lần chết
 		RUSH.deaths += 1
