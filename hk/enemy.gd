@@ -37,6 +37,8 @@ const DATA: Dictionary = {
 	"cinder": {"hp": 20, "geo": 5, "color": Color(0.95, 0.45, 0.2)},
 	"bubbler": {"hp": 12, "geo": 3, "color": Color(0.5, 0.8, 1.0)},
 }
+const TELL: Dictionary = {"sentry": "tell_bell", "cinder": "tell_ember"}   # âm báo trước riêng; quái khác dùng "tell"
+const WINDUP_TINT: Dictionary = {"sentry": Color(0.8, 1.4, 1.9), "cinder": Color(2.0, 0.85, 0.3)}   # nhấp nháy lúc windup (mặc định đỏ nhạt)
 const REVIVE_AFTER: float = 2.0   # reviver nằm bao lâu rồi đứng dậy
 const FIRE_TRAIL: float = 2.0     # cinder: vệt lửa tồn tại bao lâu
 
@@ -45,6 +47,7 @@ var minion: bool = false       # quái do sentry gọi: không rơi Geo (chống
 var _revived: bool = false     # reviver: đã đứng dậy một lần
 var _minion_ref: Node2D        # sentry: con crawler đang sống (tối đa 1)
 var _trail_t: float = 0.0
+var _fire_n: int = 0
 
 ## Hộp va chạm = phần nhìn thấy của sprite (xem hk/bodies.gd), nên hình và hộp luôn khớp.
 static func body_size(k: String) -> Vector2:
@@ -92,7 +95,7 @@ func _player() -> Node2D:
 
 func _physics_process(delta: float) -> void:
 	if state == "windup" and _prev_state != "windup":
-		sfx.emit("tell")   # âm báo trước đòn (không còn vùng cảnh báo màu); sprite vẫn nhấp nháy lúc windup
+		sfx.emit(TELL.get(kind, "tell"))   # âm báo trước đòn (không còn vùng cảnh báo màu); sprite vẫn nhấp nháy lúc windup
 	_prev_state = state
 	_time += delta
 	_flash = maxf(0.0, _flash - delta)
@@ -296,11 +299,15 @@ func _reviver(delta: float) -> void:
 		if _t <= 0.0:
 			state = "idle"
 			hp = maxi(1, int(DATA[kind]["hp"]) / 2)
+			sfx.emit("revive")
 		return
 	_patrol(60.0, delta)
 
 ## Vệt lửa của cinder: vùng gây hại nằm trên sàn dưới chân (dùng lại zone.gd), tự tắt sau FIRE_TRAIL giây.
 func _drop_fire() -> void:
+	_fire_n += 1
+	if _fire_n % 3 == 1:
+		sfx.emit("ember")
 	var z := Node2D.new()
 	z.set_script(ZONE)
 	z.kind = "flame"
@@ -347,14 +354,18 @@ func _spitter(delta: float) -> void:
 					s.life = 4.0
 					s.vel = (p.global_position - global_position).normalized() * 150.0
 					s.color = Color(0.5, 0.8, 1.0, 0.7)
+					s.popped.connect(_on_pop)
 				else:
 					s.vel = (p.global_position - global_position).normalized() * 280.0
 					s.color = Color(0.6, 0.9, 0.3)
 				get_parent().add_child.call_deferred(s)
 				s.position = position + Vector2(0, -8)
-				sfx.emit("spit")
+				sfx.emit("bubble" if kind == "bubbler" else "spit")
 				state = "idle"
 				_t = 2.0
+
+func _on_pop() -> void:
+	sfx.emit("pop")
 
 func _ground_ahead() -> bool:
 	var q := PhysicsRayQueryParameters2D.create(global_position + Vector2(float(dir) * (_size.x * 0.5 + 6.0), 0.0), global_position + Vector2(float(dir) * (_size.x * 0.5 + 6.0), _size.y * 0.5 + 24.0), 1)
@@ -420,13 +431,19 @@ func _draw() -> void:
 	if _flash > 0.0:
 		tint = Color(3, 3, 3)
 	elif (state == "windup" or state == "shake") and int(_time * 30.0) % 2 == 0:
-		tint = Color(1.6, 0.7, 0.7)
+		tint = WINDUP_TINT.get(kind, Color(1.6, 0.7, 0.7))
 	elif state == "down":   # reviver nằm: xám; nhấp nháy sắp đứng dậy
 		tint = Color(0.45, 0.45, 0.55) if _t > 0.5 or int(_time * 20.0) % 2 == 0 else Color(1.3, 1.3, 1.5)
 	else:
 		tint = Color(LOOK[kind].get("tint", Color.WHITE))
 	var look: Dictionary = LOOK[kind]
 	var jitter := Vector2(randf_range(-3.0, 3.0), 0.0) if state == "shake" else Vector2.ZERO
+	if state == "down":   # reviver nằm: xoay 90° quanh chân, thân dọc theo sàn (hộp va chạm giữ nguyên); rung nhẹ sắp đứng dậy
+		var sh2: Vector2 = Vector2(randf_range(-2.0, 2.0), 0.0) if _t < 0.5 else Vector2.ZERO
+		draw_set_transform(Vector2(-_size.y * 0.5, _size.y * 0.5 - _size.x * 0.5) + sh2, PI * 0.5, Vector2.ONE)
+		SPRITES.draw_body(self, String(look["anim"]), Vector2.ZERO, float(look["scale"]), dir < 0, tint)
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+		return
 	SPRITES.draw_body(self, String(look["anim"]), Vector2(0, _size.y * 0.5) + jitter, float(look["scale"]), dir < 0, tint)
 	if kind == "guard" or kind == "sentry":   # khiên: dựng đứng phía trước, hạ thấp khi recover
 		var up: bool = state != "recover"

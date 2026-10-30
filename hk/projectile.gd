@@ -7,6 +7,7 @@ var life: float = 2.5
 var radius: float = 9.0
 var color: Color = Color(1, 0.6, 0.3)
 var pierce: bool = false
+signal popped   # bong bóng (slows) trúng người chơi: nơi tạo ra nó phát âm
 var slows: bool = false   # bong bóng (bubbler): không sát thương, chỉ làm chậm người chơi
 
 func _ready() -> void:
@@ -34,6 +35,7 @@ func _on_body(b: Node) -> void:
 	elif not friendly and b.has_method("take_damage"):
 		if slows:
 			b.slow_t = 2.0
+			popped.emit()
 		else:
 			b.take_damage(global_position.x)
 		queue_free()
@@ -41,5 +43,9 @@ func _on_body(b: Node) -> void:
 		queue_free()
 
 func _draw() -> void:
+	if slows:   # bong bóng: viền sáng, nhấp nháy khi sắp tan
+		if life < 0.8 and int(life * 14.0) % 2 == 0:
+			return
+		draw_arc(Vector2.ZERO, radius, 0.0, TAU, 24, Color(0.85, 0.95, 1.0, 0.9), 2.0)
 	draw_circle(Vector2.ZERO, radius, color)
 	draw_circle(Vector2.ZERO, radius * 0.5, Color(1, 1, 1, 0.8))
