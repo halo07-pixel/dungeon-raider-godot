@@ -89,6 +89,7 @@ func _init() -> void:
 	w.player.died.emit()
 	await wait(2.5)
 	ck(Rush.deaths == 1 and w.room.id == "gate_6" and is_instance_valid(w.boss) and not w.busy, "chết: ở lại gate_6, deaths=1, boss còn")
+	ck(w.player.hp == St.max_hp() and St.soul == 0, "chết: hồi đầy máu, soul về 0")
 	# hạ boss -> hồi đầy máu, sang boss kế sau ~2s
 	w.player.hp = 2
 	await wait(1.0)
@@ -96,16 +97,27 @@ func _init() -> void:
 	ck(t_kill > 0.5, "đồng hồ chạy khi đang đánh (%.2f)" % t_kill)
 	kill(w)
 	await wait(0.3)
-	ck(w.busy and Rush.idx == 0, "vừa hạ: chờ, chưa sang phòng kế")
-	await wait(3.5)
-	ck(Rush.time - t_kill < 1.3 and Rush.splits.size() == 1 and String(Rush.splits[0]["id"]) == "warden" and absf(float(Rush.splits[0]["seg"]) - t_kill) < 0.1, "chờ giữa boss không tính giờ; ghi split warden")
-	ck(Rush.idx == 1 and w.room.id == "gate_7" and w.player.hp == St.max_hp() and is_instance_valid(w.boss), "sang gate_7, đầy máu, boss mới")
+	ck(Rush.cleared and not w.busy and Rush.idx == 0 and w.room.id == "gate_6", "vừa hạ: ở lại phòng, điều khiển được, chưa sang boss kế")
+	var soul_keep: int = 40
+	St.soul = soul_keep
+	await wait(3.0)
+	ck(Rush.idx == 0 and w.room.id == "gate_6", "không tự dịch chuyển sau vài giây")
+	ck(Rush.time - t_kill < 0.5 and Rush.splits.size() == 1 and String(Rush.splits[0]["id"]) == "warden" and absf(float(Rush.splits[0]["seg"]) - t_kill) < 0.1, "nghỉ không tính giờ; ghi split warden")
+	ck(w.player.hp == 2, "không hồi máu sau khi hạ boss (%d)" % w.player.hp)
+	w._on_door("1")   # đi qua cửa -> boss kế, giữ nguyên máu và soul
+	await wait(1.5)
+	ck(Rush.idx == 1 and not Rush.cleared and w.room.id == "gate_7" and is_instance_valid(w.boss), "đi qua cửa: sang gate_7, boss mới")
+	ck(w.player.hp == 2 and St.soul == soul_keep, "giữ nguyên máu (%d) và soul (%d)" % [w.player.hp, St.soul])
+	w._on_door("1")
+	await wait(0.3)
+	ck(Rush.idx == 1 and w.room.id == "gate_7", "boss chưa hạ: cửa không cho đi")
 	# boss cuối
 	Rush.idx = Rush.order.size() - 1
-	await w._rush_enter()
+	Rush.cleared = false
+	await w._rush_enter(false)
 	ck(w.room.id == "sov_1" and Rush.last(), "boss cuối (có True End): sov_1")
 	kill(w)
-	await wait(3.6)
+	await wait(4.6)
 	ck(got.size() == 3 and int(got[1]) == 1 and bool(got[2]) and absf(float(got[0]) - Rush.time) < 0.01 and Rush.splits.size() == 2, "rush_finished(time, 1 chết, kỷ lục), đủ split")
 	ck(Rush.best() > 0.0, "kỷ lục được ghi")
 	ck(not St.flag("ending"), "Rush không đặt cờ ending")

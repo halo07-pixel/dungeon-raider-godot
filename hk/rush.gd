@@ -10,6 +10,7 @@ static var idx: int = -1             # -1 = đang ở sảnh, chưa bắt đầu
 static var time: float = 0.0         # đồng hồ lượt: chỉ chạy khi đang đánh (không tính chờ giữa boss, fade, sảnh)
 static var mark: float = 0.0         # time lúc hạ boss trước
 static var splits: Array = []        # {id, seg, new} mỗi boss đã hạ
+static var cleared: bool = false     # boss của phòng hiện tại đã hạ: đồng hồ dừng, chờ người chơi đi qua cửa sang boss kế
 static var deaths: int = 0
 static var order: Array = []
 
@@ -48,9 +49,11 @@ static func setup(with_secret: bool) -> void:
 	time = 0.0
 	mark = 0.0
 	splits = []
+	cleared = false
 
 ## Rời sảnh, bắt đầu bấm giờ.
 static func start() -> void:
+	cleared = false
 	idx = 0
 	deaths = 0
 	time = 0.0
