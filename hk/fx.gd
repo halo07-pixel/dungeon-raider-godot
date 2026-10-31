@@ -1,5 +1,33 @@
 extends RefCounted
+const STATE = preload("res://hk/state.gd")
+const MAX_LIVE: int = 16   # trần số cụm bụi/nước cùng lúc (máy yếu không bị nặng)
+static var _live: int = 0
 ## Hiệu ứng nhỏ dựng bằng code: chữ nổi, tia vụn, vòng lan, tia chém theo hướng, mảnh vỡ khi chết.
+## Bụi/nước nhỏ dưới chân. Tự dọn; trả null (không tạo gì) khi tắt Atmosphere hoặc đã đủ MAX_LIVE cụm.
+static func puff(parent: Node, pos: Vector2, n: int, color: Color, speed: float = 60.0, gravity_y: float = -20.0) -> CPUParticles2D:
+	if not STATE.atmosphere_on or _live >= MAX_LIVE or not is_instance_valid(parent):
+		return null
+	var p := CPUParticles2D.new()
+	p.one_shot = true
+	p.amount = maxi(1, n)
+	p.lifetime = 0.35
+	p.explosiveness = 0.9
+	p.direction = Vector2(0, -1)
+	p.spread = 70.0
+	p.gravity = Vector2(0, gravity_y)
+	p.initial_velocity_min = speed * 0.4
+	p.initial_velocity_max = speed
+	p.scale_amount_min = 1.5
+	p.scale_amount_max = 3.0
+	p.color = color
+	p.emitting = true
+	_live += 1
+	p.tree_exited.connect(func(): _live -= 1)   # tree_exited: đúng cả khi phòng bị giải phóng giữa chừng
+	parent.add_child(p)
+	p.global_position = pos
+	p.finished.connect(p.queue_free)
+	return p
+
 static func float_text(parent: Node, pos: Vector2, text: String, color: Color = Color.WHITE) -> void:
 	var l := Label.new()
 	l.text = text

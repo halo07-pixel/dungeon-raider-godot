@@ -15,6 +15,8 @@ var _dark: bool = false   # boss Wraith tối phòng (chỉ có tác dụng khi 
 var _dust: CPUParticles2D
 var _player_light: PointLight2D
 var _lights: Array = []      # đèn của phòng hiện tại: {l: PointLight2D, base: float, flicker: bool}
+var _pp: Vector2 = Vector2.ZERO   # vị trí người chơi (đèn vật tương tác sáng dần khi lại gần)
+var _mood: String = ""   # "" | focus | danger: đèn người chơi đổi sắc
 var _braziers: Array = []    # vị trí chân lò lửa (px)
 var _area: String = "gate"
 var _tex: GradientTexture2D
@@ -104,6 +106,8 @@ func set_room(data: Dictionary, interactables: Array) -> void:
 				_lights.append({"l": _make_light(Color(1.0, 0.85, 0.4), 0.7, 1.5), "base": 0.7, "flicker": false, "pos": Vector2(vis.get_center().x, vis.position.y)})
 			"charm":
 				_lights.append({"l": _make_light(Color(0.5, 0.95, 0.85), 0.7, 1.4), "base": 0.7, "flicker": false, "pos": Vector2(vis.get_center().x, vis.position.y)})
+			"merchant":
+				_lights.append({"l": _make_light(Color(0.6, 0.8, 1.0), 0.5, 1.3), "base": 0.5, "flicker": false, "pos": vis.get_center()})
 	for it in _lights:
 		it["l"].position = it["pos"]
 	apply()
@@ -112,6 +116,11 @@ func set_room(data: Dictionary, interactables: Array) -> void:
 func follow(cam_pos: Vector2, player_pos: Vector2) -> void:
 	_dust.global_position = cam_pos
 	_player_light.global_position = player_pos + Vector2(0, -8)
+	_pp = player_pos
+
+## Tâm trạng đèn người chơi: focus = sáng trắng hơn, danger (còn 1 mặt nạ) = đỏ nhấp nháy.
+func set_mood(m: String) -> void:
+	_mood = m
 
 func _process(_d: float) -> void:
 	if not STATE.atmosphere_on:
@@ -121,6 +130,18 @@ func _process(_d: float) -> void:
 		var it: Dictionary = _lights[i]
 		if it["flicker"]:
 			it["l"].energy = float(it["base"]) * (0.85 + 0.15 * sin(t * 11.0 + i * 1.7) + 0.05 * sin(t * 23.0 + i))
+		else:   # bench/bàn thờ/bùa/thương nhân: sáng dần tới +80% khi người chơi lại gần
+			it["l"].energy = float(it["base"]) * (1.0 + 0.8 * clampf(1.0 - _pp.distance_to(it["pos"]) / 160.0, 0.0, 1.0))
+	match _mood:
+		"focus":
+			_player_light.color = Color(1.0, 1.0, 1.0)
+			_player_light.energy = 0.9
+		"danger":
+			_player_light.color = Color(1.0, 0.45, 0.4)
+			_player_light.energy = 0.5 + 0.25 * sin(t * 8.0)
+		_:
+			_player_light.color = Color(1.0, 0.92, 0.8)
+			_player_light.energy = 0.5
 	if not _braziers.is_empty():
 		queue_redraw()
 
