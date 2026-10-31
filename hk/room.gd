@@ -30,6 +30,7 @@ var oneways: Array = []
 var hazards: Array = []         # Rect2
 var doors: Dictionary = {}      # char -> Rect2
 var entities: Array = []        # {type, pos}
+const PROMPTS: Dictionary = {"bench": "Rest", "merchant": "Trade", "altar": "Take", "charm": "Take", "cache": "Open"}
 var interactables: Array = []   # {rect, kind, data}
 var locked: bool = false        # khoá cửa khi đánh boss
 var _cells: Array = []
@@ -327,4 +328,7 @@ func _draw() -> void:
 			"cache":
 				SPRITES.draw_body(self, "chest_full_open_anim", foot, 2.0, false, Color.WHITE, 0.0)
 		if _player and Rect2(_player.global_position - _player.BODY * 0.5, _player.BODY).intersects(it["rect"]):
-			draw_string(ThemeDB.fallback_font, Vector2(foot.x - 10.0, prompt_y), "^", HORIZONTAL_ALIGNMENT_CENTER, 20, 20, Color(1, 1, 1, 0.9))
+			var word: String = String(PROMPTS.get(it["kind"], ""))   # gợi ý có chữ: phím + việc sẽ làm
+			var pos := Vector2(foot.x - 50.0, prompt_y)
+			draw_string_outline(ThemeDB.fallback_font, pos, "[Up] " + word, HORIZONTAL_ALIGNMENT_CENTER, 100, 16, 5, Color(0, 0, 0, 0.85))
+			draw_string(ThemeDB.fallback_font, pos, "[Up] " + word, HORIZONTAL_ALIGNMENT_CENTER, 100, 16, Color(1, 1, 1, 0.95))
