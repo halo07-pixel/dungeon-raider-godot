@@ -6,6 +6,7 @@ const InputSetup = preload("res://hk/input.gd")
 const FX = preload("res://hk/fx.gd")
 const LORE = preload("res://hk/lore.gd")
 const MUSIC = preload("res://hk/music.gd")
+const SURFACE: Dictionary = {"gate": "stone", "catacomb": "dirt", "vault": "metal", "archive": "wet"}
 const SFX = preload("res://hk/sfx.gd")
 const BACKDROP = preload("res://hk/backdrop.gd")
 const ATMOSPHERE = preload("res://hk/atmosphere.gd")
@@ -136,6 +137,7 @@ func _on_player_fx(kind: String, pos: Vector2, power: float) -> void:
 	var dust := Color(0.72, 0.72, 0.78, 0.65)
 	match kind:
 		"run":
+			sfx.play("step_" + _surface())
 			FX.puff(_content, pos, 2, dust, 40.0)
 		"land":
 			FX.puff(_content, pos, 3 + int(power * 8.0), dust, 60.0 + power * 80.0)
@@ -143,6 +145,13 @@ func _on_player_fx(kind: String, pos: Vector2, power: float) -> void:
 			FX.puff(_content, pos, 2 + int(power * 2.0), dust, 50.0)
 		"dash":
 			FX.puff(_content, pos, 4, Color(0.75, 0.85, 1.0, 0.7), 90.0)
+
+## Mặt sàn dưới chân: bục một chiều = gỗ, còn lại theo khu. Tần suất bước do player quyết định (0.18s).
+func _surface() -> String:
+	var c: KinematicCollision2D = player.get_last_slide_collision()
+	if c and c.get_collider() is Node and (c.get_collider() as Node).is_in_group("hk_oneway"):
+		return "wood"
+	return String(SURFACE.get(_last_area, "stone"))
 
 func _on_volume_changed() -> void:
 	music.apply_volume()
@@ -213,6 +222,7 @@ func load_room(id: String) -> void:
 		backdrop.set_area(area)
 	atmosphere.set_room(data, room.interactables)
 	music.play(String(MUSIC.AREA_TRACK.get(area, "explore_stone")))
+	music.ambient(area)
 
 func _spawn_enemy(ch: String, pos: Vector2) -> void:
 	var kinds: Dictionary = {"c": "crawler", "f": "flyer", "s": "spitter", "h": "charger", "g": "guard", "d": "dropper", "k": "sentry", "z": "reviver", "i": "cinder", "b": "bubbler"}
@@ -247,6 +257,7 @@ func _spawn_boss(bid: String, pos: Vector2) -> void:
 	boss.braziers = _braziers()
 	boss.platforms = room.oneways.duplicate()
 	boss.shake.connect(_on_boss_shake)
+	boss.phase_changed.connect(_on_boss_phase)
 
 ## Chân các lò lửa của phòng hiện tại (đòn lửa của Ash Hexer dùng chúng làm điểm xuất phát).
 func _braziers() -> Array:
@@ -260,11 +271,16 @@ func _on_boss_shake(strength: float) -> void:
 		sfx.play("slam")
 		cam.punch()
 
+func _on_boss_phase(ph: int) -> void:
+	if is_instance_valid(boss):
+		music.phase(boss.kind, ph)
+
 func _on_boss_engaged() -> void:
 	room.locked = true
 	cam.zoom_to(cam.WIDE if boss.kind in WIDE_BOSSES else cam.ENGAGE)
 	sfx.play("roar")
 	music.play(String(MUSIC.BOSS_TRACK.get(boss.kind, "boss_warden")))
+	music.ambient("")   # đang đánh boss: nhạc boss thôi, không ambient
 	hud.banner(boss.title(), LORE.INTRO_GATEKEEPER if boss.empowered else LORE.line(boss.kind, "intro"))
 
 func _on_boss_defeated(bid: String) -> void:
@@ -284,6 +300,7 @@ func _on_boss_defeated(bid: String) -> void:
 	STATE.set_flag("boss_" + bid)
 	room.locked = false
 	music.play(String(MUSIC.AREA_TRACK.get(String(rooms[room.id].get("area", "gate")), "explore_stone")))
+	music.ambient(_last_area)
 	STATE.save()
 	hud.banner("%s defeated" % String(boss.title() if is_instance_valid(boss) else bid), LORE.line(bid, "memory"))
 	_refresh_unlocks()
