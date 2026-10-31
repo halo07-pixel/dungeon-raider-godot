@@ -15,6 +15,8 @@ var floor_y: float = 0.0        # pillar: mặt sàn nơi cột đáp xuống
 var fx_parent: Node             # nơi đặt hạt bụi (boss gán: cha của boss, toạ độ thế giới)
 var _t: float = 0.0
 var _landed: bool = false
+var _in_water: bool = false   # water: người chơi đang ở trong nước (để bắn nước khi vào/ra)
+var _ripple: float = 0.0
 var _body: StaticBody2D
 
 func _ready() -> void:
@@ -60,12 +62,27 @@ func _physics_process(delta: float) -> void:
 		queue_redraw()
 		return
 	var pr := Rect2(p.global_position - p.BODY * 0.5, p.BODY)
-	if pr.intersects(current()):
+	var inside: bool = pr.intersects(current())
+	if kind == "water" and _in_water and not inside:   # ra khỏi nước
+		_splash(p, 8)
+		_in_water = false
+	if inside:
 		if kind == "water":
 			p.slow_t = 0.1   # nước làm chậm (player áp dụng ở di chuyển): đứng bục cao thì an toàn
+			_ripple -= delta
+			if not _in_water:   # vừa xuống nước
+				_splash(p, 8)
+			elif _ripple <= 0.0 and absf(p.velocity.x) > 20.0:   # gợn nước khi lội
+				_ripple = 0.3
+				_splash(p, 2)
+			_in_water = true
 		else:
 			p.take_damage(rect.get_center().x)
 	queue_redraw()
+
+## Nước bắn quanh chân người chơi (chỉ trang trí; FX.puff tự tắt theo Atmosphere).
+func _splash(p: Node2D, n: int) -> void:
+	FX.puff(fx_parent, p.global_position + Vector2(0, p.BODY.y * 0.5), n, Color(0.6, 0.8, 1.0, 0.85), 130.0, 500.0)
 
 func _make_body() -> void:
 	_body = StaticBody2D.new()

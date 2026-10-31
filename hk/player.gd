@@ -7,6 +7,7 @@ signal soul_changed(soul: int)
 signal died
 signal hazard_hit
 signal sfx(name: String)   # báo lên world để phát âm thanh
+signal fx(kind: String, pos: Vector2, power: float)   # báo lên world để dựng bụi: run | land | wall | dash (power 0..1)
 
 const STATE = preload("res://hk/state.gd")
 const PROJECTILE = preload("res://hk/projectile.gd")
@@ -64,6 +65,7 @@ var _stun: float = 0.0
 var _wall_lock: float = 0.0
 var _wall_coyote: float = 0.0
 var _wall_dir: int = 0
+var _step_t: float = 0.0   # đếm lùi tới lần bụi chân kế tiếp
 var _focus_t: float = 0.0
 var _hit_set: Array = []
 var _dead: bool = false
@@ -126,6 +128,7 @@ func _physics_process(delta: float) -> void:
 	if Input.is_action_just_pressed("hk_dash") and STATE.has_ability("dash") and can_dash and _dash_cd <= 0.0 and _stun <= 0.0:
 		can_dash = false
 		sfx.emit("dash")
+		fx.emit("dash", global_position + Vector2(0, FOOT), 1.0)
 		_dash_t = DASH_TIME
 		_dash_cd = STATE.dash_cooldown()
 		return
@@ -155,6 +158,7 @@ func _physics_process(delta: float) -> void:
 		velocity = Vector2(-float(_wall_dir) * 320.0, JUMP_V * 0.95)
 		facing = -_wall_dir
 		sfx.emit("wall_jump")
+		fx.emit("wall", global_position + Vector2(float(_wall_dir) * 12.0, 0.0), 1.0)
 		_wall_lock = WALL_LOCK
 		_buffer = 0.0
 		_wall_coyote = 0.0
@@ -181,8 +185,12 @@ func _track_air(delta: float) -> void:
 	if is_on_floor():
 		if _air_t > 0.18:
 			sfx.emit("land")
-			FX.burst(get_parent(), global_position + Vector2(0, FOOT), Color(0.7, 0.7, 0.75), 5, 90.0)
+			fx.emit("land", global_position + Vector2(0, FOOT), clampf((_air_t - 0.18) / 0.6, 0.0, 1.0))
 		_air_t = 0.0
+		_step_t -= delta
+		if absf(velocity.x) > RUN_SPEED * 0.6 and _step_t <= 0.0:
+			_step_t = 0.18
+			fx.emit("run", global_position + Vector2(-float(facing) * 8.0, FOOT), 0.3)
 	else:
 		_air_t += delta
 
@@ -196,7 +204,12 @@ func _update_wall(move: float) -> bool:
 	_wall_coyote = 0.1
 	can_dash = true
 	_air_jumps = 1
-	return int(signf(move)) == toward and velocity.y > 0.0
+	var sliding: bool = int(signf(move)) == toward and velocity.y > 0.0
+	_step_t -= get_physics_process_delta_time()
+	if sliding and _step_t <= 0.0:   # bám tường trượt xuống: tia bụi
+		_step_t = 0.15
+		fx.emit("wall", global_position + Vector2(float(toward) * 12.0, -6.0), 0.3)
+	return sliding
 
 ## Focus: giữ phím khi đứng yên trên đất, đủ Soul thì hồi 1 mặt nạ. Trả về true nếu đang chiếm điều khiển.
 func _focus(delta: float) -> bool:

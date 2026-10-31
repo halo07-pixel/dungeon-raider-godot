@@ -82,6 +82,7 @@ func _ready() -> void:
 	player.died.connect(_on_player_died)
 	player.hazard_hit.connect(_on_hazard)
 	player.sfx.connect(sfx.play)
+	player.fx.connect(_on_player_fx)
 	shop.sfx.connect(sfx.play)
 	menu.volume_changed.connect(_on_volume_changed)
 	hud.set_health(STATE.hp, STATE.max_hp())
@@ -130,6 +131,19 @@ func _build_ui() -> void:
 	shop = preload("res://hk/shop.gd").new()
 	add_child(shop)
 
+## Bụi do người chơi tạo ra (chạy, đáp đất, bám tường, dash). Chỉ trang trí: FX.puff tự tắt khi Atmosphere tắt và có trần số cụm.
+func _on_player_fx(kind: String, pos: Vector2, power: float) -> void:
+	var dust := Color(0.72, 0.72, 0.78, 0.65)
+	match kind:
+		"run":
+			FX.puff(_content, pos, 2, dust, 40.0)
+		"land":
+			FX.puff(_content, pos, 3 + int(power * 8.0), dust, 60.0 + power * 80.0)
+		"wall":
+			FX.puff(_content, pos, 2 + int(power * 2.0), dust, 50.0)
+		"dash":
+			FX.puff(_content, pos, 4, Color(0.75, 0.85, 1.0, 0.7), 90.0)
+
 func _on_volume_changed() -> void:
 	music.apply_volume()
 	atmosphere.apply()
@@ -145,6 +159,7 @@ func _process(d: float) -> void:
 	if is_instance_valid(player):
 		cam.global_position = player.global_position
 		atmosphere.follow(cam.global_position, player.global_position)
+		atmosphere.set_mood("focus" if player.focusing else ("danger" if player.hp == 1 else ""))
 	menu.enabled = not busy and not shop.is_open() and not player.is_dead()
 
 func _fade_to(a: float, dur: float = 0.2) -> void:
@@ -374,6 +389,7 @@ func _on_interacted(kind: String, data: Dictionary) -> void:
 	match kind:
 		"bench":
 			sfx.play("bench")
+			FX.ring(_content, data["pos"] + Vector2(0, -14), Color(1.0, 0.9, 0.55, 0.9), 80.0, 0.6)
 			rest()
 		"merchant":
 			shop.open(player, String(room.data.get("area", "gate")))
@@ -389,11 +405,15 @@ func _on_interacted(kind: String, data: Dictionary) -> void:
 			STATE.give_ability(aid)
 			STATE.set_flag("got_" + aid)
 			STATE.save()
+			FX.ring(_content, player.global_position, Color(1.0, 0.85, 0.4, 0.9), 90.0, 0.5)
+			FX.burst(_content, player.global_position, Color(1.0, 0.85, 0.4), 14, 220.0)
 			var info: Dictionary = STATE.ABILITIES[aid]
 			hud.banner(String(info["name"]), String(info["desc"]))
 		"charm":
 			sfx.play("charm")
 			var cid: String = String(data.get("id", ""))
+			FX.ring(_content, player.global_position, Color(0.5, 0.95, 0.85, 0.9), 90.0, 0.5)
+			FX.burst(_content, player.global_position, Color(0.5, 0.95, 0.85), 14, 220.0)
 			STATE.give_charm(cid)
 			STATE.set_flag("got_" + cid)
 			STATE.save()
