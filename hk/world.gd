@@ -187,6 +187,7 @@ func load_room(id: String) -> void:
 	player.z_index = 5
 	player.ward_ready = true   # Oath Ward: mỗi phòng một lần chặn
 	boss = null
+	hud.boss = null
 	for e in room.entities:
 		match String(e["type"]):
 			"c", "f", "s", "h", "g", "d", "k", "z", "i", "b":
@@ -235,6 +236,7 @@ func _spawn_boss(bid: String, pos: Vector2) -> void:
 				boss.echoes.append(String(boss.SKILL[k]))
 	boss.position = pos - Vector2(0, boss.body_size(bid).y * 0.5 + 1.0)   # chân boss đứng trên sàn của ô X
 	_content.add_child(boss)
+	hud.boss = boss
 	boss.defeated.connect(_on_boss_defeated.bind(bid))
 	boss.arena = room.bounds()
 	boss.engaged.connect(_on_boss_engaged)
@@ -267,6 +269,7 @@ func _on_boss_engaged() -> void:
 
 func _on_boss_defeated(bid: String) -> void:
 	sfx.play("boss_die")
+	hud.boss = null
 	cam.zoom_to(cam.base, 2.0)
 	if STATE.rush:
 		STATE.set_flag("boss_" + bid)   # để Lord thành Gatekeeper khi đã hạ đủ 5 boss kia, như ván thường

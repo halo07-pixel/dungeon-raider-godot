@@ -13,6 +13,7 @@ var current_room: String = ""
 var player_pos: Vector2 = Vector2.ZERO
 var tab: String = ""            # "" = đóng
 var sel: int = 0
+var _msg: String = ""           # tab Charms: lý do không đeo được
 var _view: Control
 var _pan: Vector2 = Vector2.ZERO   # kéo bản đồ bằng phím mũi tên
 
@@ -92,10 +93,13 @@ func _process(_d: float) -> void:
 		var n: int = STATE.CHARMS.size()
 		if Input.is_action_just_pressed("hk_down"):
 			sel = (sel + 1) % n
+			_msg = ""
 		elif Input.is_action_just_pressed("hk_up"):
 			sel = (sel - 1 + n) % n
+			_msg = ""
 		elif Input.is_action_just_pressed("hk_jump"):
-			STATE.toggle_charm(String(STATE.CHARMS.keys()[sel]))
+			var cid_t: String = String(STATE.CHARMS.keys()[sel])
+			_msg = "" if STATE.toggle_charm(cid_t) else ("You have not found this charm yet." if not (cid_t in STATE.charms_owned) else "Not enough notches.")
 			var pl := get_tree().get_nodes_in_group("hk_player")
 			if not pl.is_empty():
 				pl[0].health_changed.emit(STATE.hp, STATE.max_hp())
@@ -209,23 +213,34 @@ func _draw_icon(v: Control, at: Vector2, kind: String) -> void:
 		"exit": v.draw_arc(at, 4, 0, TAU, 12, Color(1, 1, 1, 0.9), 1.5)
 
 func _draw_charms(v: Control, font: Font, sz: Vector2) -> void:
-	v.draw_string(font, Vector2(sz.x * 0.5 - 300, 110), "Notches: %d / %d" % [STATE.notches_used(), STATE.notches()], HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Color(1, 0.9, 0.6))
+	v.draw_string(font, Vector2(sz.x * 0.5 - 300, 110), "Notches", HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Color(1, 0.9, 0.6))
+	for k in STATE.notches():   # mỗi ô một chấm: đặc = đang dùng, rỗng = còn trống
+		var cp := Vector2(sz.x * 0.5 - 190.0 + k * 24.0, 103.0)
+		if k < STATE.notches_used():
+			v.draw_circle(cp, 8.0, Color(1, 0.9, 0.6))
+		else:
+			v.draw_arc(cp, 8.0, 0, TAU, 16, Color(1, 0.9, 0.6, 0.7), 2.0)
 	var i: int = 0
+	var step: float = minf(34.0, (sz.y - 280.0) / float(STATE.CHARMS.size()))   # danh sách dài (17 bùa): nén dòng để không đè phần mô tả ở đáy
+	var fs: int = 22 if step >= 30.0 else 19
 	for id in STATE.CHARMS:
 		var c: Dictionary = STATE.CHARMS[id]
-		var y: float = 150.0 + i * 34.0
+		var y: float = 150.0 + i * step
 		var owned: bool = id in STATE.charms_owned
 		var on: bool = id in STATE.charms_equipped
 		var col := Color(0.4, 0.42, 0.5) if not owned else (Color(0.6, 1, 0.8) if on else Color(0.95, 0.95, 1))
 		if i == sel:
-			v.draw_rect(Rect2(sz.x * 0.5 - 320, y - 24, 640, 32), Color(1, 1, 1, 0.1))
+			v.draw_rect(Rect2(sz.x * 0.5 - 320, y - fs - 1.0, 640, step), Color(1, 1, 1, 0.1))
 		var label: String = String(c["name"]) if owned else "???"
-		v.draw_string(font, Vector2(sz.x * 0.5 - 300, y), label + ("   [equipped]" if on else ""), HORIZONTAL_ALIGNMENT_LEFT, -1, 22, col)
-		v.draw_string(font, Vector2(sz.x * 0.5 + 220, y), "●".repeat(int(c["cost"])), HORIZONTAL_ALIGNMENT_LEFT, -1, 22, col)
+		v.draw_string(font, Vector2(sz.x * 0.5 - 300, y), label + ("   [equipped]" if on else ""), HORIZONTAL_ALIGNMENT_LEFT, -1, fs, col)
+		v.draw_string(font, Vector2(sz.x * 0.5 + 220, y), "●".repeat(int(c["cost"])), HORIZONTAL_ALIGNMENT_LEFT, -1, fs, col)
 		i += 1
 	var ids: Array = STATE.CHARMS.keys()
 	var cid: String = String(ids[clampi(sel, 0, ids.size() - 1)])
-	var desc: String = String(STATE.CHARMS[cid]["desc"]) if cid in STATE.charms_owned else charm_hint(cid)
+	var cost: int = int(STATE.CHARMS[cid]["cost"])
+	var desc: String = ("%s  (%d notch%s)" % [String(STATE.CHARMS[cid]["desc"]), cost, "" if cost == 1 else "es"]) if cid in STATE.charms_owned else charm_hint(cid)
+	if _msg != "":
+		v.draw_string(font, Vector2(sz.x * 0.5 - 300, sz.y - 100), _msg, HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Color(1.0, 0.55, 0.5))
 	v.draw_string(font, Vector2(sz.x * 0.5 - 300, sz.y - 70), desc, HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Color(0.85, 0.9, 1))
 	v.draw_string(font, Vector2(sz.x * 0.5 - 300, sz.y - 40), "Up/Down choose   Jump equip/unequip", HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.6, 0.65, 0.75))
 
