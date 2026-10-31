@@ -152,7 +152,7 @@ func _on_volume_changed() -> void:
 func _process(d: float) -> void:
 	if not STATE.rush:
 		STATE.play_time += d
-	elif RUSH.idx >= 0 and not busy:   # Rush: đồng hồ chỉ chạy lúc đang đánh
+	elif RUSH.idx >= 0 and not busy and not RUSH.cleared:   # Rush: đồng hồ chỉ chạy lúc đang đánh (dừng khi đã hạ boss, đang nghỉ)
 		RUSH.time += d
 	if Input.is_action_just_pressed("hk_debug"):
 		debug_boxes.toggle()
@@ -310,9 +310,16 @@ func _refresh_unlocks() -> void:
 func _on_door(door_id: String) -> void:
 	if busy:
 		return
-	if STATE.rush and RUSH.idx < 0:   # ra khỏi sảnh = bắt đầu lượt
-		RUSH.start()
-		await _rush_enter()
+	if STATE.rush:
+		if RUSH.idx < 0:   # ra khỏi sảnh = bắt đầu lượt
+			RUSH.start()
+			await _rush_enter(false)
+		elif RUSH.cleared and not RUSH.last():   # đã hạ boss: đi qua cửa nào cũng sang boss kế, giữ nguyên máu và soul
+			RUSH.idx += 1
+			RUSH.cleared = false
+			await _rush_enter(false)
+		elif not RUSH.cleared:
+			hud.banner("Sealed", "Defeat the boss first.")
 		return
 	var link: Dictionary = rooms[room.id]["doors"].get(door_id, {})
 	if link.is_empty() or not rooms.has(link["to"]):
@@ -363,7 +370,7 @@ func _on_player_died() -> void:
 		RUSH.deaths += 1
 		STATE.soul = 0
 		player.soul_changed.emit(0)
-		await _rush_enter()
+		await _rush_enter(true)
 		hud.banner("You fall", "Deaths: %d" % RUSH.deaths)
 		return
 	await _fade_to(1.0, 0.5)
@@ -446,14 +453,14 @@ func _rush_spawn() -> Vector2:
 	keys.sort()
 	return room.spawn_for_door(String(keys[0])) if not keys.is_empty() else room.default_spawn()
 
-## Nạp (lại) phòng boss của lượt Rush: đầy máu, đứng ở cửa vào.
-func _rush_enter() -> void:
+## Nạp (lại) phòng của lượt Rush, đứng ở cửa vào. `refill`: đầy máu (chỉ khi chết hoặc từ sảnh); sang boss kế thì giữ nguyên máu và soul.
+func _rush_enter(refill: bool) -> void:
 	busy = true
 	player.controls_enabled = false
 	await _fade_to(1.0, 0.4)
 	load_room(RUSH.current_room())
 	var spawn: Vector2 = _rush_spawn()
-	player.respawn_at(spawn, true)
+	player.respawn_at(spawn, refill)
 	entry_spawn = spawn
 	cam.global_position = spawn
 	cam.reset_smoothing()
@@ -461,19 +468,16 @@ func _rush_enter() -> void:
 	player.controls_enabled = true
 	busy = false
 
-## Hạ boss trong Rush: hồi đầy máu, chờ 2s, sang boss kế; boss cuối thì báo kết quả lên main.
+## Hạ boss trong Rush: ghi split, dừng đồng hồ, người chơi ở lại phòng (không hồi máu) tới khi tự đi qua cửa. Boss cuối thì báo kết quả lên main.
 func _rush_next(bid: String) -> void:
-	busy = true
-	player.controls_enabled = false
+	RUSH.cleared = true
 	var seg: float = RUSH.time - RUSH.mark
 	RUSH.mark = RUSH.time
 	var fresh: bool = RUSH.record_split(bid, seg)
-	hud.banner("%s defeated" % String(boss.title() if is_instance_valid(boss) else bid), RUSH.fmt(seg) + ("   NEW BEST" if fresh else ""))
+	hud.banner("%s defeated" % String(boss.title() if is_instance_valid(boss) else bid), RUSH.fmt(seg) + ("   NEW BEST" if fresh else "") + ("" if RUSH.last() else "   Go through a door to continue"))
 	if RUSH.last():
+		busy = true
+		player.controls_enabled = false
 		var rec: bool = RUSH.submit(RUSH.time)
-		await get_tree().create_timer(3.0, true, false, true).timeout
+		await get_tree().create_timer(4.0, true, false, true).timeout
 		rush_finished.emit(RUSH.time, RUSH.deaths, rec)
-		return
-	await get_tree().create_timer(2.0, true, false, true).timeout
-	RUSH.idx += 1
-	await _rush_enter()
