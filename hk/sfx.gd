@@ -6,6 +6,7 @@ const RATE: int = 22050
 const VOLUME_DB: float = -6.0
 var history: Array = []
 var _sounds: Dictionary = {}
+static var _loops: Dictionary = {}
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -28,6 +29,14 @@ func play(name: String, pitch: float = 1.0) -> void:
 	add_child(p)
 	p.finished.connect(p.queue_free)
 	p.play()
+
+## Vòng lặp nền (ambient theo khu, lớp nhạc pha cuối của Lord/Many-Faced): dựng lười lần đầu cần, nhớ lại. Mọi lớp có bao thư về 0 ở hai đầu nên khớp vòng không bị "click".
+static func loop_stream(name: String) -> AudioStreamWAV:
+	if not LOOPS.has(name):
+		return null
+	if not _loops.has(name):
+		_loops[name] = _mix(float(LOOPS[name]["total"]), LOOPS[name]["layers"], true)
+	return _loops[name]
 
 ## Mỗi lớp: freq, slide (Hz trượt hết lớp), vol, dur, wave (sine|square|saw|noise), delay, decay, lp (noise 0..1), swell.
 const DEFS: Dictionary = {
@@ -78,10 +87,26 @@ const DEFS: Dictionary = {
 	"ember": {"total": 0.1, "layers": [{"wave": "noise", "lp": 0.6, "vol": 0.14, "dur": 0.08}]},
 	"bubble": {"total": 0.2, "layers": [{"wave": "sine", "freq": 300.0, "slide": 500.0, "vol": 0.18, "dur": 0.15}, {"wave": "noise", "lp": 0.7, "vol": 0.06, "dur": 0.1}]},
 	"pop": {"total": 0.12, "layers": [{"wave": "sine", "freq": 900.0, "slide": -500.0, "vol": 0.2, "dur": 0.06}, {"wave": "noise", "lp": 0.8, "vol": 0.14, "dur": 0.05}]},
+	# bước chân theo mặt sàn (world chọn theo khu / bục gỗ)
+	"step_stone": {"total": 0.08, "layers": [{"wave": "noise", "lp": 0.3, "vol": 0.16, "dur": 0.06}, {"wave": "sine", "freq": 140.0, "slide": -60.0, "vol": 0.1, "dur": 0.06}]},
+	"step_dirt": {"total": 0.09, "layers": [{"wave": "noise", "lp": 0.12, "vol": 0.2, "dur": 0.08}]},
+	"step_metal": {"total": 0.12, "layers": [{"wave": "noise", "lp": 0.7, "vol": 0.08, "dur": 0.04}, {"wave": "sine", "freq": 900.0, "vol": 0.07, "dur": 0.1, "decay": 1.6}]},
+	"step_wet": {"total": 0.1, "layers": [{"wave": "noise", "lp": 0.5, "vol": 0.14, "dur": 0.08}, {"wave": "sine", "freq": 500.0, "slide": 300.0, "vol": 0.06, "dur": 0.06}]},
+	"step_wood": {"total": 0.08, "layers": [{"wave": "square", "freq": 110.0, "slide": -40.0, "vol": 0.1, "dur": 0.06}, {"wave": "noise", "lp": 0.2, "vol": 0.1, "dur": 0.05}]},
 	"boss_die": {"total": 1.3, "layers": [{"wave": "noise", "lp": 0.1, "vol": 0.5, "dur": 1.2}, {"wave": "sine", "freq": 150.0, "slide": -140.0, "vol": 0.4, "dur": 1.0}]},
 }
 
-func _mix(total: float, layers: Array) -> AudioStreamWAV:
+## Vòng lặp dài (xem loop_stream). amb_* = không khí từng khu; final_* = lớp nhạc pha cuối chồng lên bài boss.
+const LOOPS: Dictionary = {
+	"amb_gate": {"total": 6.0, "layers": [{"wave": "noise", "lp": 0.05, "vol": 0.12, "dur": 6.0, "swell": 0.5}, {"wave": "sine", "freq": 70.0, "vol": 0.05, "dur": 6.0, "swell": 0.5}]},
+	"amb_catacomb": {"total": 6.0, "layers": [{"wave": "noise", "lp": 0.03, "vol": 0.1, "dur": 6.0, "swell": 0.4}, {"wave": "sine", "freq": 45.0, "slide": -15.0, "vol": 0.06, "dur": 6.0, "swell": 0.5}, {"wave": "sine", "freq": 1400.0, "slide": -600.0, "vol": 0.05, "dur": 0.05, "delay": 2.2}, {"wave": "sine", "freq": 1400.0, "slide": -600.0, "vol": 0.04, "dur": 0.05, "delay": 4.1}]},
+	"amb_vault": {"total": 6.0, "layers": [{"wave": "noise", "lp": 0.3, "vol": 0.06, "dur": 6.0, "swell": 0.5}, {"wave": "saw", "freq": 60.0, "vol": 0.04, "dur": 6.0, "swell": 0.5}, {"wave": "noise", "lp": 0.9, "vol": 0.08, "dur": 0.03, "delay": 1.0}, {"wave": "noise", "lp": 0.9, "vol": 0.08, "dur": 0.03, "delay": 2.7}, {"wave": "noise", "lp": 0.9, "vol": 0.08, "dur": 0.03, "delay": 4.4}]},
+	"amb_archive": {"total": 6.0, "layers": [{"wave": "sine", "freq": 200.0, "slide": 60.0, "vol": 0.03, "dur": 6.0, "swell": 0.5}, {"wave": "noise", "lp": 0.15, "vol": 0.08, "dur": 6.0, "swell": 0.5}, {"wave": "sine", "freq": 400.0, "slide": 200.0, "vol": 0.05, "dur": 0.1, "delay": 1.3}, {"wave": "sine", "freq": 400.0, "slide": 200.0, "vol": 0.05, "dur": 0.1, "delay": 3.8}]},
+	"final_lord": {"total": 2.0, "layers": [{"wave": "sine", "freq": 55.0, "slide": -20.0, "vol": 0.3, "dur": 0.25, "decay": 2.0}, {"wave": "sine", "freq": 55.0, "slide": -20.0, "vol": 0.3, "dur": 0.25, "decay": 2.0, "delay": 0.5}, {"wave": "sine", "freq": 55.0, "slide": -20.0, "vol": 0.3, "dur": 0.25, "decay": 2.0, "delay": 1.0}, {"wave": "sine", "freq": 55.0, "slide": -20.0, "vol": 0.3, "dur": 0.25, "decay": 2.0, "delay": 1.5}, {"wave": "saw", "freq": 110.0, "vol": 0.06, "dur": 2.0, "swell": 0.5}]},
+	"final_many": {"total": 3.0, "layers": [{"wave": "sine", "freq": 220.0, "vol": 0.07, "dur": 3.0, "swell": 0.5}, {"wave": "sine", "freq": 311.0, "vol": 0.07, "dur": 3.0, "swell": 0.5}, {"wave": "noise", "lp": 0.2, "vol": 0.06, "dur": 3.0, "swell": 0.5}, {"wave": "sine", "freq": 880.0, "slide": 440.0, "vol": 0.05, "dur": 1.0, "delay": 1.5, "swell": 0.5}]},
+}
+
+static func _mix(total: float, layers: Array, looped: bool = false) -> AudioStreamWAV:
 	var n: int = int(float(RATE) * total)
 	var buf := PackedFloat32Array()
 	buf.resize(n)
@@ -119,4 +144,8 @@ func _mix(total: float, layers: Array) -> AudioStreamWAV:
 	w.format = AudioStreamWAV.FORMAT_16_BITS
 	w.mix_rate = RATE
 	w.data = data
+	if looped:
+		w.loop_mode = AudioStreamWAV.LOOP_FORWARD
+		w.loop_begin = 0
+		w.loop_end = n
 	return w

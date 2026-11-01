@@ -7,6 +7,7 @@ signal engaged
 signal defeated
 signal shake(strength: float)
 signal sfx(name: String)
+signal phase_changed(phase: int)   # world nối vào Music (lớp nhạc pha 3)
 signal darkness(on: bool)   # Wraith tối phòng; world nối vào Atmosphere
 signal tinted(c: Color)     # Many-Faced pha 3 nhuộm màu phòng (tím); Color.WHITE = bỏ nhuộm
 
@@ -609,6 +610,7 @@ func take_hit(dmg: int, _from: Vector2) -> bool:   # luôn true (không có khi�
 		want = 2
 	if want > phase:
 		phase = want
+		phase_changed.emit(phase)
 		state = "intro"
 		_t = 0.7
 		shake.emit(3.0)
