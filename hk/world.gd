@@ -145,6 +145,11 @@ func _on_player_fx(kind: String, pos: Vector2, power: float) -> void:
 			FX.puff(_content, pos, 2 + int(power * 2.0), dust, 50.0)
 		"dash":
 			FX.puff(_content, pos, 4, Color(0.75, 0.85, 1.0, 0.7), 90.0)
+		"hit":
+			var away: Vector2 = (pos - player.global_position).normalized()
+			FX.spark(_content, pos, away if away != Vector2.ZERO else Vector2.UP, Color(1, 0.9, 0.6))
+			if power >= 1.0:
+				FX.ring(_content, pos, Color(1, 0.95, 0.8, 0.9), 36.0, 0.2)
 
 ## Mặt sàn dưới chân: bục một chiều = gỗ, còn lại theo khu. Tần suất bước do player quyết định (0.18s).
 func _surface() -> String:

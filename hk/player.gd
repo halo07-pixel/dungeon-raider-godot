@@ -7,7 +7,7 @@ signal soul_changed(soul: int)
 signal died
 signal hazard_hit
 signal sfx(name: String)   # báo lên world để phát âm thanh
-signal fx(kind: String, pos: Vector2, power: float)   # báo lên world để dựng bụi: run | land | wall | dash (power 0..1)
+signal fx(kind: String, pos: Vector2, power: float)   # báo lên world để dựng bụi/tia lửa: run | land | wall | dash | hit (power 0..1)
 
 const STATE = preload("res://hk/state.gd")
 const PROJECTILE = preload("res://hk/projectile.gd")
@@ -69,6 +69,8 @@ var _step_t: float = 0.0   # đếm lùi tới lần bụi chân kế tiếp
 var _focus_t: float = 0.0
 var _hit_set: Array = []
 var _dead: bool = false
+const HITSTOP_HIT: float = 0.05   # cũ 0.05 (một mức)
+const HITSTOP_BIG: float = 0.09   # mới: hạ gục / trúng boss
 var _hitstop_n: int = 0
 var _air_t: float = 0.0
 var _trail: Array = []   # bóng mờ khi dash: {p, t, f}
@@ -296,7 +298,7 @@ func _tick_attack(delta: float) -> void:
 		if c.take_hit(STATE.nail_damage(), global_position) == false:
 			_on_blocked()
 		else:
-			_on_nail_hit()
+			_on_nail_hit(c)
 
 ## Tường đặc nằm giữa người chơi và mục tiêu thì nhát chém không tới; bục một chiều chỉ chắn khi mục tiêu ở bên dưới
 ## (hết chém xuyên sàn từ bục lơ lửng, nhưng chém từ dưới lên qua bục vẫn được, đúng nghĩa "một chiều").
@@ -317,8 +319,11 @@ func _on_blocked() -> void:   # khiên chặn: bật lùi như chém trúng như
 		_stun = 0.08
 	_attack_t = 0.0
 
-func _on_nail_hit() -> void:
-	sfx.emit("hit")
+## Đòn "nặng" (hạ gục hoặc trúng boss) dừng hình lâu hơn, rung mạnh hơn, âm trầm hơn. Chỉ là phản hồi: không đổi sát thương/tốc độ.
+func _on_nail_hit(target: Node2D) -> void:
+	var big: bool = target.is_in_group("hk_boss") or int(target.get("hp")) <= 0
+	sfx.emit("hit_heavy" if big else "hit")
+	fx.emit("hit", target.global_position, 1.0 if big else 0.4)
 	if attack_dir.y > 0.0:
 		velocity.y = POGO_V * STATE.pogo_mult() # pogo: chém xuống trúng thì nảy lên và hồi dash
 		can_dash = true
@@ -328,8 +333,8 @@ func _on_nail_hit() -> void:
 		_stun = 0.08
 	STATE.soul = mini(STATE.SOUL_MAX, STATE.soul + STATE.soul_per_hit())
 	soul_changed.emit(soul)
-	hit_landed.emit(1.0)
-	_hitstop(0.05)
+	hit_landed.emit(1.8 if big else 1.0)
+	_hitstop(HITSTOP_BIG if big else HITSTOP_HIT)
 
 func _cloaked() -> bool:   # bùa Shade Cloak: bất khả xâm phạm trong lúc dash
 	return _dash_t > 0.0 and STATE.has_charm("shade_cloak")
