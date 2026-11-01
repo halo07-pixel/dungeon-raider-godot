@@ -36,8 +36,12 @@ func _on_body(b: Node) -> void:
 		if slows:
 			b.slow_t = 2.0
 			popped.emit()
-		else:
-			b.take_damage(global_position.x)
+		elif b.take_damage(global_position.x) == true:   # bị đỡ: phản đạn lại thành đạn của người chơi (sát thương mặc định 1)
+			friendly = true
+			vel = -vel
+			life = maxf(life, 1.5)
+			set_deferred("collision_mask", 1 | 4)
+			return
 		queue_free()
 	elif b is StaticBody2D and not b.has_meta("oneway"):   # bục một chiều không chặn đạn
 		queue_free()

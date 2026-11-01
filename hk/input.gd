@@ -10,6 +10,7 @@ const KEYS: Dictionary = {
 	"hk_dash": [KEY_C, KEY_K],
 	"hk_focus": [KEY_V, KEY_L],
 	"hk_spell": [KEY_F, KEY_I],
+	"hk_parry": [KEY_Q, KEY_U],
 	"hk_map": [KEY_M],
 	"hk_charms": [KEY_TAB, KEY_E],
 	"hk_memories": [KEY_N],

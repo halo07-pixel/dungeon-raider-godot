@@ -34,6 +34,7 @@ const SKILL: Dictionary = {
 	"lord": "wind_heat", "sovereign": "wind_heat", "colossus": "wind_tide",
 }
 const GRAVITY: float = 2400.0
+const STAGGER_CD: float = 6.0   # mỗi boss chỉ choáng được một lần mỗi chừng này giây (đỡ đòn không thành vòng lặp)
 const PERCH_WAIT: float = 1.0   # giây người chơi đứng cao hơn boss trước khi boss nhảy lên
 
 const DATA: Dictionary = {
@@ -71,6 +72,7 @@ var _flash: float = 0.0
 var _time: float = 0.0
 var _combo: int = 0
 var _size: Vector2
+var _stagger_cd: float = 0.0
 var _markers: Array = []       # {x, t}: cảnh báo trước khi rơi đá / bổ nhào
 var _rain_t: float = 0.0
 var _dive_x: float = 0.0
@@ -125,6 +127,7 @@ func _physics_process(delta: float) -> void:
 			darkness.emit(false)
 	_time += delta
 	_flash = maxf(0.0, _flash - delta)
+	_stagger_cd = maxf(0.0, _stagger_cd - delta)
 	_t -= delta
 	var p := _player()
 	if p == null:
@@ -155,6 +158,14 @@ func _physics_process(delta: float) -> void:
 			move_and_slide()
 		if _t <= 0.0:
 			_set_form(_pick_form())
+			_next()
+	elif state == "stagger":   # bị đỡ đòn: đứng choáng, hết giờ thì chọn đòn mới
+		velocity = Vector2(0, minf(velocity.y + GRAVITY * delta, 900.0)) if not (form in FLYERS) else Vector2.ZERO
+		if not (form in FLYERS):
+			move_and_slide()
+		if int(_time * 20.0) % 2 == 0:
+			_flash = 0.05
+		if _t <= 0.0:
 			_next()
 	elif form in FLYERS:
 		_wraith(delta, p)
@@ -591,12 +602,23 @@ func _attack_rect() -> Rect2:
 	return Rect2()
 
 func _touch_damage(p: Node2D) -> void:
-	if state == "dormant" or state == "intro" or state == "wind_shift" or _alpha < 0.9:
+	if state == "dormant" or state == "intro" or state == "wind_shift" or state == "stagger" or _alpha < 0.9:
 		return
 	var pr := Rect2(p.global_position - p.BODY * 0.5, p.BODY)
 	var body := Rect2(global_position - _size * 0.5, _size)
 	if pr.intersects(body) or (state == "lunge" and pr.intersects(_attack_rect())):
 		p.take_damage(global_position.x)
+
+## Người chơi đỡ trúng đòn của boss: choáng `sec` giây, tối đa một lần mỗi STAGGER_CD; không áp dụng lúc ngủ/giới thiệu/đổi dạng.
+func stagger(sec: float) -> void:
+	if hp <= 0 or _stagger_cd > 0.0 or state in ["dormant", "intro", "wind_shift", "stagger"]:
+		return
+	_stagger_cd = STAGGER_CD
+	state = "stagger"
+	_t = sec
+	_alpha = 1.0
+	_markers.clear()
+	velocity = Vector2.ZERO
 
 func take_hit(dmg: int, _from: Vector2) -> bool:   # luôn true (không có khiên); thống nhất chữ ký với enemy.take_hit
 	if hp <= 0 or state == "dormant" or state == "intro" or state == "wind_shift":

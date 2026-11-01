@@ -278,6 +278,7 @@ func _draw_pause(v: Control, font: Font, sz: Vector2) -> void:
 		"   hit enemies below you to bounce",
 		"Dash: C or K (needs Shadow Dash)",
 		"Focus (hold, heal): V or L",
+		"Parry (time it as a hit lands): Q or U",
 		"Soul Bolt: F or I",
 		"Interact: Up arrow / W (benches, altars, shop)",
 		"Map: M (arrows pan, P pin)",

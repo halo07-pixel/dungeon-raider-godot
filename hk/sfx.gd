@@ -64,6 +64,7 @@ const DEFS: Dictionary = {
 	"slash": {"total": 0.12, "layers": [{"wave": "noise", "lp": 0.6, "vol": 0.3, "dur": 0.1}, {"wave": "sine", "freq": 500.0, "slide": -350.0, "vol": 0.12, "dur": 0.08}]},
 	"hit": {"total": 0.1, "layers": [{"wave": "noise", "lp": 0.9, "vol": 0.4, "dur": 0.06}, {"wave": "square", "freq": 180.0, "slide": -100.0, "vol": 0.2, "dur": 0.08}]},
 	"hit_heavy": {"total": 0.16, "layers": [{"wave": "noise", "lp": 0.7, "vol": 0.45, "dur": 0.08}, {"wave": "square", "freq": 120.0, "slide": -70.0, "vol": 0.25, "dur": 0.12}, {"wave": "sine", "freq": 70.0, "slide": -30.0, "vol": 0.35, "dur": 0.14}]},
+	"parry": {"total": 0.25, "layers": [{"wave": "square", "freq": 1500.0, "vol": 0.18, "dur": 0.05}, {"wave": "sine", "freq": 2250.0, "vol": 0.2, "dur": 0.22, "decay": 1.6}, {"wave": "sine", "freq": 90.0, "slide": -30.0, "vol": 0.3, "dur": 0.12}]},
 	"enemy_die": {"total": 0.3, "layers": [{"wave": "noise", "lp": 0.35, "vol": 0.35, "dur": 0.25}, {"wave": "sine", "freq": 200.0, "slide": -150.0, "vol": 0.25, "dur": 0.25}]},
 	"hurt": {"total": 0.3, "layers": [{"wave": "square", "freq": 140.0, "slide": -90.0, "vol": 0.3, "dur": 0.25}, {"wave": "noise", "lp": 0.4, "vol": 0.25, "dur": 0.2}]},
 	"die": {"total": 0.9, "layers": [{"wave": "sine", "freq": 220.0, "slide": -200.0, "vol": 0.3, "dur": 0.8}, {"wave": "noise", "lp": 0.1, "vol": 0.3, "dur": 0.6}]},
