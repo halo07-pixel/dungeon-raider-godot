@@ -21,6 +21,12 @@ func _init() -> void:
 	ck(St.shade.get("room") == "gate_2" and int(St.shade["geo"]) == 0 and float(St.shade["y"]) == 20.5, "shade hợp lệ được nhận, geo >= 0")
 	St.from_dict({"flags": "bad", "shade": 5})
 	ck(St.flags.is_empty() and St.shade.is_empty(), "flags/shade không phải Dictionary -> rỗng")
+	# sai kiểu ở số/mảng/chuỗi: không lỗi script, dùng mặc định (trước đây int([]) / for null làm from_dict dừng giữa chừng)
+	for bad in [{"hp_bonus": []}, {"geo": {}}, {"notch_bonus": [1]}, {"abilities": null}, {"visited": 5}, {"charms_owned": null}, {"bench_room": []}, {"music_vol": "7", "time": "x"}]:
+		St.from_dict(bad)
+		ck(St.hp == St.max_hp() and St.geo == 0 and St.bench_room == St.START_ROOM, "save sai kiểu %s -> mặc định" % str(bad))
+	St.from_dict({"abilities": ["dash", 5, ["x"], "khong_co"], "visited": ["gate_1", 7, null], "charms_owned": ["fury", {}], "geo": 12.0})
+	ck(St.abilities == ["dash"] and St.visited == ["gate_1"] and St.charms_owned == ["fury"] and St.geo == 12, "phần tử sai kiểu bị bỏ, phần tử đúng giữ (%s %s %s)" % [str(St.abilities), str(St.visited), str(St.charms_owned)])
 	var f := FileAccess.open(St.save_path + ".tmp", FileAccess.WRITE)
 	f.store_string("x")
 	f.close()

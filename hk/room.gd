@@ -249,15 +249,6 @@ func _visible(it: Dictionary) -> bool:
 			return not STATE.flag("cache_" + String(d["key"]))
 	return true
 
-func near_prompt() -> bool:
-	if _player == null:
-		return false
-	var pr := Rect2(_player.global_position - _player.BODY * 0.5, _player.BODY)
-	for it in interactables:
-		if pr.intersects(it["rect"]) and _visible(it):
-			return true
-	return false
-
 func _draw() -> void:
 	var b: Rect2 = bounds()
 	# cột nền mờ cho có chiều sâu
