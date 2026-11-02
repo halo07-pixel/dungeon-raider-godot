@@ -64,6 +64,10 @@ class R:
     def enemy(self, ch, x, y=None):
         self.put(x, (self.F - 1) if y is None else y, ch)
 
+    def spore(self, x, y, w, h):
+        """Đám bào tử cố định (bật/tắt theo nhịp): ô góc trên trái (x, y), rộng w cao h ô. Chỉ vùng gây hại, không đặc."""
+        self.extra.append("spore: %d %d %d %d" % (x, y, w, h))
+
     def save(self):
         lines = ["area: " + self.area, "name: " + self.name, "map: %d,%d" % self.mp]
         for ch, (to, td, needs) in sorted(self.doors.items()):
@@ -334,6 +338,7 @@ for x in (9, 28):
 r.enemy("h", 32)
 r.ground_door("1", "L", "arc_2", "2")
 r.ground_door("2", "R", "arc_4", "1")
+r.door("3", "B", 34, "grove_1", "1")   # lối xuống Toxic Grove
 
 r = new("arc_4", 40, 22, 18, "archive", "Pearl Walk", (72, 21))
 r.pit(8, 12); r.pit(20, 31)
@@ -385,6 +390,46 @@ def add_secrets():
             break
 
 
+# ====================================================== TOXIC GROVE (khu 5, nhánh phụ từ Sunken Library)
+r = new("grove_1", 30, 30, 26, "grove", "Hollow Roots", (66, 25))
+r.door("1", "T", 14, "arc_3", "3")
+r.ground_door("2", "R", "grove_2", "1")
+for x0, x1, y in [(8, 12, 23), (17, 21, 20), (8, 12, 17), (17, 21, 14), (8, 12, 11), (17, 21, 8), (8, 12, 5), (17, 21, 3)]:
+    r.plat(x0, x1, y)
+r.enemy("m", 14); r.enemy("t", 26); r.put(19, 2, "t")
+r.spore(15, 24, 6, 2)
+
+r = new("grove_2", 40, 22, 18, "grove", "Spore Walk", (70, 25))
+r.plat(10, 18, 14); r.plat(24, 31, 14)
+r.enemy("m", 21); r.enemy("t", 35); r.put(14, 13, "t")
+r.spore(11, 16, 5, 2); r.spore(26, 16, 5, 2)
+r.ground_door("1", "L", "grove_1", "2")
+r.ground_door("2", "R", "grove_3", "1")
+
+r = new("grove_3", 40, 22, 18, "grove", "Lantern Clearing", (76, 25))
+r.put(6, 17, "B"); r.put(14, 17, "M")
+r.plat(20, 24, 15)
+r.enemy("m", 33)
+r.spore(26, 16, 4, 2)
+r.ground_door("1", "L", "grove_2", "2")
+r.ground_door("2", "R", "grove_4", "1")
+
+r = new("grove_4", 40, 22, 18, "grove", "Rotting Hollow", (82, 25))
+r.plat(14, 18, 14); r.plat(26, 30, 14)
+r.enemy("t", 10); r.enemy("m", 23); r.put(28, 13, "t")
+r.spore(7, 16, 4, 2); r.spore(19, 16, 5, 2)
+r.put(37, 17, "B")
+r.ground_door("1", "L", "grove_3", "2")
+r.ground_door("2", "R", "grove_5", "1")
+
+r = new("grove_5", 48, 24, 20, "grove", "Heart of the Grove", (88, 25))
+r.put(6, 19, "C"); r.put(32, 19, "X")
+r.plat(12, 16, 17); r.plat(37, 41, 17)
+for x in (20, 28):
+    r.block(x, 1, x + 1, 3)
+r.ground_door("1", "L", "grove_4", "2")
+r.extra += ["charm: id=spore_ward needs=boss_grove", "boss: id=grove"]
+
 def add_torches():
     """Lò lửa: cạnh mỗi bench (3 ô bên phải, nếu trống) và hai bên phòng boss. Chỉ trang trí."""
     for r in rooms:
@@ -414,6 +459,7 @@ DECO_THEME = {  # (đứng sàn, treo tường) theo khu
     "catacomb": (["skull", "crate", "skull"], ["goo", "hole", "banner_red"]),
     "vault": (["fountain_red", "column", "fountain_red"], ["banner_yellow", "banner_yellow", "hole"]),
     "archive": (["fountain_blue", "tome", "tome"], ["banner_green", "banner_blue", "banner_green"]),
+    "grove": (["column", "crate", "skull"], ["goo", "hole", "banner_green"]),
 }
 DECO_BARE = 0.25   # xác suất một phòng thường không có trang trí
 

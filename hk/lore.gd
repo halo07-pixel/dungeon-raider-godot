@@ -25,9 +25,13 @@ const DEATH: Dictionary = {
 	"catacomb": "The dead make room for you.",
 	"vault": "Ash settles where you fell.",
 	"archive": "A page turns. Your name is still missing.",
+	"grove": "The roots keep what falls.",
 }
 ## Boss bí mật (không phải ký ức): câu vào trận / câu khi hạ.
-const SECRET: Dictionary = {"many_faced": {"intro": "I wear every face you buried.", "memory": "Then close the gate, Gatekeeper. This time, stay."}}
+const SECRET: Dictionary = {
+	"many_faced": {"intro": "I wear every face you buried.", "memory": "Then close the gate, Gatekeeper. This time, stay."},
+	"grove": {"intro": "Rest. The rot is patient.", "memory": "Something was planted here to forget. It grew anyway."},   # bonus của Toxic Grove: không tính vào 6 ký ức
+}
 const INTRO_GATEKEEPER: String = "You remember it all. Then hold the gate."   # câu vào trận của Lord khi đã có 5 ký ức kia
 const ENDING_NORMAL: Array = ["The Dungeon Lord has fallen", "The vaults fall silent. Thank you for playing."]
 const ENDING_TRUE: Array = ["The gate is closed", "Every face you buried is at rest. So are you.", "Thank you for playing."]

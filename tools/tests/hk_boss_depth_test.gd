@@ -60,7 +60,10 @@ func _init() -> void:
 		await frames(75)
 		var n: int = waves()
 		ck(n == (4 if ph == 1 else 6), "colossus pha %d: quake tạo %d sóng (%d)" % [ph, 4 if ph == 1 else 6, n])
-		await frames(60)
+		for _k in 12:   # độ dài quake phụ thuộc nhịp khung: chờ tối đa thêm 3s thay vì cố định 1s
+			if b.state != "quake" and b.state != "wind_quake":
+				break
+			await frames(15)
 		ck(b.state != "quake" and b.state != "wind_quake", "colossus pha %d: quake kết thúc (%s)" % [ph, b.state])
 		b.free()
 		waves()

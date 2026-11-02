@@ -30,6 +30,7 @@ const CHARMS: Dictionary = {
 	"steady_breath": {"name": "Steady Breath", "cost": 2, "desc": "Being hit no longer breaks your Focus. (Hollow Wraith)"},
 	"last_light": {"name": "Last Light", "cost": 2, "desc": "A fatal hit leaves you at 1 mask. Once per rest at a bench. (Dungeon Lord)"},
 	"many_faces": {"name": "Many Faces", "cost": 1, "desc": "Nail hits give +2 Soul, and you wear a different face. (The Many-Faced)"},
+	"spore_ward": {"name": "Spore Ward", "cost": 1, "desc": "Spores cannot hurt you while you dash, or for a moment after. (Rotted Warden)"},
 	"spring_nail": {"name": "Spring Nail", "cost": 1, "desc": "Bouncing off enemies with a downward nail launches you 25% higher."},
 }
 

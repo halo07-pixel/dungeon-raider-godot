@@ -2,8 +2,8 @@ extends Node
 ## Phát nhạc nền từ assets/music (nhạc CC0 của game cũ). `play` cùng bài đang phát thì bỏ qua; đổi bài có fade-in ngắn.
 const STATE = preload("res://hk/state.gd")
 const DIR: String = "res://assets/music/"
-const AREA_TRACK: Dictionary = {"gate": "explore_stone", "catacomb": "explore_hell", "vault": "explore_ice", "archive": "explore_ice"}
-const BOSS_TRACK: Dictionary = {"warden": "boss_warden", "wraith": "boss_necromancer", "lord": "lord_fight", "brute": "boss_warden", "hexer": "boss_necromancer", "colossus": "boss_warden", "many_faced": "lord_fight"}
+const AREA_TRACK: Dictionary = {"gate": "explore_stone", "catacomb": "explore_hell", "vault": "explore_ice", "archive": "explore_ice", "grove": "explore_hell"}
+const BOSS_TRACK: Dictionary = {"warden": "boss_warden", "wraith": "boss_necromancer", "lord": "lord_fight", "brute": "boss_warden", "hexer": "boss_necromancer", "colossus": "boss_warden", "grove": "boss_warden", "many_faced": "lord_fight"}
 const SFX = preload("res://hk/sfx.gd")
 const VOLUME_DB: float = -9.0
 const AMBIENT_DB: float = -12.0   # ambient + lớp pha cuối so với nhạc: ambient nhỏ hơn hẳn, lớp pha cuối chỉ nhỉnh lên

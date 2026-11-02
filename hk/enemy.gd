@@ -24,6 +24,8 @@ const LOOK: Dictionary = {   # sprite + hệ số phóng; đáy sprite khớp đ
 	"reviver": {"anim": "frost_zombie_anim", "scale": 1.8},
 	"cinder": {"anim": "chort_anim", "scale": 2.0, "tint": Color(1.5, 0.7, 0.45)},
 	"bubbler": {"anim": "orc_shaman_anim", "scale": 2.0, "tint": Color(0.6, 0.9, 1.4)},
+	"sporeling": {"anim": "slug_anim", "scale": 2.0, "tint": Color(0.6, 1.3, 0.5)},
+	"thornshooter": {"anim": "chort_anim", "scale": 2.0, "tint": Color(0.6, 1.2, 0.5)},
 }
 const DATA: Dictionary = {
 	"crawler": {"hp": 12, "geo": 2, "color": Color(0.75, 0.35, 0.3)},
@@ -36,9 +38,12 @@ const DATA: Dictionary = {
 	"reviver": {"hp": 10, "geo": 3, "color": Color(0.7, 0.85, 0.9)},
 	"cinder": {"hp": 20, "geo": 5, "color": Color(0.95, 0.45, 0.2)},
 	"bubbler": {"hp": 12, "geo": 3, "color": Color(0.5, 0.8, 1.0)},
+	"sporeling": {"hp": 14, "geo": 4, "color": Color(0.55, 0.85, 0.3)},
+	"thornshooter": {"hp": 16, "geo": 5, "color": Color(0.5, 0.75, 0.3)},
 }
 const TELL: Dictionary = {"sentry": "tell_bell", "cinder": "tell_ember"}   # âm báo trước riêng; quái khác dùng "tell"
 const WINDUP_TINT: Dictionary = {"sentry": Color(0.8, 1.4, 1.9), "cinder": Color(2.0, 0.85, 0.3)}   # nhấp nháy lúc windup (mặc định đỏ nhạt)
+const SPORE_BURST: float = 2.5   # sporeling chết: đám bào tử nổ tại chỗ (0.5s mây mờ báo hiệu rồi 2s gây hại)
 const REVIVE_AFTER: float = 2.0   # reviver nằm bao lâu rồi đứng dậy
 const FIRE_TRAIL: float = 2.0     # cinder: vệt lửa tồn tại bao lâu
 
@@ -113,8 +118,9 @@ func _physics_process(delta: float) -> void:
 		return
 	match kind:
 		"crawler": _crawler(delta)
+		"sporeling": _patrol(45.0, delta)
 		"flyer": _flyer(delta)
-		"spitter", "bubbler": _spitter(delta)
+		"spitter", "bubbler", "thornshooter": _spitter(delta)
 		"charger", "cinder": _charger(delta)
 		"guard": _guard(delta)
 		"sentry": _sentry(delta)
@@ -370,6 +376,20 @@ func _spitter(delta: float) -> void:
 					s.vel = (p.global_position - global_position).normalized() * 150.0
 					s.color = Color(0.5, 0.8, 1.0, 0.7)
 					s.popped.connect(_on_pop)
+				elif kind == "thornshooter":   # ba gai tỏa quạt (±18°), đỡ được và phản lại được
+					var base: Vector2 = (p.global_position - global_position).normalized()
+					for k in [-1.0, 1.0]:
+						var s2 := PROJECTILE.new()
+						s2.set_script(PROJECTILE)
+						s2.friendly = false
+						s2.radius = 7.0
+						s2.vel = base.rotated(deg_to_rad(18.0) * float(k)) * 300.0
+						s2.color = Color(0.45, 0.7, 0.25)
+						get_parent().add_child.call_deferred(s2)
+						s2.position = position + Vector2(0, -8)
+					s.radius = 7.0
+					s.vel = base * 300.0
+					s.color = Color(0.45, 0.7, 0.25)
 				else:
 					s.vel = (p.global_position - global_position).normalized() * 280.0
 					s.color = Color(0.6, 0.9, 0.3)
@@ -415,7 +435,7 @@ func take_hit(dmg: int, from_pos: Vector2) -> bool:
 		velocity = Vector2(away * 260.0, -60.0)
 	elif kind == "guard":
 		velocity.x = away * 120.0
-	elif kind != "spitter" and kind != "dropper" and kind != "sentry" and kind != "bubbler":
+	elif kind != "spitter" and kind != "dropper" and kind != "sentry" and kind != "bubbler" and kind != "thornshooter":
 		velocity.x = away * 260.0
 	if (kind == "charger" or kind == "guard" or kind == "cinder") and state == "windup":
 		state = "idle"
@@ -426,6 +446,16 @@ func take_hit(dmg: int, from_pos: Vector2) -> bool:
 	return true
 
 func _die() -> void:
+	if kind == "sporeling":   # đám bào tử nổ ra tại chỗ (zone.gd kind spore, một lần, không theo nhịp)
+		var z := Node2D.new()
+		z.set_script(ZONE)
+		z.kind = "spore"
+		z.rect = Rect2(global_position.x - 48.0, global_position.y + _size.y * 0.5 - 56.0, 96.0, 56.0)
+		z.life = SPORE_BURST
+		z.period = SPORE_BURST + 1.0   # chỉ một nhịp: mờ 0.5s đầu rồi gây hại tới hết life
+		z.on_from = 0.5
+		z.fx_parent = get_parent()
+		get_parent().add_child.call_deferred(z)
 	if minion:   # quái do sentry gọi: không Geo
 		FX.death(get_parent(), global_position, DATA[kind]["color"])
 		sfx.emit("enemy_die")

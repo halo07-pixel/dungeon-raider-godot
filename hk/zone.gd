@@ -2,7 +2,7 @@ extends Node2D
 ## Vùng nguy hiểm/vật thể tạm do đòn riêng của boss tạo ra (con của boss, top_level => toạ độ thế giới; boss chết thì biến mất).
 ## Gây hại theo hình chữ nhật mỗi khung vật lý (không dùng Area2D nên không dính lỗi "flushing queries").
 ## kind: spikes (gai nền nứt) | firewave (sóng lửa chạy từ lò) | heat (bục nóng) | water (nước dâng, làm chậm) | pillar (cột rơi rồi thành vật cản)
-## | flame (vệt lửa nằm yên trên sàn do quái cinder để lại; con của room, không phải của boss).
+## | spore (đám bào tử: cố định theo nhịp period/on_from, hoặc đám nổ từ sporeling) | vine (dây leo trồi lên sàn, như gai) | flame (vệt lửa nằm yên trên sàn do quái cinder để lại; con của room, không phải của boss).
 ## Trước khi có hiệu lực (`delay`) không vẽ vùng nào: tín hiệu là âm thanh + bụi/tia lửa do boss phát ra.
 const SPRITES = preload("res://hk/sprites.gd")
 const FX = preload("res://hk/fx.gd")
@@ -11,6 +11,8 @@ var rect: Rect2 = Rect2()       # vùng có hiệu lực (toạ độ thế gi�
 var delay: float = 0.0
 var life: float = 3.0           # thời gian có hiệu lực sau delay
 var vel: Vector2 = Vector2.ZERO # firewave
+var period: float = 0.0         # spore: chu kỳ bật/tắt (0 = luôn bật khi có hiệu lực)
+var on_from: float = 0.0        # spore: trong mỗi chu kỳ, từ giây này mới gây hại (trước đó chỉ là mây mờ báo hiệu)
 var floor_y: float = 0.0        # pillar: mặt sàn nơi cột đáp xuống
 var fx_parent: Node             # nơi đặt hạt bụi (boss gán: cha của boss, toạ độ thế giới)
 var _t: float = 0.0
@@ -35,7 +37,10 @@ func current() -> Rect2:
 	return rect
 
 func active() -> bool:
-	return delay <= 0.0 and _t < life
+	return delay <= 0.0 and _t < life and _spore_on()
+
+func _spore_on() -> bool:   # kind khác spore: luôn true
+	return kind != "spore" or period <= 0.0 or fmod(_t, period) >= on_from
 
 func _physics_process(delta: float) -> void:
 	if delay > 0.0:
@@ -76,7 +81,7 @@ func _physics_process(delta: float) -> void:
 				_ripple = 0.3
 				_splash(p, 2)
 			_in_water = true
-		else:
+		elif _spore_on() and not (kind == "spore" and float(p.get("spore_t")) > 0.0):   # Spore Ward: dash miễn nhiễm bào tử
 			p.take_damage(rect.get_center().x, 1, false)   # vùng gây hại: không đỡ được
 	queue_redraw()
 
@@ -101,6 +106,23 @@ func _draw() -> void:
 	var r: Rect2 = current()
 	var flick: float = 0.8 + 0.2 * sin(Time.get_ticks_msec() * 0.03)
 	match kind:
+		"spore":   # mây bào tử: mờ khi chưa gây hại (có chu kỳ), đậm khi đang gây hại
+			var on: bool = _spore_on()
+			var warn: bool = not on and period > 0.0 and fmod(_t, period) >= on_from - 0.4
+			var a: float = 0.5 if on else (0.3 + 0.1 * sin(Time.get_ticks_msec() * 0.03) if warn else 0.14)
+			var n2: int = maxi(3, int(r.size.x / 18.0))
+			for k in n2:
+				var ph: float = Time.get_ticks_msec() * 0.002 + float(k) * 1.7
+				var cx2: float = r.position.x + r.size.x * (float(k) + 0.5) / float(n2)
+				var cy2: float = r.end.y - r.size.y * (0.3 + 0.35 * (0.5 + 0.5 * sin(ph)))
+				draw_circle(Vector2(cx2, cy2), minf(r.size.y * 0.42, 26.0), Color(0.55, 0.9, 0.25, a))
+				draw_circle(Vector2(cx2 + 4.0, cy2 - 3.0), minf(r.size.y * 0.25, 14.0), Color(0.8, 1.0, 0.5, a * 0.8))
+		"vine":   # dây leo trồi lên từ sàn
+			var nv: int = maxi(1, int(r.size.x / 16.0))
+			for k in nv:
+				var x1: float = r.position.x + k * (r.size.x / nv)
+				var w1: float = r.size.x / nv
+				draw_colored_polygon(PackedVector2Array([Vector2(x1, r.end.y), Vector2(x1 + w1 * 0.5 + sin(Time.get_ticks_msec() * 0.02) * 3.0, r.position.y), Vector2(x1 + w1, r.end.y)]), Color(0.35, 0.7, 0.25))
 		"spikes":   # gai xương trồi lên từ nền nứt
 			var n: int = maxi(1, int(r.size.x / 16.0))
 			for k in n:

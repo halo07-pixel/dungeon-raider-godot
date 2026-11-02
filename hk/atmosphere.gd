@@ -7,6 +7,7 @@ const AREAS: Dictionary = {   # ambient không tối hơn ~0.72 mỗi kênh đ�
 	"catacomb": {"ambient": Color(0.96, 0.76, 0.76), "p": Color(1.0, 0.5, 0.3, 0.75), "grav": Vector2(0, -14), "n": 44},
 	"vault": {"ambient": Color(0.74, 0.88, 0.95), "p": Color(0.7, 0.8, 0.85, 0.45), "grav": Vector2(3, 12), "n": 36},
 	"archive": {"ambient": Color(0.84, 0.77, 1.0), "p": Color(0.75, 0.6, 1.0, 0.65), "grav": Vector2(0, -10), "n": 40},
+	"grove": {"ambient": Color(0.80, 0.98, 0.78), "p": Color(0.6, 0.95, 0.4, 0.6), "grav": Vector2(0, -8), "n": 44},
 }
 const TILE: float = 32.0
 var _mod: CanvasModulate

@@ -47,8 +47,9 @@ const AREA_CHARMS: Dictionary = {
 	"gate": ["swift_edge", "soul_siphon", "fortune"],
 	"vault": ["frugal_soul", "spring_nail"],
 	"archive": ["second_wind", "shade_cloak"],
+	"grove": ["fortune", "shade_cloak"],
 }
-const AREA_TIER: Dictionary = {"gate": 1, "vault": 2, "archive": 2}   # mặt nạ/notch tối đa mua được ở khu này
+const AREA_TIER: Dictionary = {"gate": 1, "vault": 2, "archive": 2, "grove": 2}   # mặt nạ/notch tối đa mua được ở khu này
 
 ## Giá (đã hạ so với bản cũ 120+40*cost / mặt nạ 250+200n / notch 300+250n vì quái chỉ rơi vài Geo).
 static func charm_price(cid: String) -> int:
