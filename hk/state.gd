@@ -52,6 +52,7 @@ static var flags: Dictionary = {}       # cờ một lần: boss đã hạ, bàn
 static var visited: Array = []
 static var bench_room: String = START_ROOM
 static var bench_id: String = "start"
+static var benches: Array = []          # phòng có bench đã từng nghỉ (đích đi nhanh)
 static var shade: Dictionary = {}       # {room, x, y, geo}
 static var pins: Array = []             # ghim bản đồ do người chơi đặt: {room, x, y}
 const MAX_PINS: int = 10
@@ -79,6 +80,7 @@ static func reset() -> void:
 	visited = []
 	bench_room = START_ROOM
 	bench_id = "start"
+	benches = []
 	shade = {}
 	pins = []
 	play_time = 0.0
@@ -184,7 +186,7 @@ static func geo_mult() -> float:
 static func to_dict() -> Dictionary:
 	return {"v": 1, "hp_bonus": hp_bonus, "soul": soul, "geo": geo, "abilities": abilities, "charms_owned": charms_owned,
 		"charms_equipped": charms_equipped, "notch_bonus": notch_bonus, "flags": flags, "visited": visited,
-		"bench_room": bench_room, "bench_id": bench_id, "shade": shade, "music_vol": music_vol, "sfx_vol": sfx_vol, "shake_on": shake_on, "zoom_on": zoom_on, "atmosphere_on": atmosphere_on, "pins": pins, "time": play_time}
+		"bench_room": bench_room, "bench_id": bench_id, "benches": benches, "shade": shade, "music_vol": music_vol, "sfx_vol": sfx_vol, "shake_on": shake_on, "zoom_on": zoom_on, "atmosphere_on": atmosphere_on, "pins": pins, "time": play_time}
 
 ## Dữ liệu save có thể hỏng/sửa tay: đọc số, mảng, chuỗi có kiểm tra kiểu thay vì ép kiểu (int([]) làm script lỗi giữa chừng).
 static func _int(v, fallback: int) -> int:
@@ -231,6 +233,9 @@ static func from_dict(d: Dictionary) -> void:
 	bench_room = br if br is String else START_ROOM
 	var bi = d.get("bench_id")
 	bench_id = bi if bi is String else "start"
+	benches = _strings(d.get("benches"))
+	if bench_id == "bench" and not (bench_room in benches):   # save cũ chưa có danh sách: bench đang dùng chắc chắn đã nghỉ
+		benches.append(bench_room)
 	var s = d.get("shade", {})
 	shade = {}
 	if s is Dictionary and s.get("room") is String and (s.get("x") is float or s.get("x") is int) and (s.get("y") is float or s.get("y") is int) and (s.get("geo") is float or s.get("geo") is int):

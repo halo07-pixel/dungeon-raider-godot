@@ -3,7 +3,7 @@ extends RefCounted
 ##   area: gate|catacomb|vault     name: Tên hiển thị     map: x,y (toạ độ trên bản đồ, đơn vị ô bản đồ)
 ##   hint: cột hàng chữ   torch: cột hàng   deco: loại cột hàng   door N: phòng_đích cửa_đích [needs=cờ]   altar: id=... needs=...   charm: id=...   boss: id=...   gate_flag: cờ
 ## Ký tự lưới: # tường  = bục một chiều  ^ gai  1-9 cửa  @ điểm xuất phát  B bench  M thương nhân  $ rương geo
-##   A bàn thờ kỹ năng  C bùa  X boss  G cổng mở khi có cờ  c f s h = quái bò/bay/bắn/húc
+##   A bàn thờ kỹ năng  C bùa  X boss  G cổng mở khi có cờ  % tường nứt (chém một nhát là vỡ)  c f s h = quái bò/bay/bắn/húc
 const DIR: String = "res://hk/rooms"
 const MAP_CELL_TILES: float = 8.0   # 1 ô bản đồ = 8x8 ô lưới
 

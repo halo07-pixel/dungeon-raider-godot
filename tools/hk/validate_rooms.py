@@ -67,7 +67,7 @@ class Room:
         self.bench = None
         for y, row in enumerate(self.cells):
             for x, ch in enumerate(row):
-                self.S[y + 1, x + 1] = ch in "#G"
+                self.S[y + 1, x + 1] = ch in "#G%"   # % tường nứt: đặc cho đường chính (phải vỡ mới vào hốc; xem check_secrets)
                 self.O[y + 1, x + 1] = ch == "="
                 self.H[y + 1, x + 1] = ch == "^"
                 px, py = x * TILE, y * TILE
@@ -493,6 +493,40 @@ def load_rooms():
     return rooms
 
 
+def check_secrets(rooms):
+    """Hốc bí mật: mỗi ô `%` phải có ô trống phía ngoài đứng được (sàn đặc bên dưới) và hốc bên trong phải chứa rương `$`
+    (flood fill qua ô không đặc từ ô trong, giới hạn 20 ô). Đường chính coi `%` là đặc nên hốc không được cần cho tiến trình."""
+    fails = []
+    for rid, room in rooms.items():
+        crack = [(x, y) for y, row in enumerate(room.cells) for x, ch in enumerate(row) if ch == "%"]
+        if not crack:
+            continue
+        if any(ch == "$" for row in room.cells for ch in row) is False:
+            fails.append("%s: có tường nứt nhưng không có rương" % rid)
+            continue
+
+        def ch_at(x, y):
+            return room.cells[y][x] if 0 <= y < room.rows and 0 <= x < room.cols else "#"
+
+        found = False
+        for x, y in crack:
+            for dx in (-1, 1):
+                outer, inner = (x - dx, y), (x + dx, y)
+                if ch_at(*outer) in ".$" and ch_at(outer[0], y + 1) in "#=%" and ch_at(*inner) not in "#G%":
+                    seen, stack = {inner}, [inner]
+                    while stack and len(seen) <= 20:
+                        cx, cy = stack.pop()
+                        for nx, ny in ((cx + 1, cy), (cx - 1, cy), (cx, cy + 1), (cx, cy - 1)):
+                            if (nx, ny) not in seen and ch_at(nx, ny) not in "#G%":
+                                seen.add((nx, ny))
+                                stack.append((nx, ny))
+                    if len(seen) <= 20 and any(ch_at(*c) == "$" for c in seen):
+                        found = True
+        if not found:
+            fails.append("%s: tường nứt không dẫn tới hốc kín có rương (ngoài đứng được, trong ≤20 ô)" % rid)
+    return fails
+
+
 def main():
     quick = "--quick" in sys.argv
     verbose = "--verbose" in sys.argv
@@ -567,6 +601,7 @@ def main():
         F, x0, x1 = g.plats[rid][i]
         print("  %s bục %d (y=%d, x %d..%d)" % (rid, i, F, x0, x1))
         fails.append("bẫy: %s bục %d (y=%d, x %d..%d) vào được nhưng không ra được" % (rid, i, F, x0, x1))
+    fails += check_secrets(rooms)
     print("Thời gian: %.1fs, %d nút tới được" % (time.time() - t0, len(reached)))
     if fails:
         print("\nLỖI (%d):" % len(fails))

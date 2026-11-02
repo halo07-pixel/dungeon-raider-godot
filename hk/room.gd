@@ -4,6 +4,7 @@ extends Node2D
 signal door_entered(door_id: String)
 signal hazard_touched(from_x: float)
 signal interacted(kind: String, data: Dictionary)
+signal secret_opened(pos: Vector2)   # tường nứt vỡ (world: bụi + âm)
 
 const TILE: int = 32
 const STATE = preload("res://hk/state.gd")
@@ -32,6 +33,8 @@ var doors: Dictionary = {}      # char -> Rect2
 var entities: Array = []        # {type, pos}
 const PROMPTS: Dictionary = {"bench": "Rest", "merchant": "Trade", "altar": "Take", "charm": "Take", "cache": "Open"}
 var interactables: Array = []   # {rect, kind, data}
+var cracks: Array = []          # Rect2 các ô tường nứt `%` còn nguyên (mỗi phòng tối đa một bí mật: vỡ một ô là vỡ cả cụm)
+const CRACK = preload("res://hk/crack.gd")
 var locked: bool = false        # khoá cửa khi đánh boss
 var _cells: Array = []
 var _pal: Dictionary
@@ -64,7 +67,13 @@ func bounds() -> Rect2:
 
 func _is_solid(x: int, y: int) -> bool:
 	var ch: String = _cell(x, y)
-	return ch == "#" or ch == "G"
+	return ch == "#" or ch == "G" or (ch == "%" and not _secret_open())
+
+func secret_flag() -> String:
+	return "secret_" + id
+
+func _secret_open() -> bool:
+	return STATE.flag(secret_flag())
 
 func _cell(x: int, y: int) -> String:
 	if x < 0 or y < 0 or x >= cols or y >= rows:
@@ -91,6 +100,7 @@ func _parse() -> void:
 				continue
 			var pos: Vector2 = Vector2(x * TILE + TILE * 0.5, y * TILE + TILE)
 			match ch:
+				"%": if not _secret_open(): cracks.append(Rect2(x * TILE, y * TILE, TILE, TILE))
 				"^": hazards.append(Rect2(x * TILE + 4, y * TILE + 14, TILE - 8, TILE - 14))
 				"c", "f", "s", "h", "g", "d", "k", "z", "i", "b": entities.append({"type": ch, "pos": pos if ch != "f" and ch != "d" else pos - Vector2(0, 16)})
 				"B": _add_interactable("bench", Rect2(pos.x - 22.0, pos.y - 14.0, 44.0, 14.0), {"pos": pos})
@@ -145,6 +155,19 @@ func _make_bodies() -> void:
 		cs.shape = sh
 		cs.position = r.position + r.size * 0.5
 		body.add_child(cs)
+	for cr in cracks:   # tường nứt: đặc (lớp 1) và nhận nhát chém (lớp 4, có take_hit)
+		var cb := StaticBody2D.new()
+		cb.set_script(CRACK)
+		cb.collision_layer = 1 | 4
+		cb.position = cr.get_center()
+		cb.add_to_group("hk_crack")
+		var ccs := CollisionShape2D.new()
+		var csh := RectangleShape2D.new()
+		csh.size = cr.size
+		ccs.shape = csh
+		cb.add_child(ccs)
+		cb.broken.connect(_on_crack_broken.bind(cb.position))
+		add_child(cb)
 	var ow := StaticBody2D.new()   # bục một chiều tách riêng: đạn bay xuyên (xem projectile), người/quái vẫn đứng được
 	ow.collision_layer = 1
 	ow.set_meta("oneway", true)
@@ -158,6 +181,16 @@ func _make_bodies() -> void:
 		cs2.position = r.position + r.size * 0.5
 		cs2.one_way_collision = true
 		ow.add_child(cs2)
+
+func _on_crack_broken(pos: Vector2) -> void:
+	if _secret_open():
+		return
+	STATE.set_flag(secret_flag())
+	for n in get_tree().get_nodes_in_group("hk_crack"):
+		if is_ancestor_of(n):
+			n.queue_free()
+	cracks.clear()
+	secret_opened.emit(pos)
 
 ## Điểm đứng khi đi vào bằng cửa `door_id`: lùi vào trong phòng, phía sau cửa.
 func spawn_for_door(door_id: String) -> Vector2:
@@ -267,6 +300,13 @@ func _draw() -> void:
 	for y in rows:
 		for x in cols:
 			if not _is_solid(x, y):
+				continue
+			if _cell(x, y) == "%":
+				var cr := Rect2(x * TILE, y * TILE, TILE, TILE)
+				draw_texture_rect(SPRITES.tex("floor_%d%s" % [1 + (x * 5 + y * 11) % 8, sfx]), cr, false, Color(0.62, 0.62, 0.7))
+				var cc := Color(0.04, 0.04, 0.08, 0.85)   # vết nứt: gợi ý nhỏ cho người tinh ý
+				draw_polyline(PackedVector2Array([cr.position + Vector2(16, 0), cr.position + Vector2(11, 10), cr.position + Vector2(19, 18), cr.position + Vector2(13, 32)]), cc, 2.0)
+				draw_polyline(PackedVector2Array([cr.position + Vector2(11, 10), cr.position + Vector2(3, 14)]), cc, 2.0)
 				continue
 			var top: bool = not _is_solid(x, y - 1)
 			var name: String = ("wall_mid" + sfx) if top else ("floor_%d%s" % [1 + (x * 5 + y * 11) % 8, sfx])

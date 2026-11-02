@@ -36,6 +36,7 @@ var busy: bool = false
 var entry_spawn: Vector2 = Vector2.ZERO
 var boss: Node2D
 var _content: Node2D
+const TRAVEL_FADE: float = 0.45
 var _fade: ColorRect
 var _last_area: String = ""
 
@@ -87,6 +88,7 @@ func _ready() -> void:
 	player.parried.connect(_on_player_parried)
 	shop.sfx.connect(sfx.play)
 	menu.volume_changed.connect(_on_volume_changed)
+	menu.travel.connect(_travel)
 	hud.set_health(STATE.hp, STATE.max_hp())
 	hud.set_soul(STATE.soul)
 	load_room(STATE.bench_room)
@@ -186,6 +188,7 @@ func _process(d: float) -> void:
 		atmosphere.follow(cam.global_position, player.global_position)
 		atmosphere.set_mood("focus" if player.focusing else ("danger" if player.hp == 1 else ""))
 	menu.enabled = not busy and not shop.is_open() and not player.is_dead()
+	menu.can_travel = menu.enabled and _at_bench()
 
 func _fade_to(a: float, dur: float = 0.2) -> void:
 	var t := create_tween()
@@ -209,6 +212,7 @@ func load_room(id: String) -> void:
 	room.door_entered.connect(_on_door)
 	room.hazard_touched.connect(_on_hazard_touch)
 	room.interacted.connect(_on_interacted)
+	room.secret_opened.connect(_on_secret_opened)
 	player.z_index = 5
 	player.ward_ready = true   # Oath Ward: mỗi phòng một lần chặn
 	boss = null
@@ -426,6 +430,12 @@ func _on_player_died() -> void:
 	player.controls_enabled = true
 	busy = false
 
+func _on_secret_opened(pos: Vector2) -> void:
+	sfx.play("crumble")
+	FX.burst(_content, pos, Color(0.6, 0.55, 0.5), 18, 220.0)
+	FX.ring(_content, pos, Color(1.0, 0.9, 0.6, 0.8), 70.0, 0.4)
+	hud.banner("A hidden passage", "")
+
 func _on_interacted(kind: String, data: Dictionary) -> void:
 	if busy:
 		return
@@ -439,7 +449,7 @@ func _on_interacted(kind: String, data: Dictionary) -> void:
 		"cache":
 			STATE.set_flag("cache_" + String(data["key"]))
 			sfx.play("geo")
-			var n: int = 25
+			var n: int = 25 * (3 if STATE.flag("secret_" + room.id) else 1)   # rương trong hốc bí mật: gấp ba
 			STATE.geo += n
 			FX.float_text(_content, data["pos"], "+%d Geo" % n, Color(1, 0.9, 0.4))
 		"altar":
@@ -462,12 +472,46 @@ func _on_interacted(kind: String, data: Dictionary) -> void:
 			STATE.save()
 			hud.banner("Charm: " + String(STATE.CHARMS[cid]["name"]), String(STATE.CHARMS[cid]["desc"]))
 
+## Đi nhanh chỉ khi đang đứng ở bench (vùng nghỉ), không phải Boss Rush, không đang khoá cửa đánh boss.
+func _at_bench() -> bool:
+	if STATE.rush or room.locked or not is_instance_valid(player):
+		return false
+	var pr := Rect2(player.global_position - player.BODY * 0.5, player.BODY)
+	for it in room.interactables:
+		if it["kind"] == "bench" and pr.intersects(it["rect"]):
+			return true
+	return false
+
+## Đi nhanh tới bench đã nghỉ: mờ đen, nạp phòng đích, đặt người chơi cạnh bench, hồi đầy máu như nghỉ.
+func _travel(id: String) -> void:
+	if busy or not (id in STATE.benches) or not rooms.has(id):
+		return
+	busy = true
+	player.controls_enabled = false
+	sfx.play("bench")
+	await _fade_to(1.0, TRAVEL_FADE)
+	STATE.hp = STATE.max_hp()
+	STATE.bench_room = id
+	STATE.bench_id = "bench"
+	STATE.save()
+	load_room(id)
+	var spawn: Vector2 = room.bench_spawn()
+	player.respawn_at(spawn, true)
+	entry_spawn = spawn
+	cam.global_position = spawn
+	cam.reset_smoothing()
+	await _fade_to(0.0, TRAVEL_FADE)
+	player.controls_enabled = true
+	busy = false
+
 func rest() -> void:
 	busy = true
 	player.controls_enabled = false
 	STATE.hp = STATE.max_hp()
 	STATE.bench_room = room.id
 	STATE.bench_id = "bench"
+	if not (room.id in STATE.benches):
+		STATE.benches.append(room.id)
 	STATE.save()
 	hud.banner("Rested", LORE.bench_line())
 	await _fade_to(1.0, 0.3)
