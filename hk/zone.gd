@@ -77,7 +77,7 @@ func _physics_process(delta: float) -> void:
 				_splash(p, 2)
 			_in_water = true
 		else:
-			p.take_damage(rect.get_center().x)
+			p.take_damage(rect.get_center().x, 1, false)   # vùng gây hại: không đỡ được
 	queue_redraw()
 
 ## Nước bắn quanh chân người chơi (chỉ trang trí; FX.puff tự tắt theo Atmosphere).

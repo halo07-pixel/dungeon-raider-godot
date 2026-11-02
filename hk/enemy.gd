@@ -103,6 +103,14 @@ func _physics_process(delta: float) -> void:
 	_t -= delta
 	if _kb_t > 0.0:
 		_kb_t -= delta
+	if state == "stagger":   # bị đỡ đòn: đứng choáng, không gây hại, hết giờ thì về "idle"
+		velocity = Vector2.ZERO if kind == "flyer" else Vector2(0.0, velocity.y)
+		if kind != "flyer":
+			_gravity_and_move(delta)
+		if _t <= 0.0:
+			state = "idle"
+		queue_redraw()
+		return
 	match kind:
 		"crawler": _crawler(delta)
 		"flyer": _flyer(delta)
@@ -116,6 +124,13 @@ func _physics_process(delta: float) -> void:
 		if b.has_method("take_damage"):
 			b.take_damage(global_position.x)
 	queue_redraw()
+
+## Người chơi đỡ trúng đòn ngay cạnh: choáng `sec` giây (ngắt đòn đang chuẩn bị). Không áp dụng cho dropper (đang treo/rơi) hay quái đang nằm.
+func stagger(sec: float) -> void:
+	if hp <= 0 or kind == "dropper" or state == "down" or state == "stagger":
+		return
+	state = "stagger"
+	_t = sec
 
 func body_rect() -> Rect2:
 	return Rect2(global_position - _size * 0.5, _size)
@@ -430,7 +445,7 @@ func _draw() -> void:
 	var tint := Color.WHITE
 	if _flash > 0.0:
 		tint = Color(3, 3, 3)
-	elif (state == "windup" or state == "shake") and int(_time * 30.0) % 2 == 0:
+	elif (state == "windup" or state == "shake" or state == "stagger") and int(_time * 30.0) % 2 == 0:
 		tint = WINDUP_TINT.get(kind, Color(1.6, 0.7, 0.7))
 	elif state == "down":   # reviver nằm: xám; nhấp nháy sắp đứng dậy
 		tint = Color(0.45, 0.45, 0.55) if _t > 0.5 or int(_time * 20.0) % 2 == 0 else Color(1.3, 1.3, 1.5)

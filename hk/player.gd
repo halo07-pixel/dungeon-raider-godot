@@ -5,6 +5,7 @@ signal hit_landed(strength: float)
 signal health_changed(hp: int, max_hp: int)
 signal soul_changed(soul: int)
 signal died
+signal parried(from_x: float)   # đỡ trúng một đòn: world dựng hiệu ứng, làm kẻ gần đó choáng, phản đạn
 signal hazard_hit
 signal sfx(name: String)   # báo lên world để phát âm thanh
 signal fx(kind: String, pos: Vector2, power: float)   # báo lên world để dựng bụi/tia lửa: run | land | wall | dash | hit (power 0..1)
@@ -62,6 +63,12 @@ var _attack_t: float = 0.0
 var _attack_cd: float = 0.0
 var _spell_cd: float = 0.0
 var _stun: float = 0.0
+const PARRY_WINDOW: float = 0.18    # thời gian "cửa sổ đỡ" sau khi bấm
+const PARRY_RECOVER: float = 0.35   # khựng thêm nếu đỡ trượt (đỡ trúng thì được đỡ lại ngay)
+const PARRY_INVULN: float = 0.5
+const PARRY_SOUL: int = 11
+var _parry_t: float = 0.0
+var _parry_rec: float = 0.0
 var _wall_lock: float = 0.0
 var _wall_coyote: float = 0.0
 var _wall_dir: int = 0
@@ -98,6 +105,8 @@ func _physics_process(delta: float) -> void:
 	_attack_cd = maxf(0.0, _attack_cd - delta)
 	_spell_cd = maxf(0.0, _spell_cd - delta)
 	_wall_lock = maxf(0.0, _wall_lock - delta)
+	_parry_t = maxf(0.0, _parry_t - delta)
+	_parry_rec = maxf(0.0, _parry_rec - delta)
 	_wall_coyote -= delta
 	if not controls_enabled:
 		velocity.x = 0.0
@@ -173,6 +182,9 @@ func _physics_process(delta: float) -> void:
 	if Input.is_action_just_released("hk_jump") and velocity.y < 0.0:
 		velocity.y *= JUMP_CUT
 
+	if Input.is_action_just_pressed("hk_parry") and _parry_rec <= 0.0 and _stun <= 0.0:
+		_parry_t = PARRY_WINDOW
+		_parry_rec = PARRY_WINDOW + PARRY_RECOVER
 	if Input.is_action_just_pressed("hk_attack") and _attack_cd <= 0.0 and _stun <= 0.0:
 		_start_attack()
 	if Input.is_action_just_pressed("hk_spell") and _spell_cd <= 0.0 and _stun <= 0.0 and STATE.soul >= STATE.spell_cost():
@@ -339,15 +351,27 @@ func _on_nail_hit(target: Node2D) -> void:
 func _cloaked() -> bool:   # bùa Shade Cloak: bất khả xâm phạm trong lúc dash
 	return _dash_t > 0.0 and STATE.has_charm("shade_cloak")
 
-func take_damage(from_x: float, dmg: int = 1) -> void:
+## Trả true nếu đòn bị đỡ (đạn của quái dựa vào đó để bị phản lại). `parryable` = false cho gai/lửa/nước (không đỡ được).
+func take_damage(from_x: float, dmg: int = 1, parryable: bool = true) -> bool:
 	if invuln > 0.0 or _dead or not controls_enabled or _cloaked():
-		return
+		return false
+	if parryable and _parry_t > 0.0:   # đỡ trúng: không mất mặt nạ, trước cả Oath Ward / Last Light
+		_parry_t = 0.0
+		_parry_rec = 0.0
+		invuln = maxf(invuln, PARRY_INVULN)
+		STATE.soul = mini(STATE.SOUL_MAX, STATE.soul + PARRY_SOUL)
+		soul_changed.emit(soul)
+		sfx.emit("parry")
+		parried.emit(from_x)
+		hit_landed.emit(1.5)
+		_hitstop(0.12)
+		return true
 	if ward_ready and STATE.has_charm("oath_ward"):   # Oath Ward: chặn đòn đầu tiên trong phòng, không mất máu
 		ward_ready = false
 		invuln = 0.8
 		sfx.emit("clang")
 		FX.burst(get_parent(), global_position, Color(1.0, 0.95, 0.7), 10, 160.0)
-		return
+		return false
 	var steady: bool = focusing and STATE.has_charm("steady_breath")   # Steady Breath: bị đánh không đứt Focus
 	if hp - dmg <= 0 and STATE.has_charm("last_light") and not STATE.last_light_used:   # Last Light: đòn chí mạng còn 1 mặt nạ
 		STATE.last_light_used = true
@@ -370,12 +394,13 @@ func take_damage(from_x: float, dmg: int = 1) -> void:
 	if hp <= 0:
 		_dead = true
 		died.emit()
+	return false
 
 ## Gai/hầm: mất 1 mặt nạ rồi world đưa về chỗ an toàn.
 func hazard_damage(from_x: float) -> void:
 	if invuln > 0.0 or _dead or _cloaked():
 		return
-	take_damage(from_x)
+	take_damage(from_x, 1, false)
 	if not _dead:
 		hazard_hit.emit()
 
@@ -406,6 +431,9 @@ func _hitstop(sec: float) -> void:
 
 func _draw() -> void:
 	var a: float = 0.4 if invuln > 0.0 and int(invuln * 20.0) % 2 == 0 else 1.0
+	if _parry_t > 0.0:   # cửa sổ đỡ: cung sáng phía trước mặt
+		var c0: float = 0.0 if facing >= 0 else PI
+		draw_arc(Vector2(0, -2), 32.0, c0 - 1.0, c0 + 1.0, 14, Color(1.0, 0.95, 0.6, 0.85), 4.0)
 	if focusing:
 		draw_circle(Vector2.ZERO, 34.0 + sin(_focus_t * 20.0) * 3.0, Color(1, 1, 1, 0.25))
 	var foot := Vector2(0, FOOT)

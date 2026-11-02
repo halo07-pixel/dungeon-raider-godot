@@ -84,6 +84,7 @@ func _ready() -> void:
 	player.hazard_hit.connect(_on_hazard)
 	player.sfx.connect(sfx.play)
 	player.fx.connect(_on_player_fx)
+	player.parried.connect(_on_player_parried)
 	shop.sfx.connect(sfx.play)
 	menu.volume_changed.connect(_on_volume_changed)
 	hud.set_health(STATE.hp, STATE.max_hp())
@@ -150,6 +151,16 @@ func _on_player_fx(kind: String, pos: Vector2, power: float) -> void:
 			FX.spark(_content, pos, away if away != Vector2.ZERO else Vector2.UP, Color(1, 0.9, 0.6))
 			if power >= 1.0:
 				FX.ring(_content, pos, Color(1, 0.95, 0.8, 0.9), 36.0, 0.2)
+
+## Đỡ trúng: vòng sáng + tia lửa, camera nảy, kẻ ở gần điểm bị đánh (trong 140px ngang, 160px dọc) bị choáng; boss choáng lâu hơn.
+func _on_player_parried(from_x: float) -> void:
+	var at: Vector2 = player.global_position + Vector2(float(player.facing) * 22.0, -8.0)
+	FX.ring(_content, at, Color(1.0, 0.95, 0.7, 0.9), 44.0, 0.25)
+	FX.spark(_content, at, Vector2(float(player.facing), -0.3).normalized(), Color(1, 0.9, 0.6))
+	cam.punch()
+	for n in get_tree().get_nodes_in_group("hk_enemy") + get_tree().get_nodes_in_group("hk_boss"):
+		if n.has_method("stagger") and absf(n.global_position.x - from_x) < 140.0 and absf(n.global_position.y - player.global_position.y) < 160.0:
+			n.stagger(0.8 if n.is_in_group("hk_boss") else 0.6)
 
 ## Mặt sàn dưới chân: bục một chiều = gỗ, còn lại theo khu. Tần suất bước do player quyết định (0.18s).
 func _surface() -> String:
