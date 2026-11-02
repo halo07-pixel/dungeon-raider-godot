@@ -304,7 +304,7 @@ func _tick_attack(delta: float) -> void:
 	q.collision_mask = 4
 	for r in get_world_2d().direct_space_state.intersect_shape(q, 8):
 		var c = r["collider"]
-		if c in _hit_set or not c.has_method("take_hit") or _wall_between(c.global_position):
+		if c in _hit_set or not c.has_method("take_hit") or _wall_between(c.global_position, c):
 			continue
 		_hit_set.append(c)
 		if c.take_hit(STATE.nail_damage(), global_position) == false:
@@ -314,12 +314,16 @@ func _tick_attack(delta: float) -> void:
 
 ## Tường đặc nằm giữa người chơi và mục tiêu thì nhát chém không tới; bục một chiều chỉ chắn khi mục tiêu ở bên dưới
 ## (hết chém xuyên sàn từ bục lơ lửng, nhưng chém từ dưới lên qua bục vẫn được, đúng nghĩa "một chiều").
-func _wall_between(target: Vector2) -> bool:
+func _wall_between(target: Vector2, who: Node = null) -> bool:
 	var space := get_world_2d().direct_space_state
 	var q := PhysicsRayQueryParameters2D.create(global_position, target, 1)
-	if target.y > global_position.y:
-		return not space.intersect_ray(q).is_empty()
 	var skip: Array[RID] = []
+	if who != null and who.is_in_group("hk_crack"):   # tường nứt là chính vật bị chém: không để nó (và các ô cạnh nó) tự chắn nhát chém
+		for n in get_tree().get_nodes_in_group("hk_crack"):
+			skip.append((n as CollisionObject2D).get_rid())
+	if target.y > global_position.y:
+		q.exclude = skip
+		return not space.intersect_ray(q).is_empty()
 	for n in get_tree().get_nodes_in_group("hk_oneway"):
 		skip.append((n as CollisionObject2D).get_rid())
 	q.exclude = skip

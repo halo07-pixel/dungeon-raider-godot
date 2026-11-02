@@ -4,11 +4,14 @@ const STATE = preload("res://hk/state.gd")
 const WorldData = preload("res://hk/world_data.gd")
 const LORE = preload("res://hk/lore.gd")
 signal volume_changed
+signal travel(room_id: String)   # đi nhanh tới bench đã nghỉ (world xử lý)
 const CELL: float = 26.0
 const AREA_COLORS: Dictionary = {"gate": Color(0.35, 0.42, 0.62), "catacomb": Color(0.62, 0.4, 0.45), "vault": Color(0.3, 0.6, 0.65), "archive": Color(0.6, 0.5, 0.8)}
 
 var rooms: Dictionary = {}
 var enabled: bool = true
+var can_travel: bool = false    # world đặt: đang đứng ở bench
+var _targets: Array = []        # bench đi nhanh được (không gồm phòng hiện tại), dựng lúc mở tab Bản đồ
 var current_room: String = ""
 var player_pos: Vector2 = Vector2.ZERO
 var tab: String = ""            # "" = đóng
@@ -85,7 +88,18 @@ func _process(_d: float) -> void:
 			else:
 				STATE.zoom_on = step > 0
 			volume_changed.emit()
-	if tab == "map":
+	if tab == "map" and can_travel and not _targets.is_empty():   # đi nhanh: Lên/Xuống chọn bench (bản đồ căn giữa bench đó), Nhảy xác nhận
+		sel = (sel + int(Input.is_action_just_pressed("hk_down")) - int(Input.is_action_just_pressed("hk_up")) + _targets.size()) % _targets.size()
+		if rooms.has(current_room) and rooms.has(_targets[sel]):
+			var a: Dictionary = rooms[current_room]
+			var b: Dictionary = rooms[_targets[sel]]
+			_pan = ((a["map"] + WorldData.map_size(a) * 0.5) - (b["map"] + WorldData.map_size(b) * 0.5)) * CELL
+		if Input.is_action_just_pressed("hk_jump"):
+			var dest: String = String(_targets[sel])
+			close()
+			travel.emit(dest)
+			return
+	elif tab == "map":
 		_pan -= Vector2(Input.get_axis("hk_left", "hk_right"), Input.get_axis("hk_up", "hk_down")) * 420.0 * _d
 		if Input.is_action_just_pressed("hk_pin") and rooms.has(current_room):
 			STATE.toggle_pin(current_room, player_pos)
@@ -107,6 +121,8 @@ func _process(_d: float) -> void:
 
 func _snapshot() -> void:
 	_pan = Vector2.ZERO
+	sel = 0
+	_targets = travel_targets()
 	var w := get_parent()
 	if w and w.get("room") and w.room:
 		current_room = w.room.id
@@ -128,6 +144,14 @@ func _draw_view() -> void:
 		"pause": _draw_pause(v, font, sz)
 
 ## Biểu tượng trong một phòng đã đến: {k: loại, c: (cột, hàng) theo ô lưới}. Chỉ vật chưa lấy/chưa hạ; cửa dẫn tới phòng chưa đến là "exit".
+## Bench đi nhanh được: đã nghỉ, có trong thế giới, khác phòng hiện tại.
+func travel_targets() -> Array:
+	var out: Array = []
+	for id in STATE.benches:
+		if rooms.has(id) and id != current_room:
+			out.append(id)
+	return out
+
 static func map_icons(room: Dictionary) -> Array:
 	var out: Array = []
 	var grid: Array = room["grid"]
@@ -188,6 +212,8 @@ func _draw_map(v: Control, font: Font, sz: Vector2) -> void:
 				_draw_icon(v, rect.position + (ic["c"] + Vector2(0.5, 0.5)) / WorldData.MAP_CELL_TILES * CELL, String(ic["k"]))
 		else:
 			v.draw_rect(rect, Color(0.5, 0.5, 0.55, 0.35), false, 1.5)
+		if can_travel and id in _targets:   # bench đi nhanh được: vòng vàng, bench đang chọn dày hơn
+			v.draw_rect(rect.grow(4.0), Color(1, 0.9, 0.4), false, 4.0 if _targets[sel] == id else 1.5)
 		if id == current_room:
 			v.draw_rect(rect.grow(2.0), Color(1, 1, 1), false, 3.0)
 			var tile: float = 32.0
@@ -199,7 +225,10 @@ func _draw_map(v: Control, font: Font, sz: Vector2) -> void:
 			var pp2: Vector2 = origin + pr["map"] * CELL + Vector2(float(p["x"]), float(p["y"])) / 32.0 / WorldData.MAP_CELL_TILES * CELL
 			v.draw_colored_polygon(PackedVector2Array([pp2 + Vector2(0, 7), pp2 + Vector2(-5, -5), pp2 + Vector2(5, -5)]), Color(1, 0.3, 0.9))
 	v.draw_string(font, Vector2(40, sz.y - 54), "White frame: this room   red dot: you   yellow: bench   cyan: shop   green: item left   red ring: boss   orange: chest   hollow: unexplored exit", HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Color(0.7, 0.75, 0.85))
-	v.draw_string(font, Vector2(40, sz.y - 28), "Arrows: pan the map   P: place / remove a pin here (%d / %d)" % [STATE.pins.size(), STATE.MAX_PINS], HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Color(0.7, 0.75, 0.85))
+	var foot: String = "Arrows: pan the map   P: place / remove a pin here (%d / %d)" % [STATE.pins.size(), STATE.MAX_PINS]
+	if can_travel:
+		foot = "Up / Down: choose a bench (yellow frame)   Jump: travel there" if not _targets.is_empty() else "Rest at another bench first to travel between them."
+	v.draw_string(font, Vector2(40, sz.y - 28), foot, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Color(1, 0.9, 0.5) if can_travel else Color(0.7, 0.75, 0.85))
 
 func _draw_icon(v: Control, at: Vector2, kind: String) -> void:
 	match kind:

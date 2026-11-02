@@ -352,6 +352,39 @@ for x in (20, 28):
 r.ground_door("1", "L", "arc_4", "2")
 r.extra += ["charm: id=swift_current needs=boss_colossus", "boss: id=colossus"]
 
+SECRETS = {"gate": 1, "catacomb": 2, "vault": 1, "archive": 1}   # số phòng bí mật mỗi khu
+
+
+def add_secrets():
+    """Hốc bí mật: gò 5x3 trên sàn liền, mặt trái là 2 ô tường nứt `%`, bên trong 3x2 ô trống có rương `$`.
+    Chỉ đặt ở phòng không boss/rương/bench/thương nhân/bàn thờ, nơi sàn liền, trần thoáng 2 ô trên gò (đứng lên được) và hai bên
+    còn một ô trống để đứng chém. Mọi ô ngoài gò giữ nguyên nên đường chính không đổi (gò cao 3 ô như khối ở gate_3)."""
+    import random
+    left = dict(SECRETS)
+    for r in rooms:
+        if left.get(r.area, 0) <= 0 or any(e.startswith(("boss:", "altar:", "charm:")) for e in r.extra):
+            continue
+        if any(ch in "$ACX" for row in r.g for ch in row):
+            continue
+        rng = random.Random("secret" + r.id)
+        xs = list(range(10, r.w - 16))
+        rng.shuffle(xs)
+        for x0 in xs:
+            F = r.F
+            lo, hi = x0 - 1, x0 + 6   # chừa mỗi bên một ô trống để đứng chém
+            if not all(r.g[y][x] == "." for y in range(F - 5, F) for x in range(lo, hi)):
+                continue
+            if not all(r.g[F][x] == "#" for x in range(lo, hi)):
+                continue
+            r.fill(x0, F - 3, x0 + 4, F - 3)
+            r.fill(x0 + 4, F - 2, x0 + 4, F - 1)
+            r.fill(x0, F - 2, x0, F - 1, "%")
+            r.put(x0 + 2, F - 1, "$")
+            left[r.area] -= 1
+            print("secret:", r.id, "x0 =", x0)
+            break
+
+
 def add_torches():
     """Lò lửa: cạnh mỗi bench (3 ô bên phải, nếu trống) và hai bên phòng boss. Chỉ trang trí."""
     for r in rooms:
@@ -363,6 +396,8 @@ def add_torches():
         if any(e.startswith("boss:") for e in r.extra):
             cols += [3, r.w - 4]
         for x in cols:
+            if any("%" in r.g[y][max(0, x - 6):x + 7] for y in (r.F - 1, r.F - 2)):   # nhà bí mật: không đặt lò lửa gần hốc (tránh lộ/đè rương)
+                continue
             if 1 < x < r.w - 2 and r.g[r.F - 1][x] == "." and r.g[r.F - 2][x] == "." and r.g[r.F][x] in "#=":
                 r.extra.append("torch: %d %d" % (x, r.F - 1))
 
@@ -448,6 +483,7 @@ if __name__ == "__main__":
     for f in os.listdir(OUT):
         if f.endswith(".txt"):
             os.remove(os.path.join(OUT, f))
+    add_secrets()
     add_torches()
     add_decor()
     for r in rooms:
