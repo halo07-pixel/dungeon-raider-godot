@@ -6,14 +6,15 @@ const InputSetup = preload("res://hk/input.gd")
 const FX = preload("res://hk/fx.gd")
 const LORE = preload("res://hk/lore.gd")
 const MUSIC = preload("res://hk/music.gd")
-const SURFACE: Dictionary = {"gate": "stone", "catacomb": "dirt", "vault": "metal", "archive": "wet"}
+const ZONE = preload("res://hk/zone.gd")
+const SURFACE: Dictionary = {"gate": "stone", "catacomb": "dirt", "vault": "metal", "archive": "wet", "grove": "dirt"}
 const SFX = preload("res://hk/sfx.gd")
 const BACKDROP = preload("res://hk/backdrop.gd")
 const ATMOSPHERE = preload("res://hk/atmosphere.gd")
 const BOSS = preload("res://hk/boss.gd")
 const RUSH = preload("res://hk/rush.gd")
 const DEBUG_BOXES = preload("res://hk/debug_boxes.gd")
-const AREA_NAMES: Dictionary = {"gate": "Gate Ruins", "catacomb": "Weeping Catacombs", "vault": "Ashen Vaults", "archive": "Drowned Archive"}
+const AREA_NAMES: Dictionary = {"gate": "Gate Ruins", "catacomb": "Weeping Catacombs", "vault": "Ashen Vaults", "archive": "Drowned Archive", "grove": "Toxic Grove"}
 const ZOOM: float = 1.5
 const WIDE_BOSSES: Array = ["colossus", "lord", "many_faced", "sovereign"]   # boss lớn: zoom ra khi vào trận
 
@@ -219,7 +220,7 @@ func load_room(id: String) -> void:
 	hud.boss = null
 	for e in room.entities:
 		match String(e["type"]):
-			"c", "f", "s", "h", "g", "d", "k", "z", "i", "b":
+			"c", "f", "s", "h", "g", "d", "k", "z", "i", "b", "m", "t":
 				_spawn_enemy(String(e["type"]), e["pos"])
 			"boss":
 				var bid: String = String(data.get("boss", {}).get("id", ""))
@@ -234,6 +235,18 @@ func load_room(id: String) -> void:
 		_content.add_child(sh)
 	cam.set_bounds(room.bounds())
 	cam.zoom_to(cam.base, 0.0, true)   # vào phòng mới luôn về zoom thường
+	for i in data.get("spores", []).size():   # đám bào tử cố định của phòng: bật/tắt theo nhịp, lệch pha từng đám
+		var sp: Dictionary = data["spores"][i]
+		var sz := Node2D.new()
+		sz.set_script(ZONE)
+		sz.kind = "spore"
+		sz.rect = Rect2(float(sp["col"]) * room.TILE, float(sp["row"]) * room.TILE, float(sp["w"]) * room.TILE, float(sp["h"]) * room.TILE)
+		sz.life = 1.0e9
+		sz.period = 3.0
+		sz.on_from = 1.5
+		sz._t = float(i) * 1.1
+		sz.fx_parent = _content
+		_content.add_child(sz)
 	STATE.visit(id)
 	var area: String = String(data.get("area", "gate"))
 	if area != _last_area:
@@ -245,7 +258,7 @@ func load_room(id: String) -> void:
 	music.ambient(area)
 
 func _spawn_enemy(ch: String, pos: Vector2) -> void:
-	var kinds: Dictionary = {"c": "crawler", "f": "flyer", "s": "spitter", "h": "charger", "g": "guard", "d": "dropper", "k": "sentry", "z": "reviver", "i": "cinder", "b": "bubbler"}
+	var kinds: Dictionary = {"c": "crawler", "f": "flyer", "s": "spitter", "h": "charger", "g": "guard", "d": "dropper", "k": "sentry", "z": "reviver", "i": "cinder", "b": "bubbler", "m": "sporeling", "t": "thornshooter"}
 	var e := CharacterBody2D.new()
 	e.set_script(preload("res://hk/enemy.gd"))
 	e.kind = kinds[ch]

@@ -59,6 +59,8 @@ var _coyote: float = 0.0
 var _buffer: float = 0.0
 var _dash_t: float = 0.0
 var _dash_cd: float = 0.0
+var spore_t: float = 0.0   # bùa Spore Ward: còn bao lâu bào tử không làm hại (đặt lúc dash, không cộng dồn)
+const SPORE_WARD_TAIL: float = 0.8   # giây sau khi hết dash
 var _attack_t: float = 0.0
 var _attack_cd: float = 0.0
 var _spell_cd: float = 0.0
@@ -102,6 +104,7 @@ func _physics_process(delta: float) -> void:
 		g["t"] -= delta
 	_trail = _trail.filter(func(g): return g["t"] > 0.0)
 	_dash_cd = maxf(0.0, _dash_cd - delta)
+	spore_t = maxf(0.0, spore_t - delta)
 	_attack_cd = maxf(0.0, _attack_cd - delta)
 	_spell_cd = maxf(0.0, _spell_cd - delta)
 	_wall_lock = maxf(0.0, _wall_lock - delta)
@@ -142,6 +145,8 @@ func _physics_process(delta: float) -> void:
 		fx.emit("dash", global_position + Vector2(0, FOOT), 1.0)
 		_dash_t = DASH_TIME
 		_dash_cd = STATE.dash_cooldown()
+		if STATE.has_charm("spore_ward"):
+			spore_t = DASH_TIME + SPORE_WARD_TAIL
 		return
 
 	var move: float = Input.get_axis("hk_left", "hk_right")

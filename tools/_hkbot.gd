@@ -3,7 +3,7 @@ extends SceneTree
 ## kind = crawler|flyer|spitter|charger|guard|dropper|sentry|reviver|cinder|bubbler|warden|wraith|lord|brute|hexer|colossus|many_faced; `all` = lần lượt tất cả rồi in bảng.
 ## Bot "người chơi trung bình": tiến lại, chém khi tới tầm, nhảy né sau ~0.25s khi quái/boss vào thế đánh hoặc khi vùng gây hại (gai, lửa, sóng lửa, bục nóng) sắp chạm,
 ## nhảy lên chém khi boss bay ở trên cao. Không vòng ra sau khiên (guard/sentry bị chặn nhiều hơn người thật). In: số lần bị trúng, thời gian hạ, tỉ lệ hạ được trong 90s.
-const ALL: Array = ["crawler", "flyer", "spitter", "charger", "guard", "dropper", "sentry", "reviver", "cinder", "bubbler", "warden", "brute", "hexer", "wraith", "colossus", "lord", "many_faced"]
+const ALL: Array = ["crawler", "flyer", "spitter", "charger", "guard", "dropper", "sentry", "reviver", "cinder", "bubbler", "sporeling", "thornshooter", "warden", "brute", "hexer", "wraith", "colossus", "grove", "lord", "many_faced"]
 const HAZARD_LEAD: float = 0.35   # coi vùng là nguy hiểm khi còn ≤ chừng này giây nữa có hiệu lực (người thật nghe âm báo)
 const HAZARD_PAD: float = 60.0    # lề né quanh vùng gây hại
 const DANGER: Array = ["windup", "lunge", "bash", "dive", "shake", "wind_slash", "wind_slam", "wind_dive", "air", "wind_quake", "quake", "wind_rush", "rush"]
@@ -31,7 +31,7 @@ func hazard_center(p: Node2D, owners: Array):
 		if not is_instance_valid(o):
 			continue
 		for n in o.get_children():
-			if n.has_method("active") and n.get("kind") != null and n.kind in ["spikes", "firewave", "heat", "flame", "pillar"]:
+			if n.has_method("active") and n.get("kind") != null and n.kind in ["spikes", "firewave", "heat", "flame", "pillar", "spore", "vine"]:
 				if (n.active() or n.delay <= HAZARD_LEAD) and body.intersects(n.current()):
 					return n.current().get_center()
 	return null
@@ -51,7 +51,7 @@ func _init() -> void:
 	var kinds: Array = ALL if args[0] == "all" else [args[0]]
 	var runs: int = int(args[1]) if args.size() > 1 else 6
 	var St = load("res://hk/state.gd")
-	var boss_kinds: Array = ["warden", "wraith", "lord", "brute", "hexer", "colossus", "many_faced"]
+	var boss_kinds: Array = ["warden", "wraith", "lord", "brute", "hexer", "colossus", "many_faced", "grove"]
 	var table: Array = []
 	for kind in kinds:
 		var is_boss: bool = kind in boss_kinds

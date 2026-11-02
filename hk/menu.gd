@@ -6,7 +6,7 @@ const LORE = preload("res://hk/lore.gd")
 signal volume_changed
 signal travel(room_id: String)   # đi nhanh tới bench đã nghỉ (world xử lý)
 const CELL: float = 26.0
-const AREA_COLORS: Dictionary = {"gate": Color(0.35, 0.42, 0.62), "catacomb": Color(0.62, 0.4, 0.45), "vault": Color(0.3, 0.6, 0.65), "archive": Color(0.6, 0.5, 0.8)}
+const AREA_COLORS: Dictionary = {"gate": Color(0.35, 0.42, 0.62), "catacomb": Color(0.62, 0.4, 0.45), "vault": Color(0.3, 0.6, 0.65), "archive": Color(0.6, 0.5, 0.8), "grove": Color(0.45, 0.7, 0.35)}
 
 var rooms: Dictionary = {}
 var enabled: bool = true

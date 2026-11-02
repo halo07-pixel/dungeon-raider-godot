@@ -22,6 +22,7 @@ const LOOK: Dictionary = {
 	"brute": {"anim": "frost_big_zombie_anim", "scale": 2.5},
 	"hexer": {"anim": "hell_acolyte_anim", "scale": 3.0},
 	"colossus": {"anim": "hell_ogre_idle_anim", "scale": 2.5},
+	"grove": {"anim": "ogre_run_anim", "scale": 3.0, "tint": Color(0.7, 1.2, 0.55)},
 	"many_faced": {"anim": "ogre_idle_anim", "scale": 3.0},   # hộp ban đầu = dạng warden; hộp thật theo `form`
 	"sovereign": {"anim": "big_demon_idle_anim", "scale": 3.6},
 }
@@ -31,7 +32,7 @@ const ECHO_FROM: Array = ["warden", "brute", "colossus", "hexer", "wraith"]   # 
 ## Đòn riêng của mỗi dạng (tương tác với biom của boss): state báo trước -> hàm tung đòn trong `_cast`.
 const SKILL: Dictionary = {
 	"warden": "wind_pillar", "brute": "wind_fissure", "wraith": "wind_veil", "hexer": "wind_torch",
-	"lord": "wind_heat", "sovereign": "wind_heat", "colossus": "wind_tide",
+	"lord": "wind_heat", "sovereign": "wind_heat", "colossus": "wind_tide", "grove": "wind_bloom",
 }
 const QUAKE_WAVES: Array = [2, 3]   # số sóng của đòn quake theo pha 1 / pha 2+
 const RUSH_SPEED: float = 560.0
@@ -46,11 +47,12 @@ const DATA: Dictionary = {
 	"brute": {"title": "Bone Brute", "hp": 110, "color": Color(0.55, 0.75, 0.85), "speed": 85.0},
 	"hexer": {"title": "Ash Hexer", "hp": 90, "color": Color(0.85, 0.45, 0.35), "speed": 170.0},
 	"colossus": {"title": "Drowned Colossus", "hp": 130, "color": Color(0.6, 0.5, 0.8), "speed": 100.0},
+	"grove": {"title": "Rotted Warden", "hp": 140, "color": Color(0.5, 0.8, 0.35), "speed": 90.0},
 	"many_faced": {"title": "The Many-Faced", "hp": 480, "color": Color(0.7, 0.45, 0.9), "speed": 0.0},
 	"sovereign": {"title": "The Many-Faced", "hp": 0, "color": Color(0.7, 0.45, 0.9), "speed": 125.0},
 }
 ## Geo thưởng một lần khi hạ boss lần đầu (cờ boss_<id> chưa đặt).
-const BOUNTY: Dictionary = {"warden": 60, "hexer": 40, "brute": 40, "wraith": 80, "colossus": 50, "lord": 150, "many_faced": 0}
+const BOUNTY: Dictionary = {"warden": 60, "hexer": 40, "brute": 40, "wraith": 80, "colossus": 50, "grove": 60, "lord": 150, "many_faced": 0}
 const SHIFT_P1: Array = ["warden", "brute", "wraith", "hexer"]
 const SHIFT_P2: Array = ["warden", "brute", "wraith", "hexer", "colossus", "lord"]
 
@@ -312,7 +314,7 @@ func _ground(delta: float, p: Node2D) -> void:
 			if _combo <= 0 or _t <= 0.0:
 				state = "recover"
 				_t = 1.0
-		"wind_pillar", "wind_fissure", "wind_heat", "wind_tide", "wind_torch", "wind_veil":   # torch/veil: chỉ dùng khi Lord echo (boss bay có khối riêng)
+		"wind_pillar", "wind_fissure", "wind_heat", "wind_tide", "wind_torch", "wind_veil", "wind_bloom", "wind_vine":   # torch/veil: chỉ dùng khi Lord echo (boss bay có khối riêng)
 			velocity.x = 0.0
 			_face(p)
 			if _t <= 0.0:
@@ -351,6 +353,10 @@ func _pick_attack() -> void:
 		opts.append("combo")
 	if form == "colossus":
 		opts.append("quake")
+	if form == "grove":   # dây leo: đòn thứ hai của Rotted Warden (nhiều hơn ở pha 2)
+		opts.append("vine")
+		if phase >= 2:
+			opts.append("vine")
 	if SKILL.has(form):   # đòn riêng của dạng này (nhiều hơn ở pha 2)
 		opts.append("skill")
 		if phase >= 2:
@@ -381,6 +387,9 @@ func _pick_attack() -> void:
 		"quake":
 			state = "wind_quake"
 			_t = 0.7
+		"vine":
+			state = "wind_vine"
+			_t = 0.8
 		"rush":
 			state = "wind_rush"
 			_t = 0.8
@@ -430,6 +439,19 @@ func _cast(p: Node2D) -> void:
 				var x2: float = clampf(p.global_position.x + dx, arena.position.x + 60.0, arena.end.x - 60.0)
 				_dust(Vector2(x2, fy))
 				_zone("spikes", Rect2(x2 - 20.0, fy - 44.0, 40.0, 44.0), 0.6, 3.5)
+			shake.emit(2.0)
+		"wind_bloom":   # Rotted Warden: năm cụm bào tử nở quanh người chơi, tồn tại 4s (đứng ngoài cụm hoặc dash với Spore Ward)
+			for dx in [-200.0, -100.0, 0.0, 100.0, 200.0]:
+				var xb: float = clampf(p.global_position.x + dx, arena.position.x + 60.0, arena.end.x - 60.0)
+				_dust(Vector2(xb, fy))
+				var zb: Node2D = _zone("spore", Rect2(xb - 40.0, fy - 70.0, 80.0, 70.0), 0.7, 4.0)
+				zb.period = 0.0
+		"wind_vine":   # Rotted Warden: dây leo trồi lên thành hàng từ boss tới người chơi, từng cụm một (không đỡ được)
+			var sgn: float = 1.0 if p.global_position.x >= global_position.x else -1.0
+			for i in 6:
+				var xv: float = clampf(global_position.x + sgn * (90.0 + 90.0 * float(i)), arena.position.x + 40.0, arena.end.x - 40.0)
+				_dust(Vector2(xv, fy))
+				_zone("vine", Rect2(xv - 22.0, fy - 64.0, 44.0, 64.0), 0.3 + 0.18 * float(i), 0.9)
 			shake.emit(2.0)
 		"wind_torch":   # Ash Hexer: nhóm lửa từ các lò chạy dọc sàn vào giữa phòng
 			var src: Array = braziers if not braziers.is_empty() else [Vector2(arena.position.x + 60.0, fy), Vector2(arena.end.x - 60.0, fy)]
@@ -706,7 +728,7 @@ func _look_tint() -> Color:
 		return Color(1.55, 1.5, 1.15)
 	if form == "sovereign":
 		return Color(1.0, 0.8, 1.35)
-	return Color.WHITE
+	return LOOK[form].get("tint", Color.WHITE)
 
 func _draw_aura(h: Vector2) -> void:
 	var r: float = maxf(h.x, h.y)
