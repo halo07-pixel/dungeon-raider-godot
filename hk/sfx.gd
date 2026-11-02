@@ -54,6 +54,8 @@ const DEFS: Dictionary = {
 	"tell_torch": {"total": 0.35, "layers": [{"wave": "noise", "lp": 0.4, "vol": 0.25, "dur": 0.3, "swell": 0.4}, {"wave": "saw", "freq": 220.0, "slide": 120.0, "vol": 0.1, "dur": 0.3}]},
 	"tell_heat": {"total": 0.4, "layers": [{"wave": "saw", "freq": 140.0, "slide": 260.0, "vol": 0.14, "dur": 0.38, "swell": 0.8}, {"wave": "noise", "lp": 0.6, "vol": 0.1, "dur": 0.3}]},
 	"tell_tide": {"total": 0.5, "layers": [{"wave": "sine", "freq": 140.0, "slide": 220.0, "vol": 0.22, "dur": 0.45, "swell": 0.7}, {"wave": "noise", "lp": 0.2, "vol": 0.12, "dur": 0.4}]},
+	"tell_quake": {"total": 0.5, "layers": [{"wave": "sine", "freq": 80.0, "slide": 40.0, "vol": 0.32, "dur": 0.2}, {"wave": "sine", "freq": 80.0, "slide": 40.0, "vol": 0.32, "dur": 0.2, "delay": 0.25}, {"wave": "noise", "lp": 0.06, "vol": 0.15, "dur": 0.45}]},
+	"tell_rush": {"total": 0.5, "layers": [{"wave": "saw", "freq": 200.0, "slide": 700.0, "vol": 0.18, "dur": 0.4, "swell": 0.9}, {"wave": "sine", "freq": 1500.0, "vol": 0.12, "dur": 0.1, "delay": 0.38}]},
 	"tell_dive": {"total": 0.3, "layers": [{"wave": "saw", "freq": 600.0, "slide": -400.0, "vol": 0.14, "dur": 0.25}]},
 	"rumble": {"total": 0.25, "layers": [{"wave": "noise", "lp": 0.06, "vol": 0.25, "dur": 0.22}]},
 	"jump": {"total": 0.14, "layers": [{"wave": "sine", "freq": 330.0, "slide": 280.0, "vol": 0.25, "dur": 0.12}]},

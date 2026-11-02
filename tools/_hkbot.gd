@@ -6,7 +6,7 @@ extends SceneTree
 const ALL: Array = ["crawler", "flyer", "spitter", "charger", "guard", "dropper", "sentry", "reviver", "cinder", "bubbler", "warden", "brute", "hexer", "wraith", "colossus", "lord", "many_faced"]
 const HAZARD_LEAD: float = 0.35   # coi vùng là nguy hiểm khi còn ≤ chừng này giây nữa có hiệu lực (người thật nghe âm báo)
 const HAZARD_PAD: float = 60.0    # lề né quanh vùng gây hại
-const DANGER: Array = ["windup", "lunge", "bash", "dive", "shake", "wind_slash", "wind_slam", "wind_dive", "air"]
+const DANGER: Array = ["windup", "lunge", "bash", "dive", "shake", "wind_slash", "wind_slam", "wind_dive", "air", "wind_quake", "quake", "wind_rush", "rush"]
 var _pulse: Array = []
 
 func tap(a: String) -> void:

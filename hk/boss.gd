@@ -33,6 +33,8 @@ const SKILL: Dictionary = {
 	"warden": "wind_pillar", "brute": "wind_fissure", "wraith": "wind_veil", "hexer": "wind_torch",
 	"lord": "wind_heat", "sovereign": "wind_heat", "colossus": "wind_tide",
 }
+const QUAKE_WAVES: Array = [2, 3]   # số sóng của đòn quake theo pha 1 / pha 2+
+const RUSH_SPEED: float = 560.0
 const GRAVITY: float = 2400.0
 const STAGGER_CD: float = 6.0   # mỗi boss chỉ choáng được một lần mỗi chừng này giây (đỡ đòn không thành vòng lặp)
 const PERCH_WAIT: float = 1.0   # giây người chơi đứng cao hơn boss trước khi boss nhảy lên
@@ -278,6 +280,38 @@ func _ground(delta: float, p: Node2D) -> void:
 				_summon()
 				state = "recover"
 				_t = 0.6
+		"wind_quake":   # Colossus: dậm đất liên tiếp, mỗi nhịp một sóng chạy hai bên (nhảy qua từng sóng theo nhịp)
+			velocity.x = 0.0
+			if _t <= 0.0:
+				state = "quake"
+				_combo = int(QUAKE_WAVES[0 if phase == 1 else 1])
+		"quake":
+			velocity.x = 0.0
+			if _t <= 0.0:
+				_shockwave()
+				_combo -= 1
+				_t = 0.5
+				if _combo <= 0:
+					state = "recover"
+					_t = 0.9
+		"wind_rush":   # Brute (pha 2): lao hết phòng rồi quay lại; KHÔNG đỡ được (báo bằng sắc vàng + âm tell_rush)
+			velocity.x = 0.0
+			_face(p)
+			if _t <= 0.0:
+				state = "rush"
+				_combo = 2
+				_t = 7.0   # giới hạn an toàn: hai lượt hết phòng (~6.5s ở tốc độ 560)
+				shake.emit(2.0)
+		"rush":
+			velocity.x = float(dir) * RUSH_SPEED
+			var edge: bool = (dir < 0 and global_position.x <= arena.position.x + 50.5) or (dir > 0 and global_position.x >= arena.end.x - 50.5) or (is_on_wall() and get_wall_normal().x * float(dir) < 0.0)   # chỉ tính bờ đang lao tới (không quay hai lần ở cùng một bờ)
+			if edge:
+				_combo -= 1
+				dir = -dir
+				shake.emit(2.0)
+			if _combo <= 0 or _t <= 0.0:
+				state = "recover"
+				_t = 1.0
 		"wind_pillar", "wind_fissure", "wind_heat", "wind_tide", "wind_torch", "wind_veil":   # torch/veil: chỉ dùng khi Lord echo (boss bay có khối riêng)
 			velocity.x = 0.0
 			_face(p)
@@ -307,6 +341,7 @@ func _pick_attack() -> void:
 		opts = ["slam", "slam", "slash"]
 		if phase >= 2:
 			opts.append("combo")
+			opts.append("rush")
 	elif _lordlike():
 		opts.append("summon")
 		if phase >= 2:
@@ -314,6 +349,8 @@ func _pick_attack() -> void:
 			opts.append("rain")
 	elif phase >= 2:
 		opts.append("combo")
+	if form == "colossus":
+		opts.append("quake")
 	if SKILL.has(form):   # đòn riêng của dạng này (nhiều hơn ở pha 2)
 		opts.append("skill")
 		if phase >= 2:
@@ -341,6 +378,12 @@ func _pick_attack() -> void:
 		"bolt":
 			state = "wind_bolt"
 			_t = 0.55
+		"quake":
+			state = "wind_quake"
+			_t = 0.7
+		"rush":
+			state = "wind_rush"
+			_t = 0.8
 		"rain":
 			state = "rain"
 			_t = 3.0
@@ -607,7 +650,7 @@ func _touch_damage(p: Node2D) -> void:
 	var pr := Rect2(p.global_position - p.BODY * 0.5, p.BODY)
 	var body := Rect2(global_position - _size * 0.5, _size)
 	if pr.intersects(body) or (state == "lunge" and pr.intersects(_attack_rect())):
-		p.take_damage(global_position.x)
+		p.take_damage(global_position.x, 1, state != "rush")
 
 ## Người chơi đỡ trúng đòn của boss: choáng `sec` giây, tối đa một lần mỗi STAGGER_CD; không áp dụng lúc ngủ/giới thiệu/đổi dạng.
 func stagger(sec: float) -> void:
@@ -687,6 +730,8 @@ func _draw() -> void:
 	var tint := _look_tint()
 	if _flash > 0.0:
 		tint = Color(3, 3, 3, _alpha)
+	elif (state == "wind_rush" or state == "rush") and int(_time * 30.0) % 2 == 0:
+		tint = Color(1.8, 1.5, 0.4, _alpha)   # vàng = không đỡ được, phải né
 	elif (state.begins_with("wind") or state == "fade_out") and int(_time * 30.0) % 2 == 0:
 		tint = Color(1.6, 0.8, 0.8, _alpha)
 	else:
