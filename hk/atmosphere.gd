@@ -59,9 +59,6 @@ func _make_light(col: Color, energy: float, scale_: float) -> PointLight2D:
 	add_child(l)
 	return l
 
-func is_on() -> bool:
-	return STATE.atmosphere_on
-
 ## Boss bật/tắt bóng tối trong phòng.
 func set_tint(c: Color) -> void:
 	_tint = c

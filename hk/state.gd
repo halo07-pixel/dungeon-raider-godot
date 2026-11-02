@@ -186,23 +186,37 @@ static func to_dict() -> Dictionary:
 		"charms_equipped": charms_equipped, "notch_bonus": notch_bonus, "flags": flags, "visited": visited,
 		"bench_room": bench_room, "bench_id": bench_id, "shade": shade, "music_vol": music_vol, "sfx_vol": sfx_vol, "shake_on": shake_on, "zoom_on": zoom_on, "atmosphere_on": atmosphere_on, "pins": pins, "time": play_time}
 
+## Dữ liệu save có thể hỏng/sửa tay: đọc số, mảng, chuỗi có kiểm tra kiểu thay vì ép kiểu (int([]) làm script lỗi giữa chừng).
+static func _int(v, fallback: int) -> int:
+	return int(v) if (v is int or v is float) else fallback
+
+static func _list(v) -> Array:
+	return v if v is Array else []
+
+static func _strings(v) -> Array:
+	var out: Array = []
+	for x in _list(v):
+		if x is String:
+			out.append(x)
+	return out
+
 static func from_dict(d: Dictionary) -> void:
 	reset()
-	hp_bonus = clampi(int(d.get("hp_bonus", 0)), 0, 4)
-	music_vol = clampi(int(d.get("music_vol", music_vol)), 0, 10)
-	sfx_vol = clampi(int(d.get("sfx_vol", sfx_vol)), 0, 10)
+	hp_bonus = clampi(_int(d.get("hp_bonus"), 0), 0, 4)
+	music_vol = clampi(_int(d.get("music_vol"), music_vol), 0, 10)
+	sfx_vol = clampi(_int(d.get("sfx_vol"), sfx_vol), 0, 10)
 	atmosphere_on = bool(d.get("atmosphere_on", atmosphere_on)) if d.get("atmosphere_on", true) is bool else atmosphere_on
 	shake_on = bool(d.get("shake_on", shake_on)) if d.get("shake_on", true) is bool else shake_on
 	zoom_on = bool(d.get("zoom_on", zoom_on)) if d.get("zoom_on", true) is bool else zoom_on
-	geo = clampi(int(d.get("geo", 0)), 0, MAX_GEO)
+	geo = clampi(_int(d.get("geo"), 0), 0, MAX_GEO)
 	var tm = d.get("time", 0.0)
 	play_time = maxf(0.0, float(tm)) if (tm is float or tm is int) else 0.0
-	notch_bonus = clampi(int(d.get("notch_bonus", 0)), 0, 4)
-	for a in d.get("abilities", []):
-		give_ability(String(a))
-	for c in d.get("charms_owned", []):
-		give_charm(String(c))
-	for c in d.get("charms_equipped", []):
+	notch_bonus = clampi(_int(d.get("notch_bonus"), 0), 0, 4)
+	for a in _strings(d.get("abilities")):
+		give_ability(a)
+	for c in _strings(d.get("charms_owned")):
+		give_charm(c)
+	for c in _strings(d.get("charms_equipped")):
 		if c in charms_owned and not (c in charms_equipped) and notches_used() + int(CHARMS[c]["cost"]) <= notches():
 			charms_equipped.append(String(c))
 	var f = d.get("flags", {})
@@ -211,15 +225,17 @@ static func from_dict(d: Dictionary) -> void:
 		for k in f:
 			if k is String and f[k] is bool:
 				flags[k] = f[k]
-	for r in d.get("visited", []):
-		visited.append(String(r))
-	bench_room = String(d.get("bench_room", START_ROOM))
-	bench_id = String(d.get("bench_id", "start"))
+	for r in _strings(d.get("visited")):
+		visited.append(r)
+	var br = d.get("bench_room")
+	bench_room = br if br is String else START_ROOM
+	var bi = d.get("bench_id")
+	bench_id = bi if bi is String else "start"
 	var s = d.get("shade", {})
 	shade = {}
 	if s is Dictionary and s.get("room") is String and (s.get("x") is float or s.get("x") is int) and (s.get("y") is float or s.get("y") is int) and (s.get("geo") is float or s.get("geo") is int):
 		shade = {"room": String(s["room"]), "x": float(s["x"]), "y": float(s["y"]), "geo": clampi(int(s["geo"]), 0, MAX_GEO)}
-	for p in d.get("pins", []):   # dữ liệu save có thể hỏng: chỉ nhận ghim đúng kiểu, tối đa MAX_PINS
+	for p in _list(d.get("pins")):   # dữ liệu save có thể hỏng: chỉ nhận ghim đúng kiểu, tối đa MAX_PINS
 		if p is Dictionary and p.get("room") is String and (p.get("x") is float or p.get("x") is int) and (p.get("y") is float or p.get("y") is int) and pins.size() < MAX_PINS:
 			pins.append({"room": String(p["room"]), "x": float(p["x"]), "y": float(p["y"])})
 	hp = max_hp()
