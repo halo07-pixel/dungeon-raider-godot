@@ -112,6 +112,25 @@ func _init() -> void:
 	p.velocity = Vector2.ZERO
 	await frames(3)
 	ck(not St.flag("secret_cat_3"), "chưa vỡ: chưa có cờ")
+	var Menu = load("res://hk/menu.gd")
+	var rd: Dictionary = load("res://hk/world_data.gd").load_all()["cat_3"].duplicate()
+	rd["id"] = "cat_3"   # menu._draw_map đặt id trước khi gọi map_icons
+	var has_cache := func(ic: Array) -> bool:
+		for i in ic:
+			if i["k"] == "cache":
+				return true
+		return false
+	ck(not has_cache.call(Menu.map_icons(rd)), "hốc bí mật chưa mở: bản đồ không lộ rương")
+	var crack_n: Node = get_nodes_in_group("hk_crack")[0]
+	p.global_position = crack_n.global_position + Vector2(-400, 0)
+	await frames(2)
+	ck(crack_n._glow < 0.05, "xa vết nứt: không sáng (%f)" % crack_n._glow)
+	p.global_position = crack_n.global_position + Vector2(-40, 0)
+	await frames(2)
+	ck(crack_n._glow > 0.3, "lại gần vết nứt: sáng lên (%f)" % crack_n._glow)
+	p.global_position = Vector2(14.0 * 32.0 + 16.0, fy)
+	p.velocity = Vector2.ZERO
+	await frames(3)
 	p.facing = 1
 	p.attack_dir = Vector2.RIGHT
 	p._hit_set.clear()
@@ -124,6 +143,9 @@ func _init() -> void:
 	p.velocity = Vector2.ZERO
 	await frames(10)
 	ck(p.is_on_floor() and absf(p.global_position.x - (18.0 * 32.0 + 16.0)) < 4.0, "vào được hốc (x=%f)" % p.global_position.x)
+	ck(has_cache.call(Menu.map_icons(rd)), "hốc đã mở: bản đồ hiện rương chưa nhặt")
+	for ar in ["gate", "catacomb", "vault", "archive", "grove"]:
+		ck(load("res://hk/lore.gd").secret_note(ar) != "", "có ghi chú hốc cho khu " + ar)
 	var geo0: int = St.geo
 	w._on_interacted("cache", {"key": "cat_3:18:17", "pos": Vector2(18.0 * 32.0 + 16.0, 18.0 * 32.0)})
 	ck(St.geo - geo0 == 75, "rương trong hốc bí mật cho 75 Geo (%d)" % (St.geo - geo0))
