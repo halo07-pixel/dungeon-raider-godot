@@ -36,6 +36,7 @@ const SKILL: Dictionary = {
 }
 const SWEEP_H: float = 36.0       # chiều cao sóng quét của Warden (nhảy qua được)
 const SWEEP_SPEED: float = 300.0
+const SWEEP_P1: float = 0.5       # xác suất sweep nằm trong danh sách đòn của một lượt ở pha 1
 const VINE_GAP: float = 45.0      # pha 2: hàng dây thứ hai lệch nửa bước so với hàng đầu, lấp các khe
 const QUAKE_WAVES: Array = [2, 3]   # số sóng của đòn quake theo pha 1 / pha 2+
 const RUSH_SPEED: float = 560.0
@@ -356,7 +357,7 @@ func _pick_attack() -> void:
 		opts.append("combo")
 	if form == "colossus":
 		opts.append("quake")
-	if form == "warden" and phase >= 2:   # quét sàn: đòn không đỡ được của Warden (nhảy hoặc dash qua)
+	if form == "warden" and (phase >= 2 or randf() < SWEEP_P1):   # quét sàn: đòn không đỡ được của Warden (nhảy hoặc dash qua); pha 1 chỉ thỉnh thoảng
 		opts.append("sweep")
 	if form == "grove":   # dây leo: đòn thứ hai của Rotted Warden (nhiều hơn ở pha 2)
 		opts.append("vine")
@@ -449,18 +450,18 @@ func _cast(p: Node2D) -> void:
 				_zone("spikes", Rect2(x2 - 20.0, fy - 44.0, 40.0, 44.0), 0.6, 3.5)
 			shake.emit(2.0)
 		"wind_bloom":   # Rotted Warden: năm cụm bào tử nở quanh người chơi, tồn tại 4s (đứng ngoài cụm hoặc dash với Spore Ward)
-			for dx in [-200.0, -100.0, 0.0, 100.0, 200.0]:
+			for dx in ([-300.0, -200.0, -100.0, 0.0, 100.0, 200.0, 300.0] if phase >= 2 else [-200.0, -100.0, 0.0, 100.0, 200.0]):   # pha 2: phủ rộng hơn
 				var xb: float = clampf(p.global_position.x + dx, arena.position.x + 60.0, arena.end.x - 60.0)
 				_dust(Vector2(xb, fy))
 				var zb: Node2D = _zone("spore", Rect2(xb - 40.0, fy - 70.0, 80.0, 70.0), 0.7, 4.0)
 				zb.period = 0.0
-		"wind_vine":   # Rotted Warden: dây leo trồi lên thành hàng từ boss tới người chơi, từng cụm một (không đỡ được); pha 2: hàng thứ hai lấp các khe sau khi hàng đầu tàn
+		"wind_vine":   # Rotted Warden: dây leo trồi lên thành hàng từ boss tới người chơi, từng cụm một (không đỡ được); pha 2: hàng thứ hai lấp các khe sau khi hàng đầu tàn (pha 1: chỉ 3 dây đầu)
 			var sgn: float = 1.0 if p.global_position.x >= global_position.x else -1.0
 			for i in 6:
 				var xv: float = clampf(global_position.x + sgn * (90.0 + 90.0 * float(i)), arena.position.x + 40.0, arena.end.x - 40.0)
 				_dust(Vector2(xv, fy))
 				_zone("vine", Rect2(xv - 22.0, fy - 64.0, 44.0, 64.0), 0.3 + 0.18 * float(i), 0.9)
-				if phase >= 2:
+				if phase >= 2 or i < 3:   # pha 1: hàng thứ hai nhẹ (3 dây đầu)
 					_zone("vine", Rect2(xv + sgn * VINE_GAP - 22.0, fy - 64.0, 44.0, 64.0), 1.2 + 0.18 * float(i), 0.9)
 			shake.emit(2.0)
 		"wind_sweep":   # Gate Warden (pha 2): sóng đá thấp quét sàn về phía người chơi, KHÔNG đỡ được (nháy vàng + tell_sweep); nhảy hoặc dash qua
@@ -710,6 +711,8 @@ func take_hit(dmg: int, _from: Vector2) -> bool:   # luôn true (không có khi�
 	var want: int = phase
 	if kind == "many_faced":   # 3 pha: 66% và 33% máu
 		want = 3 if hp * 3 <= max_hp else (2 if hp * 3 <= max_hp * 2 else 1)
+	elif kind == "grove" and hp * 3 <= max_hp * 2:   # Rotted Warden vào pha 2 sớm hơn (66% thay vì 50%): bản cũ hạ trong ~9s nên gần như không thấy pha 2
+		want = 2
 	elif hp <= max_hp / 2:
 		want = 2
 	if want > phase:

@@ -177,11 +177,26 @@ func _init() -> void:
 	b.state = "wind_bloom"
 	b._t = 0.0
 	await frames(3)
-	ck(zones(b, "spore").size() == 5, "wind_bloom: 5 cụm bào tử (%d)" % zones(b, "spore").size())
+	ck(zones(b, "spore").size() == 5, "wind_bloom pha 1: 5 cụm bào tử (%d)" % zones(b, "spore").size())
 	b.state = "wind_vine"
 	b._t = 0.0
 	await frames(3)
-	ck(zones(b, "vine").size() == 6, "wind_vine: 6 dây leo (%d)" % zones(b, "vine").size())
+	ck(zones(b, "vine").size() == 9, "wind_vine pha 1: 6 dây + 3 dây hàng nhẹ (%d)" % zones(b, "vine").size())
+	b.phase = 2
+	b.state = "wind_bloom"
+	b._t = 0.0
+	await frames(3)
+	ck(zones(b, "spore").size() == 12, "wind_bloom pha 2: thêm 2 cụm (5 + 7 = 12 gồm cụm pha 1 còn lại) (%d)" % zones(b, "spore").size())
+	for zs in zones(b, "spore"):
+		zs.free()
+	b.phase = 1
+	# grove vào pha 2 ở 66% máu (warden: 50%)
+	b.hp = b.max_hp * 2 / 3 + 1
+	b.state = "walk"
+	b.take_hit(1, Vector2.ZERO)
+	ck(b.phase == 2, "grove vào pha 2 ở ~66%% máu (phase %d, hp %d)" % [b.phase, b.hp])
+	b.phase = 1
+	b.state = "walk"
 	for zq in zones(b, "vine"):   # pha 2: thêm hàng dây thứ hai (6 + 6), hàng sau xuất hiện muộn hơn và lệch khe
 		zq.free()
 	b.phase = 2
