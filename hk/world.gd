@@ -465,6 +465,8 @@ func _on_interacted(kind: String, data: Dictionary) -> void:
 			var n: int = 25 * (3 if STATE.flag("secret_" + room.id) else 1)   # rương trong hốc bí mật: gấp ba
 			STATE.geo += n
 			FX.float_text(_content, data["pos"], "+%d Geo" % n, Color(1, 0.9, 0.4))
+			if STATE.flag("secret_" + room.id):
+				hud.banner("Hidden cache", LORE.secret_note(String(room.data.get("area", "gate"))))
 		"altar":
 			sfx.play("ability")
 			var aid: String = String(data.get("id", ""))

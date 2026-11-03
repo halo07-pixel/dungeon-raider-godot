@@ -204,7 +204,18 @@ func _init() -> void:
 	await frames(10)
 	ck(p.spore_t == 0.0, "chưa dash: spore_t = 0")
 	p._stun = 0.0   # đòn bào tử trước đó để lại choáng ngắn
-	await tap("hk_dash")
+	p.can_dash = true   # dash có thể còn hồi/đang ở trạng thái sau đòn trước: đặt sạch để test không phụ thuộc nhịp
+	p._dash_cd = 0.0
+	var dev := InputEventAction.new()   # giữ phím qua vài khung vật lý để chắc chắn có một tick thấy just_pressed
+	dev.action = "hk_dash"
+	dev.pressed = true
+	Input.parse_input_event(dev)
+	await process_frame
+	await frames(3)
+	var drel := InputEventAction.new()
+	drel.action = "hk_dash"
+	drel.pressed = false
+	Input.parse_input_event(drel)
 	ck(p.spore_t > 0.0 and p.spore_t <= p.DASH_TIME + p.SPORE_WARD_TAIL + 0.001, "dash với Spore Ward: spore_t trong (0, %.2f] (%f)" % [p.DASH_TIME + p.SPORE_WARD_TAIL, p.spore_t])
 	await frames(70)
 	ck(p.spore_t == 0.0, "hết tail: spore_t về 0")

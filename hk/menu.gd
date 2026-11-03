@@ -155,6 +155,10 @@ func travel_targets() -> Array:
 static func map_icons(room: Dictionary) -> Array:
 	var out: Array = []
 	var grid: Array = room["grid"]
+	var hidden_secret: bool = false   # hốc bí mật chưa mở: rương trong đó không được lộ trên bản đồ
+	for gl in grid:
+		if String(gl).contains("%"):
+			hidden_secret = not STATE.flag("secret_" + String(room.get("id", "")))
 	for y in grid.size():
 		var line: String = String(grid[y])
 		for x in line.length():
@@ -173,7 +177,7 @@ static func map_icons(room: Dictionary) -> Array:
 					if not STATE.flag("boss_" + String(room.get("boss", {}).get("id", ""))):
 						out.append({"k": "boss", "c": c})
 				"$":
-					if not STATE.flag("cache_%s:%d:%d" % [String(room.get("id", "")), x, y]):
+					if not hidden_secret and not STATE.flag("cache_%s:%d:%d" % [String(room.get("id", "")), x, y]):
 						out.append({"k": "cache", "c": c})
 	for dch in room["doors"]:
 		if not (String(room["doors"][dch]["to"]) in STATE.visited):
@@ -224,7 +228,17 @@ func _draw_map(v: Control, font: Font, sz: Vector2) -> void:
 			var pr: Dictionary = rooms[p["room"]]
 			var pp2: Vector2 = origin + pr["map"] * CELL + Vector2(float(p["x"]), float(p["y"])) / 32.0 / WorldData.MAP_CELL_TILES * CELL
 			v.draw_colored_polygon(PackedVector2Array([pp2 + Vector2(0, 7), pp2 + Vector2(-5, -5), pp2 + Vector2(5, -5)]), Color(1, 0.3, 0.9))
-	v.draw_string(font, Vector2(40, sz.y - 54), "White frame: this room   red dot: you   yellow: bench   cyan: shop   green: item left   red ring: boss   orange: chest   hollow: unexplored exit", HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Color(0.7, 0.75, 0.85))
+	var lx: float = 40.0   # chú giải: vẽ chính biểu tượng thật rồi tên, không mô tả bằng màu
+	for lg in [["bench", "Bench"], ["shop", "Shop"], ["item", "Item left"], ["boss", "Boss"], ["cache", "Chest"], ["exit", "Unexplored exit"]]:
+		_draw_icon(v, Vector2(lx + 6.0, sz.y - 59.0), String(lg[0]))
+		v.draw_string(font, Vector2(lx + 18.0, sz.y - 54.0), String(lg[1]), HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Color(0.7, 0.75, 0.85))
+		lx += 30.0 + 8.0 * String(lg[1]).length()
+	v.draw_circle(Vector2(lx + 6.0, sz.y - 59.0), 4, Color(1, 0.3, 0.3))
+	v.draw_string(font, Vector2(lx + 18.0, sz.y - 54.0), "You", HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Color(0.7, 0.75, 0.85))
+	lx += 60.0
+	v.draw_colored_polygon(PackedVector2Array([Vector2(lx + 6.0, sz.y - 54.0), Vector2(lx + 1.0, sz.y - 64.0), Vector2(lx + 11.0, sz.y - 64.0)]), Color(1, 0.3, 0.9))
+	v.draw_string(font, Vector2(lx + 18.0, sz.y - 54.0), "Pin", HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Color(0.7, 0.75, 0.85))
+	v.draw_string(font, Vector2(40, 126), String(cur.get("name", "")), HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Color(0.95, 0.9, 0.7))   # tên phòng hiện tại (cur từ đầu hàm)
 	var foot: String = "Arrows: pan the map   P: place / remove a pin here (%d / %d)" % [STATE.pins.size(), STATE.MAX_PINS]
 	if can_travel:
 		foot = "Up / Down: choose a bench (yellow frame)   Jump: travel there" if not _targets.is_empty() else "Rest at another bench first to travel between them."
@@ -290,9 +304,21 @@ func _draw_memories(v: Control, font: Font, sz: Vector2) -> void:
 	for i in LORE.MEMORIES.size():
 		var m: Dictionary = LORE.MEMORIES[i]
 		var got: bool = LORE.has_memory(String(m["id"]))
-		var y: float = 170.0 + i * 70.0
+		var y: float = 170.0 + i * 62.0
 		v.draw_string(font, Vector2(sz.x * 0.5 - 380, y), String(m["title"]) if got else "???", HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Color(0.95, 0.95, 1) if got else Color(0.4, 0.42, 0.5))
 		v.draw_string(font, Vector2(sz.x * 0.5 - 380, y + 28), String(m["memory"]) if got else "A boss still holds this memory.", HORIZONTAL_ALIGNMENT_LEFT, -1, 17, Color(0.75, 0.82, 0.95) if got else Color(0.4, 0.42, 0.5))
+	var by: float = 170.0 + LORE.MEMORIES.size() * 62.0 + 10.0   # mục Bonus: ký ức của boss bí mật/phụ, chỉ hiện khi đã hạ, không tính vào x / 6
+	var shown: bool = false
+	for sid in LORE.SECRET:
+		if not LORE.has_memory(String(sid)):
+			continue
+		if not shown:
+			v.draw_string(font, Vector2(sz.x * 0.5 - 380, by), "Bonus", HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Color(0.95, 0.9, 0.7))
+			shown = true
+			by += 32.0
+		v.draw_string(font, Vector2(sz.x * 0.5 - 380, by), LORE.line(String(sid), "title"), HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Color(0.85, 0.95, 0.85))
+		v.draw_string(font, Vector2(sz.x * 0.5 - 380, by + 26), LORE.line(String(sid), "memory"), HORIZONTAL_ALIGNMENT_LEFT, -1, 17, Color(0.75, 0.88, 0.8))
+		by += 58.0
 	v.draw_string(font, Vector2(sz.x * 0.5 - 380, sz.y - 40), "N or Esc: close", HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.6, 0.65, 0.75))
 
 func _draw_pause(v: Control, font: Font, sz: Vector2) -> void:

@@ -29,8 +29,16 @@ const DEATH: Dictionary = {
 }
 ## Boss bí mật (không phải ký ức): câu vào trận / câu khi hạ.
 const SECRET: Dictionary = {
-	"many_faced": {"intro": "I wear every face you buried.", "memory": "Then close the gate, Gatekeeper. This time, stay."},
-	"grove": {"intro": "Rest. The rot is patient.", "memory": "Something was planted here to forget. It grew anyway."},   # bonus của Toxic Grove: không tính vào 6 ký ức
+	"many_faced": {"title": "The Last Face", "intro": "I wear every face you buried.", "memory": "Then close the gate, Gatekeeper. This time, stay."},
+	"grove": {"title": "The Planting", "intro": "Rest. The rot is patient.", "memory": "Something was planted here to forget. It grew anyway."},   # bonus của Toxic Grove: không tính vào 6 ký ức
+}
+## Ghi chú trong hốc bí mật (hiện khi mở rương hốc): một dòng theo khu.
+const SECRET_NOTE: Dictionary = {
+	"gate": "Scratched in the stone: 'I stayed.'",
+	"catacomb": "A tally of names, every one crossed out.",
+	"vault": "Ash, and a key that opens nothing.",
+	"archive": "A page torn out. Only the margin remains.",
+	"grove": "Something bloomed here before the rot.",
 }
 const INTRO_GATEKEEPER: String = "You remember it all. Then hold the gate."   # câu vào trận của Lord khi đã có 5 ký ức kia
 const ENDING_NORMAL: Array = ["The Dungeon Lord has fallen", "The vaults fall silent. Thank you for playing."]
@@ -65,6 +73,9 @@ static func is_complete() -> bool:
 
 static func bench_line() -> String:
 	return String(BENCH[count()])
+
+static func secret_note(area: String) -> String:
+	return String(SECRET_NOTE.get(area, SECRET_NOTE["gate"]))
 
 static func death_line(area: String) -> String:
 	return String(DEATH.get(area, DEATH["gate"]))

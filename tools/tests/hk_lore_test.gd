@@ -55,6 +55,10 @@ func _init() -> void:
 	for m in L.MEMORIES:
 		St.set_flag("boss_" + String(m["id"]))
 	ck(L.is_complete() and L.ending_lines() == L.ENDING_FULL, "đủ 6: ending hoàn chỉnh")
+	for sid in L.SECRET:
+		ck(L.line(String(sid), "title") != "" and L.line(String(sid), "memory") != "", "boss bí mật '%s' có title + memory cho mục Bonus" % sid)
+		St.set_flag("boss_" + String(sid))   # để mục Bonus được vẽ
+	ck(L.count() == L.MEMORIES.size(), "boss bí mật không tính vào số ký ức")
 	# tab Memories bằng phím N, đóng bằng N
 	var menu = load("res://hk/menu.gd").new()
 	root.add_child(menu)
