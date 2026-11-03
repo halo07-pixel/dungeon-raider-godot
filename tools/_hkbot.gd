@@ -2,11 +2,14 @@ extends SceneTree
 ## Bot đo độ khó (không chạy trong run_all; test `hk_bot_test.gd` chỉ kiểm bot chạy được): godot --headless --path . -s tools/_hkbot.gd -- <kind|all> [lần]
 ## kind = crawler|flyer|spitter|charger|guard|dropper|sentry|reviver|cinder|bubbler|warden|wraith|lord|brute|hexer|colossus|many_faced; `all` = lần lượt tất cả rồi in bảng.
 ## Bot "người chơi trung bình": tiến lại, chém khi tới tầm, nhảy né sau ~0.25s khi quái/boss vào thế đánh hoặc khi vùng gây hại (gai, lửa, sóng lửa, bục nóng) sắp chạm,
-## nhảy lên chém khi boss bay ở trên cao. Không vòng ra sau khiên (guard/sentry bị chặn nhiều hơn người thật). In: số lần bị trúng, thời gian hạ, tỉ lệ hạ được trong 90s.
+## nhảy lên chém khi boss bay ở trên cao. Tham số thứ 3 `parry` bật đỡ: bấm `hk_parry` khi đòn cận chiến đã vào thế đánh được ≥PARRY_REACT giây và còn trong tầm, hoặc đạn địch tới gần (không đỡ `rush`, zone). Không vòng ra sau khiên (guard/sentry bị chặn nhiều hơn người thật). In: số lần bị trúng, thời gian hạ, tỉ lệ hạ được trong 90s.
 const ALL: Array = ["crawler", "flyer", "spitter", "charger", "guard", "dropper", "sentry", "reviver", "cinder", "bubbler", "sporeling", "thornshooter", "warden", "brute", "hexer", "wraith", "colossus", "grove", "lord", "many_faced"]
 const HAZARD_LEAD: float = 0.35   # coi vùng là nguy hiểm khi còn ≤ chừng này giây nữa có hiệu lực (người thật nghe âm báo)
 const HAZARD_PAD: float = 60.0    # lề né quanh vùng gây hại
 const DANGER: Array = ["windup", "lunge", "bash", "dive", "shake", "wind_slash", "wind_slam", "wind_dive", "air", "wind_quake", "quake", "wind_rush", "rush"]
+const PARRY_REACT: float = 0.15   # độ trễ phản xạ cố định của bot khi đỡ (so sánh công bằng giữa các bản)
+const PARRY_MELEE: float = 130.0
+const PARRY_SHOT: float = 120.0
 var _pulse: Array = []
 
 func tap(a: String) -> void:
@@ -36,6 +39,15 @@ func hazard_center(p: Node2D, owners: Array):
 					return n.current().get_center()
 	return null
 
+## Đạn địch (projectile.gd, không friendly, không phải bong bóng chậm) đang bay về phía người chơi trong tầm đỡ.
+func shot_incoming(p: Node2D) -> bool:
+	for n in root.get_children():
+		if n.has_method("_on_body") and n.get("friendly") == false and not bool(n.get("slows")):
+			var d: Vector2 = p.global_position - n.global_position
+			if d.length() < PARRY_SHOT and d.dot(n.vel) > 0.0:
+				return true
+	return false
+
 func hold(a: String, on: bool) -> void:
 	if on:
 		Input.action_press(a)
@@ -50,6 +62,7 @@ func _init() -> void:
 	var args := OS.get_cmdline_user_args()
 	var kinds: Array = ALL if args[0] == "all" else [args[0]]
 	var runs: int = int(args[1]) if args.size() > 1 else 6
+	var use_parry: bool = args.size() > 2 and args[2] == "parry"
 	var St = load("res://hk/state.gd")
 	var boss_kinds: Array = ["warden", "wraith", "lord", "brute", "hexer", "colossus", "many_faced", "grove"]
 	var table: Array = []
@@ -102,6 +115,7 @@ func _init() -> void:
 			var t: float = 0.0
 			var danger_t: float = 0.0
 			var dodge_t: float = 0.0
+			var parry_cd: float = 0.0
 			var flee_x: float = 0.0
 			var last_f: int = Engine.get_physics_frames()
 			while is_instance_valid(e) and t < 90.0 and St.hp > 0:
@@ -125,13 +139,18 @@ func _init() -> void:
 					danger_t += dt
 				else:
 					danger_t = 0.0
+				parry_cd -= dt
+				if use_parry and parry_cd <= 0.0 and p._parry_rec <= 0.0 and st != "rush" and dodge_t <= 0.0:
+					if (danger_t > PARRY_REACT and dist < PARRY_MELEE) or shot_incoming(p):
+						tap("hk_parry")
+						parry_cd = 0.6
 				if dodge_t <= 0.0:
 					var hz = hazard_center(p, [e, root])
 					if hz != null:   # vùng gây hại sắp chạm: nhảy và chạy ngược khỏi vùng
 						dodge_t = 0.45
 						flee_x = hz.x
 						tap("hk_jump")
-					elif danger_t > 0.25 and dist < 260.0:
+					elif danger_t > 0.25 and dist < 260.0 and not (use_parry and dist < PARRY_MELEE and st != "rush"):
 						dodge_t = 0.45
 						flee_x = e.global_position.x
 						tap("hk_jump")
