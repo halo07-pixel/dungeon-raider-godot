@@ -34,6 +34,9 @@ const SKILL: Dictionary = {
 	"warden": "wind_pillar", "brute": "wind_fissure", "wraith": "wind_veil", "hexer": "wind_torch",
 	"lord": "wind_heat", "sovereign": "wind_heat", "colossus": "wind_tide", "grove": "wind_bloom",
 }
+const SWEEP_H: float = 36.0       # chiều cao sóng quét của Warden (nhảy qua được)
+const SWEEP_SPEED: float = 300.0
+const VINE_GAP: float = 45.0      # pha 2: hàng dây thứ hai lệch nửa bước so với hàng đầu, lấp các khe
 const QUAKE_WAVES: Array = [2, 3]   # số sóng của đòn quake theo pha 1 / pha 2+
 const RUSH_SPEED: float = 560.0
 const GRAVITY: float = 2400.0
@@ -314,7 +317,7 @@ func _ground(delta: float, p: Node2D) -> void:
 			if _combo <= 0 or _t <= 0.0:
 				state = "recover"
 				_t = 1.0
-		"wind_pillar", "wind_fissure", "wind_heat", "wind_tide", "wind_torch", "wind_veil", "wind_bloom", "wind_vine":   # torch/veil: chỉ dùng khi Lord echo (boss bay có khối riêng)
+		"wind_pillar", "wind_fissure", "wind_heat", "wind_tide", "wind_torch", "wind_veil", "wind_bloom", "wind_vine", "wind_sweep":   # torch/veil: chỉ dùng khi Lord echo (boss bay có khối riêng)
 			velocity.x = 0.0
 			_face(p)
 			if _t <= 0.0:
@@ -353,6 +356,8 @@ func _pick_attack() -> void:
 		opts.append("combo")
 	if form == "colossus":
 		opts.append("quake")
+	if form == "warden" and phase >= 2:   # quét sàn: đòn không đỡ được của Warden (nhảy hoặc dash qua)
+		opts.append("sweep")
 	if form == "grove":   # dây leo: đòn thứ hai của Rotted Warden (nhiều hơn ở pha 2)
 		opts.append("vine")
 		if phase >= 2:
@@ -389,6 +394,9 @@ func _pick_attack() -> void:
 			_t = 0.7
 		"vine":
 			state = "wind_vine"
+			_t = 0.8
+		"sweep":
+			state = "wind_sweep"
 			_t = 0.8
 		"rush":
 			state = "wind_rush"
@@ -446,12 +454,21 @@ func _cast(p: Node2D) -> void:
 				_dust(Vector2(xb, fy))
 				var zb: Node2D = _zone("spore", Rect2(xb - 40.0, fy - 70.0, 80.0, 70.0), 0.7, 4.0)
 				zb.period = 0.0
-		"wind_vine":   # Rotted Warden: dây leo trồi lên thành hàng từ boss tới người chơi, từng cụm một (không đỡ được)
+		"wind_vine":   # Rotted Warden: dây leo trồi lên thành hàng từ boss tới người chơi, từng cụm một (không đỡ được); pha 2: hàng thứ hai lấp các khe sau khi hàng đầu tàn
 			var sgn: float = 1.0 if p.global_position.x >= global_position.x else -1.0
 			for i in 6:
 				var xv: float = clampf(global_position.x + sgn * (90.0 + 90.0 * float(i)), arena.position.x + 40.0, arena.end.x - 40.0)
 				_dust(Vector2(xv, fy))
 				_zone("vine", Rect2(xv - 22.0, fy - 64.0, 44.0, 64.0), 0.3 + 0.18 * float(i), 0.9)
+				if phase >= 2:
+					_zone("vine", Rect2(xv + sgn * VINE_GAP - 22.0, fy - 64.0, 44.0, 64.0), 1.2 + 0.18 * float(i), 0.9)
+			shake.emit(2.0)
+		"wind_sweep":   # Gate Warden (pha 2): sóng đá thấp quét sàn về phía người chơi, KHÔNG đỡ được (nháy vàng + tell_sweep); nhảy hoặc dash qua
+			var sg: float = 1.0 if p.global_position.x >= global_position.x else -1.0
+			var edge: float = arena.end.x - 20.0 if sg > 0.0 else arena.position.x + 20.0
+			var dist: float = absf(edge - global_position.x)
+			_dust(Vector2(global_position.x + sg * 50.0, fy))
+			_zone("sweep", Rect2(global_position.x + sg * 50.0 - 20.0, fy - SWEEP_H, 40.0, SWEEP_H), 0.1, dist / SWEEP_SPEED, Vector2(sg * SWEEP_SPEED, 0.0))
 			shake.emit(2.0)
 		"wind_torch":   # Ash Hexer: nhóm lửa từ các lò chạy dọc sàn vào giữa phòng
 			var src: Array = braziers if not braziers.is_empty() else [Vector2(arena.position.x + 60.0, fy), Vector2(arena.end.x - 60.0, fy)]
@@ -752,7 +769,7 @@ func _draw() -> void:
 	var tint := _look_tint()
 	if _flash > 0.0:
 		tint = Color(3, 3, 3, _alpha)
-	elif (state == "wind_rush" or state == "rush") and int(_time * 30.0) % 2 == 0:
+	elif (state == "wind_rush" or state == "rush" or state == "wind_sweep") and int(_time * 30.0) % 2 == 0:
 		tint = Color(1.8, 1.5, 0.4, _alpha)   # vàng = không đỡ được, phải né
 	elif (state.begins_with("wind") or state == "fade_out") and int(_time * 30.0) % 2 == 0:
 		tint = Color(1.6, 0.8, 0.8, _alpha)

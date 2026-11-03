@@ -58,6 +58,7 @@ const DEFS: Dictionary = {
 	"tell_bloom": {"total": 0.5, "layers": [{"wave": "noise", "lp": 0.2, "vol": 0.2, "dur": 0.45, "swell": 0.8}, {"wave": "sine", "freq": 160.0, "slide": 240.0, "vol": 0.14, "dur": 0.4, "swell": 0.6}]},
 	"tell_vine": {"total": 0.4, "layers": [{"wave": "saw", "freq": 120.0, "slide": 90.0, "vol": 0.14, "dur": 0.35, "swell": 0.7}, {"wave": "noise", "lp": 0.1, "vol": 0.1, "dur": 0.3}]},
 	"tell_quake": {"total": 0.5, "layers": [{"wave": "sine", "freq": 80.0, "slide": 40.0, "vol": 0.32, "dur": 0.2}, {"wave": "sine", "freq": 80.0, "slide": 40.0, "vol": 0.32, "dur": 0.2, "delay": 0.25}, {"wave": "noise", "lp": 0.06, "vol": 0.15, "dur": 0.45}]},
+	"tell_sweep": {"total": 0.5, "layers": [{"wave": "saw", "freq": 90.0, "slide": 200.0, "vol": 0.16, "dur": 0.4, "swell": 0.8}, {"wave": "noise", "lp": 0.08, "vol": 0.14, "dur": 0.4}, {"wave": "sine", "freq": 1100.0, "vol": 0.1, "dur": 0.1, "delay": 0.4}]},
 	"tell_rush": {"total": 0.5, "layers": [{"wave": "saw", "freq": 200.0, "slide": 700.0, "vol": 0.18, "dur": 0.4, "swell": 0.9}, {"wave": "sine", "freq": 1500.0, "vol": 0.12, "dur": 0.1, "delay": 0.38}]},
 	"tell_dive": {"total": 0.3, "layers": [{"wave": "saw", "freq": 600.0, "slide": -400.0, "vol": 0.14, "dur": 0.25}]},
 	"rumble": {"total": 0.25, "layers": [{"wave": "noise", "lp": 0.06, "vol": 0.25, "dur": 0.22}]},

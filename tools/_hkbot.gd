@@ -34,7 +34,7 @@ func hazard_center(p: Node2D, owners: Array):
 		if not is_instance_valid(o):
 			continue
 		for n in o.get_children():
-			if n.has_method("active") and n.get("kind") != null and n.kind in ["spikes", "firewave", "heat", "flame", "pillar", "spore", "vine"]:
+			if n.has_method("active") and n.get("kind") != null and n.kind in ["spikes", "firewave", "heat", "flame", "pillar", "spore", "vine", "sweep"]:
 				if (n.active() or n.delay <= HAZARD_LEAD) and body.intersects(n.current()):
 					return n.current().get_center()
 	return null

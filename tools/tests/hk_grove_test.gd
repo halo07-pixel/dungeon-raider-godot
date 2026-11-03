@@ -182,6 +182,20 @@ func _init() -> void:
 	b._t = 0.0
 	await frames(3)
 	ck(zones(b, "vine").size() == 6, "wind_vine: 6 dây leo (%d)" % zones(b, "vine").size())
+	for zq in zones(b, "vine"):   # pha 2: thêm hàng dây thứ hai (6 + 6), hàng sau xuất hiện muộn hơn và lệch khe
+		zq.free()
+	b.phase = 2
+	b.state = "wind_vine"
+	b._t = 0.0
+	await frames(3)
+	var vz: Array = zones(b, "vine")
+	var maxd: float = 0.0
+	for zv in vz:
+		maxd = maxf(maxd, zv.delay)
+	ck(vz.size() == 12 and maxd > 1.9, "wind_vine pha 2: 12 dây, hàng sau muộn (%d dây, delay tối đa %f)" % [vz.size(), maxd])
+	for zv in vz:
+		zv.free()
+	b.phase = 1
 	var vines: int = 0
 	var blooms: int = 0
 	for i in 300:

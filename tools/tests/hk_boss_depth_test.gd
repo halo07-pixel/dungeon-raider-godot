@@ -133,6 +133,58 @@ func _init() -> void:
 	p._parry_t = 0.15
 	await frames(1)
 	ck(p.hp == p.max_hp - 1, "rush trúng lúc đang đỡ: vẫn mất 1 mặt nạ (hp %d)" % p.hp)
+	# --- warden pha 2: sweep không đỡ được
+	ck(Sfx.DEFS.has("tell_sweep"), "có âm tell_sweep")
+	var wd := CharacterBody2D.new()
+	wd.set_script(B)
+	wd.kind = "warden"
+	wd.position = Vector2(900, floor_y - 100.0)
+	root.add_child(wd)
+	wd.arena = room.bounds()
+	await frames(5)
+	var picked: Array = [0, 0]
+	for i in 200:
+		for ph in [1, 2]:
+			wd.state = "walk"
+			wd.phase = ph
+			wd._pick_attack()
+			if wd.state == "wind_sweep":
+				picked[ph - 1] += 1
+	ck(picked[0] == 0 and picked[1] > 0, "sweep chỉ chọn ở pha 2 (p1 %d, p2 %d)" % [picked[0], picked[1]])
+	wd.phase = 2
+	wd.state = "walk"
+	wd._t = 99.0
+	wd.global_position = Vector2(900, floor_y - wd._size.y * 0.5 - 1.0)
+	p.global_position = Vector2(1500, floor_y - 22.0)
+	heard.clear()
+	wd.sfx.connect(func(n: String): heard.append(n))
+	wd.state = "wind_sweep"
+	wd._t = 0.15   # tell phát khi vào state, đòn tung ra sau khi hết _t
+	await frames(14)
+	var sw: Array = []
+	for c in wd.get_children():
+		if c.get("kind") == "sweep":
+			sw.append(c)
+	ck(sw.size() == 1, "wind_sweep tạo 1 sóng (%d)" % sw.size())
+	if sw.size() == 1:
+		var z: Node2D = sw[0]
+		ck(z.vel.x > 0.0 and z.rect.size.y == B.SWEEP_H, "sóng chạy về phía người chơi, cao %d" % int(B.SWEEP_H))
+		var x0: float = z.rect.position.x
+		await frames(30)
+		ck(z.rect.position.x > x0 + 50.0, "sóng di chuyển dọc sàn (%f -> %f)" % [x0, z.rect.position.x])
+		# trúng sóng lúc đang đỡ: vẫn mất mặt nạ; nhảy cao hơn sóng thì không
+		p.hp = p.max_hp
+		p.invuln = 0.0
+		p._parry_t = 0.15
+		p.global_position = Vector2(z.rect.get_center().x, floor_y - 22.0)
+		await frames(2)
+		ck(p.hp == p.max_hp - 1, "sweep trúng lúc đang đỡ: vẫn mất 1 mặt nạ (hp %d)" % p.hp)
+		p.hp = p.max_hp
+		p.invuln = 0.0
+		p.global_position = Vector2(z.rect.get_center().x, floor_y - B.SWEEP_H - 80.0)
+		await frames(2)
+		ck(p.hp == p.max_hp, "nhảy cao hơn sóng: không trúng (hp %d)" % p.hp)
+	ck(heard.has("tell_sweep"), "wind_sweep phát tell_sweep")
 	print("hk_boss_depth_test: ", "OK" if fails == 0 else "%d lỗi" % fails)
 	print("DONE fails=", fails)
 	quit(fails)
