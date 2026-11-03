@@ -150,7 +150,12 @@ func _init() -> void:
 			wd._pick_attack()
 			if wd.state == "wind_sweep":
 				picked[ph - 1] += 1
-	ck(picked[0] == 0 and picked[1] > 0, "sweep chỉ chọn ở pha 2 (p1 %d, p2 %d)" % [picked[0], picked[1]])
+	ck(picked[0] > 0 and picked[1] > 0, "sweep có ở cả hai pha (p1 %d, p2 %d)" % [picked[0], picked[1]])
+	wd.phase = 1   # ngưỡng pha 2 của warden vẫn là 50%: ở 66% máu chưa vào pha 2
+	wd.hp = wd.max_hp * 2 / 3
+	wd.state = "walk"
+	wd.take_hit(1, Vector2.ZERO)
+	ck(wd.phase == 1, "warden ở ~66%% máu vẫn pha 1 (phase %d)" % wd.phase)
 	wd.phase = 2
 	wd.state = "walk"
 	wd._t = 99.0
