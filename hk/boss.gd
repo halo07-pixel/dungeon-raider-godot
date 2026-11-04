@@ -14,6 +14,7 @@ signal tinted(c: Color)     # Many-Faced pha 3 nhuộm màu phòng (tím); Color
 const PROJECTILE = preload("res://hk/projectile.gd")
 const ENEMY = preload("res://hk/enemy.gd")
 const FX = preload("res://hk/fx.gd")
+const STATE = preload("res://hk/state.gd")
 const SPRITES = preload("res://hk/sprites.gd")
 const LOOK: Dictionary = {
 	"warden": {"anim": "ogre_idle_anim", "scale": 3.0},
@@ -103,6 +104,14 @@ var _last_pick: String = ""     # đòn lượt trước (không lặp đòn y h
 var braziers: Array = []     # chân các lò lửa trong phòng (world gán) — nguồn sóng lửa của Hexer
 var platforms: Array = []    # Rect2 các bục một chiều trong phòng (world gán) — Lord làm nóng bục
 var _dark_t: float = 0.0
+const HABIT_AT: int = 2           # nightmare: số lần liên tiếp người chơi né cùng một kiểu thì boss đáp trả
+const FEINT_P: float = 0.25       # nightmare pha 2+: xác suất đòn chém/đập là đòn giả
+const DESPAIR_GAPS: int = 2       # pha 3: số khe an toàn trong hàng gai
+var _air_seen: bool = false       # người chơi rời đất trong lúc boss dựng đòn
+var _jumps: int = 0               # số đòn liên tiếp bị né bằng nhảy
+var _stands: int = 0              # số đòn liên tiếp người chơi đứng yên dưới đất chịu
+var _feint_at: float = 0.0        # >0: khi _t tụt tới đây thì đòn này huỷ, đứng khựng rồi chém thật nhanh
+var _trail: Array = []            # lịch sử vị trí người chơi cho "bóng" ở pha 3 (chỉ vẽ)
 var empowered: bool = false  # world gán: Lord khi đã có 5 ký ức kia ("The Gatekeeper": đổi sắc, vầng sáng, đèn ký ức, đòn Echo)
 var echoes: Array = []       # world gán: state đòn riêng của mọi boss đã hạ (warden/brute/colossus/hexer/wraith) — Echo dùng lại
 var lanterns: int = 0        # world gán: số ký ức đã có (đèn sáng trên tường phòng Lord)
@@ -163,6 +172,7 @@ func _physics_process(delta: float) -> void:
 			engaged.emit()
 		queue_redraw()
 		return
+	_nightmare_tick(p)
 	if kind == "many_faced" and state != "wind_shift" and state != "intro":
 		_form_t -= delta
 	if state == "intro":
@@ -187,6 +197,12 @@ func _physics_process(delta: float) -> void:
 			_flash = 0.05
 		if _t <= 0.0:
 			_next()
+	elif state == "feint":   # đòn giả: khựng một nhịp rồi chém thật nhanh
+		velocity = Vector2(0, minf(velocity.y + GRAVITY * delta, 900.0))
+		move_and_slide()
+		if _t <= 0.0:
+			state = "wind_slash"
+			_t = 0.16
 	elif form in FLYERS:
 		_wraith(delta, p)
 	else:
@@ -232,8 +248,42 @@ func _face(p: Node2D) -> void:
 
 func _next() -> void:
 	_twin = 0
+	_feint_at = 0.0
 	state = "hover" if form in FLYERS else "walk"
 	_t = (randf_range(1.0, 1.6) if form in FLYERS else randf_range(0.5, 1.0)) * (P2_REST if phase >= 2 else 1.0)
+
+# ------------------------------------------------------------ nightmare (STATE.is_nightmare)
+## Ghi thói quen người chơi, kích hoạt đòn giả, lưu vết cho bóng. Chỉ chạy khi cài đặt bật.
+func _nightmare_tick(p: Node2D) -> void:
+	if not STATE.is_nightmare():
+		return
+	if state.begins_with("wind") and _t > 0.0 and not p.is_on_floor():
+		_air_seen = true
+	if _prev_state.begins_with("wind") and not state.begins_with("wind") and state != "feint":   # một đòn vừa xong: ghi cách người chơi đã chịu
+		if _air_seen:
+			_jumps += 1
+			_stands = 0
+		else:
+			_stands += 1
+			_jumps = 0
+		_air_seen = false
+	if _feint_at > 0.0 and (state == "wind_slash" or state == "wind_slam") and _t <= _feint_at:
+		_feint_at = 0.0
+		state = "feint"
+		_t = 0.3
+		velocity.x = 0.0
+	_trail.append(p.global_position)
+	if _trail.size() > 80:
+		_trail.pop_front()
+
+## Đáp trả thói quen: hay nhảy né thì thêm đòn bắn quạt (chặn trên không); hay đứng chịu thì thêm sóng đất.
+func _habit_opts(opts: Array) -> void:
+	if not STATE.is_nightmare():
+		return
+	if _jumps >= HABIT_AT:
+		opts.append("bolt")
+	elif _stands >= HABIT_AT + 1:
+		opts.append("quake")
 
 # ------------------------------------------------------------ đi bộ (warden, lord)
 func _ground(delta: float, p: Node2D) -> void:
@@ -336,7 +386,7 @@ func _ground(delta: float, p: Node2D) -> void:
 			if _combo <= 0 or _t <= 0.0:
 				state = "recover"
 				_t = 1.0
-		"wind_pillar", "wind_fissure", "wind_heat", "wind_tide", "wind_torch", "wind_veil", "wind_bloom", "wind_vine", "wind_sweep", "wind_hurl", "wind_undertow", "wind_cage", "wind_geyser", "wind_volley":   # torch/veil: chỉ dùng khi Lord echo (boss bay có khối riêng)
+		"wind_pillar", "wind_fissure", "wind_heat", "wind_tide", "wind_torch", "wind_veil", "wind_bloom", "wind_vine", "wind_sweep", "wind_hurl", "wind_undertow", "wind_cage", "wind_geyser", "wind_volley", "wind_despair":   # torch/veil: chỉ dùng khi Lord echo (boss bay có khối riêng)
 			velocity.x = 0.0
 			_face(p)
 			if _t <= 0.0:
@@ -416,11 +466,19 @@ func _pick_attack() -> void:
 		opts.append("bolt")
 		if form == "sovereign":
 			opts.append("bolt")
+	_habit_opts(opts)
+	if STATE.is_nightmare() and phase >= 3:
+		opts.append("despair")
 	var pick: String = String(opts[randi() % opts.size()])
 	if pick == _last_pick and opts.size() > 1:   # không lặp đòn: bốc lại một lần
 		pick = String(opts[randi() % opts.size()])
 	_last_pick = pick
+	if STATE.is_nightmare() and phase >= 2 and (pick == "slash" or pick == "slam") and randf() < FEINT_P:
+		_feint_at = 0.25
 	match pick:
+		"despair":
+			state = "wind_despair"
+			_t = 0.9
 		"slash":
 			state = "wind_slash"
 			_t = 0.5
@@ -505,6 +563,20 @@ func _dust(pos: Vector2) -> void:   # tín hiệu thay vùng cảnh báo: bụi/
 func _cast(p: Node2D) -> void:
 	var fy: float = _floor_y()
 	match state:
+		"wind_despair":   # pha 3 (nightmare): hai đợt hàng gai kín cả đấu trường, chỉ chừa vài khe; đợt hai đổi chỗ khe (không đỡ được; nhảy qua hoặc dash)
+			var w: float = arena.size.x - 120.0
+			var cells: int = int(w / 60.0)
+			for wave in 2:
+				var gaps: Array = []
+				for _g in DESPAIR_GAPS:
+					gaps.append(randi() % cells)
+				for c in cells:
+					if gaps.has(c) or gaps.has(c - 1):
+						continue
+					var xd: float = arena.position.x + 60.0 + c * 60.0
+					_dust(Vector2(xd + 30.0, fy))
+					_zone("spikes", Rect2(xd, fy - 44.0, 60.0, 44.0), 0.9 + wave * 1.0, 1.4)
+			shake.emit(3.0)
 		"wind_pillar":   # Gate Warden: đập sập cột ngay chỗ người chơi; rơi gây sát thương, đáp xuống thành vật cản/chỗ nấp 6s
 			var x: float = clampf(p.global_position.x, arena.position.x + 60.0, arena.end.x - 60.0)
 			_dust(Vector2(x, arena.position.y + 40.0))
@@ -682,6 +754,8 @@ func _wraith(delta: float, p: Node2D) -> void:
 					r = 4
 				elif form == "hexer" and randf() < 0.25:   # mưa tàn lửa: ≤1/4 mỗi lượt
 					r = 5
+				if STATE.is_nightmare() and phase >= 3 and randf() < 0.3:
+					r = 6
 				if r == 0:
 					state = "wind_bolt"
 					_t = 0.55
@@ -697,6 +771,9 @@ func _wraith(delta: float, p: Node2D) -> void:
 				elif r == 5:
 					state = "wind_ember"
 					_t = 0.7
+				elif r == 6:
+					state = "wind_despair"
+					_t = 0.9
 				elif r == 3:
 					state = "wind_conjure"
 					_t = 0.8
@@ -710,7 +787,7 @@ func _wraith(delta: float, p: Node2D) -> void:
 				_conjure()
 				state = "hover"
 				_t = 1.4
-		"wind_torch", "wind_veil", "wind_ember":
+		"wind_torch", "wind_veil", "wind_ember", "wind_despair":
 			velocity = Vector2.ZERO
 			_face(p)
 			if _t <= 0.0:
@@ -850,6 +927,8 @@ func take_hit(dmg: int, _from: Vector2) -> bool:   # luôn true (không có khi�
 	var want: int = phase
 	if kind == "many_faced":   # 3 pha: 66% và 33% máu
 		want = 3 if hp * 3 <= max_hp else (2 if hp * 3 <= max_hp * 2 else 1)
+	elif STATE.is_nightmare() and hp * 4 <= max_hp:   # nightmare: pha 3 tuyệt vọng ở 25% máu
+		want = 3
 	elif kind in EARLY_P2 and hp * 3 <= max_hp * 2:   # mini-boss hạ trong ~7-9s vào pha 2 sớm hơn (66% thay vì 50%) để thấy pha 2
 		want = 2
 	elif hp <= max_hp / 2:
@@ -861,6 +940,9 @@ func take_hit(dmg: int, _from: Vector2) -> bool:   # luôn true (không có khi�
 		_t = 0.7
 		shake.emit(3.0)
 		_markers.clear()
+		if phase == 3 and kind != "many_faced":
+			_dark_t = 0.8   # đèn chớp tắt khi bước vào tuyệt vọng
+			darkness.emit(true)
 		if kind == "many_faced":
 			if phase == 3:
 				_set_form("sovereign")
@@ -919,6 +1001,9 @@ func _draw() -> void:
 		tint.a = _alpha
 	var h: Vector2 = _size * 0.5
 	_draw_aura(h)
+	if phase >= 3 and STATE.is_nightmare() and _trail.size() >= 70:   # bóng: dư ảnh tối của người chơi từ ~1.2s trước (chỉ vẽ)
+		var sp: Vector2 = to_local(_trail[0])
+		draw_rect(Rect2(sp.x - 12.0, sp.y - 22.0, 24.0, 44.0), Color(0.0, 0.0, 0.0, 0.45))
 	var look: Dictionary = LOOK[form]
 	SPRITES.draw_body(self, String(look["anim"]), Vector2(0, h.y), float(look["scale"]), dir < 0, tint, 6.0)
 	if not (form in FLYERS) and state == "lunge":

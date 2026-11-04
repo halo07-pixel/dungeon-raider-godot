@@ -96,6 +96,7 @@ const DEFS: Dictionary = {
 	"tell_cage": {"total": 0.5, "layers": [{"wave": "saw", "freq": 120.0, "slide": 80.0, "vol": 0.16, "dur": 0.35, "swell": 0.6}, {"wave": "noise", "lp": 0.25, "vol": 0.14, "dur": 0.3}]},
 	"tell_geyser": {"total": 0.5, "layers": [{"wave": "sine", "freq": 200.0, "slide": 260.0, "vol": 0.2, "dur": 0.4, "swell": 0.6}, {"wave": "noise", "lp": 0.5, "vol": 0.1, "dur": 0.35}]},
 	"tell_volley": {"total": 0.5, "layers": [{"wave": "sine", "freq": 420.0, "slide": 160.0, "vol": 0.14, "dur": 0.25}, {"wave": "noise", "lp": 0.6, "vol": 0.08, "dur": 0.2}]},
+	"tell_despair": {"total": 0.8, "layers": [{"wave": "saw", "freq": 70.0, "slide": -30.0, "vol": 0.24, "dur": 0.7, "swell": 0.8}, {"wave": "noise", "lp": 0.15, "vol": 0.2, "dur": 0.7, "swell": 0.8}]},
 	"tell_ember": {"total": 0.4, "layers": [{"wave": "noise", "lp": 0.25, "vol": 0.28, "dur": 0.35, "swell": 0.7}, {"wave": "saw", "freq": 80.0, "slide": 60.0, "vol": 0.12, "dur": 0.35}]},
 	"ember": {"total": 0.1, "layers": [{"wave": "noise", "lp": 0.6, "vol": 0.14, "dur": 0.08}]},
 	"bubble": {"total": 0.2, "layers": [{"wave": "sine", "freq": 300.0, "slide": 500.0, "vol": 0.18, "dur": 0.15}, {"wave": "noise", "lp": 0.7, "vol": 0.06, "dur": 0.1}]},

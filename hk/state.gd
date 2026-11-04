@@ -67,9 +67,13 @@ static var sfx_vol: int = 10
 static var atmosphere_on: bool = true   # ánh sáng + hạt (cài đặt, không bị reset() xoá)
 static var shake_on: bool = true   # rung màn hình (cài đặt, không bị reset() xoá)
 static var zoom_on: bool = true    # hiệu ứng zoom camera (cài đặt, không bị reset() xoá)
+static var nightmare: bool = true  # boss nhớ thói quen, đòn giả, pha 3 tuyệt vọng (cài đặt, lưu trong save, không bị reset() xoá; Boss Rush luôn dùng bản gốc)
 
 static func vol_db(v: int) -> float:
 	return -80.0 if v <= 0 else linear_to_db(float(v) / 10.0)
+
+static func is_nightmare() -> bool:
+	return nightmare and not rush
 
 static func reset() -> void:
 	hp_bonus = 0
@@ -200,7 +204,7 @@ static func geo_mult() -> float:
 static func to_dict() -> Dictionary:
 	return {"v": 1, "hp_bonus": hp_bonus, "shards": shards, "soul": soul, "geo": geo, "abilities": abilities, "charms_owned": charms_owned,
 		"charms_equipped": charms_equipped, "notch_bonus": notch_bonus, "flags": flags, "visited": visited,
-		"bench_room": bench_room, "bench_id": bench_id, "benches": benches, "shade": shade, "music_vol": music_vol, "sfx_vol": sfx_vol, "shake_on": shake_on, "zoom_on": zoom_on, "atmosphere_on": atmosphere_on, "pins": pins, "time": play_time}
+		"bench_room": bench_room, "bench_id": bench_id, "benches": benches, "shade": shade, "music_vol": music_vol, "sfx_vol": sfx_vol, "shake_on": shake_on, "zoom_on": zoom_on, "nightmare": nightmare, "atmosphere_on": atmosphere_on, "pins": pins, "time": play_time}
 
 ## Dữ liệu save có thể hỏng/sửa tay: đọc số, mảng, chuỗi có kiểm tra kiểu thay vì ép kiểu (int([]) làm script lỗi giữa chừng).
 static func _int(v, fallback: int) -> int:
@@ -224,6 +228,7 @@ static func from_dict(d: Dictionary) -> void:
 	atmosphere_on = bool(d.get("atmosphere_on", atmosphere_on)) if d.get("atmosphere_on", true) is bool else atmosphere_on
 	shake_on = bool(d.get("shake_on", shake_on)) if d.get("shake_on", true) is bool else shake_on
 	zoom_on = bool(d.get("zoom_on", zoom_on)) if d.get("zoom_on", true) is bool else zoom_on
+	nightmare = bool(d.get("nightmare", nightmare)) if d.get("nightmare", true) is bool else nightmare
 	shards = clampi(_int(d.get("shards"), 0), 0, SHARDS_PER)
 	geo = clampi(_int(d.get("geo"), 0), 0, MAX_GEO)
 	var tm = d.get("time", 0.0)
