@@ -1,13 +1,14 @@
 extends Node2D
 ## Vùng nguy hiểm/vật thể tạm do đòn riêng của boss tạo ra (con của boss, top_level => toạ độ thế giới; boss chết thì biến mất).
 ## Gây hại theo hình chữ nhật mỗi khung vật lý (không dùng Area2D nên không dính lỗi "flushing queries").
-## kind: spikes (gai nền nứt) | firewave (sóng lửa chạy từ lò) | heat (bục nóng) | water (nước dâng, làm chậm) | pillar (cột rơi rồi thành vật cản) | sweep (sóng đá quét sàn của Warden) | spore | vine
+## kind: undertow (xoáy nước của Colossus, kéo về pull_x, không sát thương) | spikes (gai nền nứt) | firewave (sóng lửa chạy từ lò) | heat (bục nóng) | water (nước dâng, làm chậm) | pillar (cột rơi rồi thành vật cản) | sweep (sóng đá quét sàn của Warden) | spore | vine
 ## | spore (đám bào tử: cố định theo nhịp period/on_from, hoặc đám nổ từ sporeling) | vine (dây leo trồi lên sàn, như gai) | flame (vệt lửa nằm yên trên sàn do quái cinder để lại; con của room, không phải của boss).
 ## Trước khi có hiệu lực (`delay`) không vẽ vùng nào: tín hiệu là âm thanh + bụi/tia lửa do boss phát ra.
 const SPRITES = preload("res://hk/sprites.gd")
 const FX = preload("res://hk/fx.gd")
 const DROWN_TIME: float = 2.0   # ở trong nước chừng này giây thì mất 1 mặt nạ, rồi đếm lại
 const MAX_DROWN: int = 2        # trần số mặt nạ mất vì chìm mỗi đợt nước
+const UNDERTOW_PULL: float = 220.0   # px/s xoáy của Colossus kéo về phía boss
 const PULL: float = 80.0        # px/s dòng chảy kéo về phía boss
 var kind: String = "spikes"
 var rect: Rect2 = Rect2()       # vùng có hiệu lực (toạ độ thế giới); water: vùng khi nước dâng đủ cao
@@ -97,6 +98,8 @@ func _physics_process(delta: float) -> void:
 					_drown_t = 0.0
 					_drowns += 1
 					p.take_damage(rect.get_center().x, 1, false)   # chìm: không đỡ được
+		elif kind == "undertow":
+			p.drift = signf(pull_x - p.global_position.x) * UNDERTOW_PULL   # xoáy: chỉ kéo, không sát thương
 		elif _spore_on() and not (kind == "spore" and float(p.get("spore_t")) > 0.0):   # Spore Ward: dash miễn nhiễm bào tử
 			p.take_damage(rect.get_center().x, 1, false)   # vùng gây hại: không đỡ được
 	queue_redraw()
@@ -163,6 +166,11 @@ func _draw() -> void:
 		"heat":   # bục nóng đỏ: vầng sáng trên mặt bục
 			draw_rect(Rect2(r.position.x, r.end.y - 6.0, r.size.x, 6.0), Color(1.0, 0.4, 0.1, flick))
 			draw_rect(Rect2(r.position.x, r.position.y + 12.0, r.size.x, r.size.y - 18.0), Color(1.0, 0.45, 0.15, 0.22 * flick))
+		"undertow":   # xoáy nước: các vòng cung xanh quay quanh tâm
+			var cx3: float = pull_x
+			for k in 4:
+				var rr: float = r.size.x * 0.5 * (0.35 + 0.2 * float(k)) * (0.9 + 0.1 * sin(Time.get_ticks_msec() * 0.01 + float(k)))
+				draw_arc(Vector2(cx3, r.end.y), rr, PI, TAU, 24, Color(0.5, 0.8, 1.0, 0.55), 3.0)
 		"water":
 			draw_rect(r, Color(0.25, 0.5, 0.9, 0.35))
 			draw_rect(Rect2(r.position.x, r.position.y, r.size.x, 3.0), Color(0.7, 0.9, 1.0, 0.8))
