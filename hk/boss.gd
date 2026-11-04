@@ -44,6 +44,9 @@ const P2_REST: float = 0.7        # pha 2: thời gian đi bộ/bay giữa hai �
 const CHAIN: Dictionary = {"wind_tide": "quake", "wind_heat": "rain"}   # đòn riêng nối thẳng sang đòn thứ hai (colossus: nước rồi dậm đất; lord/sovereign pha 2: bục nóng rồi mưa đá)
 const EARLY_P2: Array = ["grove", "brute", "colossus", "hexer"]   # vào pha 2 ở 66% máu (cũ: grove đã vậy; brute/colossus/hexer 50%)
 const TIDE_H: float = 90.0         # nước dâng cao (cũ 80): vẫn thấp hơn mặt bục 96px của arc_5 và nhảy được ra khỏi nước; chỉ khi phòng có bục thì chìm/dòng chảy
+const HURL_SPEEDS: Array = [260.0, 340.0, 420.0]   # brute "Bone Hurl": ba xương bay ngang, tới lệch nhau (nhảy qua từng quả hoặc đỡ để phản lại)
+const UNDERTOW_PULL: float = 220.0   # colossus "Undertow": px/s kéo người chơi về phía boss trong 1.5s (zone.gd kind undertow)
+const EMBER_N: int = 5               # hexer "Ember Rain": số điểm lửa thả xuống sàn quanh người chơi (nằm 2s)
 const GRAVITY: float = 2400.0
 const STAGGER_CD: float = 6.0   # mỗi boss chỉ choáng được một lần mỗi chừng này giây (đỡ đòn không thành vòng lặp)
 const PERCH_WAIT: float = 1.0   # giây người chơi đứng cao hơn boss trước khi boss nhảy lên
@@ -323,7 +326,7 @@ func _ground(delta: float, p: Node2D) -> void:
 			if _combo <= 0 or _t <= 0.0:
 				state = "recover"
 				_t = 1.0
-		"wind_pillar", "wind_fissure", "wind_heat", "wind_tide", "wind_torch", "wind_veil", "wind_bloom", "wind_vine", "wind_sweep":   # torch/veil: chỉ dùng khi Lord echo (boss bay có khối riêng)
+		"wind_pillar", "wind_fissure", "wind_heat", "wind_tide", "wind_torch", "wind_veil", "wind_bloom", "wind_vine", "wind_sweep", "wind_hurl", "wind_undertow":   # torch/veil: chỉ dùng khi Lord echo (boss bay có khối riêng)
 			velocity.x = 0.0
 			_face(p)
 			if _t <= 0.0:
@@ -376,6 +379,10 @@ func _pick_attack() -> void:
 		opts.append("combo")
 	if form == "colossus" or form == "brute":   # brute: dậm đất có sóng cả hai pha
 		opts.append("quake")
+	if form == "brute":
+		opts.append("hurl")   # ném xương: một trong ~5-7 lựa chọn mỗi lượt (≤1/4)
+	if form == "colossus" and not platforms.is_empty():
+		opts.append("undertow")   # xoáy nước kéo về phía boss: chỉ khi phòng có bục để thoát lên
 	if form == "warden" and (phase >= 2 or randf() < SWEEP_P1):   # quét sàn: đòn không đỡ được của Warden (nhảy hoặc dash qua); pha 1 chỉ thỉnh thoảng
 		opts.append("sweep")
 	if form == "grove":   # dây leo: đòn thứ hai của Rotted Warden (nhiều hơn ở pha 2)
@@ -422,6 +429,12 @@ func _pick_attack() -> void:
 		"sweep":
 			state = "wind_sweep"
 			_t = 0.8
+		"hurl":
+			state = "wind_hurl"
+			_t = 0.7
+		"undertow":
+			state = "wind_undertow"
+			_t = 0.7
 		"rush":
 			state = "wind_rush"
 			_t = 0.8
@@ -522,6 +535,29 @@ func _cast(p: Node2D) -> void:
 				var r: Rect2 = pool[i]
 				_dust(Vector2(r.get_center().x, r.position.y))
 				_zone("heat", Rect2(r.position.x, r.position.y - 40.0, r.size.x, 44.0), 0.9, 3.0)
+		"wind_hurl":   # Bone Brute: ném ba xương ngang sàn/ngang ngực về phía người chơi, tốc độ lệch nhau (đạn nên đỡ được, bị đỡ thì phản lại)
+			var hs: float = 1.0 if p.global_position.x >= global_position.x else -1.0
+			for i in HURL_SPEEDS.size():
+				var s := Area2D.new()
+				s.set_script(PROJECTILE)
+				s.friendly = false
+				s.radius = 11.0
+				s.life = 3.0
+				s.color = Color(0.9, 0.88, 0.78)
+				s.vel = Vector2(hs * float(HURL_SPEEDS[i]), 0.0)
+				get_parent().add_child.call_deferred(s)
+				s.position = Vector2(global_position.x + hs * 40.0, fy - (14.0 if i != 1 else 30.0))
+			shake.emit(1.5)
+		"wind_undertow":   # Drowned Colossus: xoáy nước 1.5s quanh boss kéo người chơi vào (không sát thương; chạm boss mới đau); nhảy lên bục hoặc dash ra
+			sfx.emit("rumble")
+			var ut: Node2D = _zone("undertow", Rect2(global_position.x - 260.0, fy - 120.0, 520.0, 120.0), 0.2, 1.5)
+			ut.pull_x = global_position.x
+		"wind_ember":   # Ash Hexer: thả tàn lửa xuống sàn quanh người chơi, mỗi điểm nằm 2s
+			for i in EMBER_N:
+				var xe: float = clampf(p.global_position.x + randf_range(-260.0, 260.0), arena.position.x + 60.0, arena.end.x - 60.0)
+				FX.burst(get_parent(), Vector2(xe, global_position.y), Color(1.0, 0.55, 0.2), 4, 80.0)
+				_zone("flame", Rect2(xe - 20.0, fy - 28.0, 40.0, 28.0), 0.5 + 0.12 * float(i), 2.0)
+			shake.emit(1.0)
 		"wind_tide":   # Drowned Colossus: nước dâng (TIDE_H, hoặc 80px khi phòng không có bục) trong 0.8s, giữ rồi rút; làm chậm, có bục thì chìm (mất mặt nạ sau 2s) + dòng chảy kéo về phía boss; bục cao thì an toàn
 			sfx.emit("rumble")
 			var safe: bool = not platforms.is_empty()   # có bục để trú thì nước nguy hiểm (chìm + dòng chảy), không thì như cũ (80px, chỉ làm chậm)
@@ -586,6 +622,8 @@ func _wraith(delta: float, p: Node2D) -> void:
 					r = 3
 				if SKILL.has(form) and _dark_t <= 0.0 and randf() < (0.45 if phase >= 2 else 0.3):   # đòn riêng
 					r = 4
+				elif form == "hexer" and randf() < 0.25:   # mưa tàn lửa: ≤1/4 mỗi lượt
+					r = 5
 				if r == 0:
 					state = "wind_bolt"
 					_t = 0.55
@@ -598,6 +636,9 @@ func _wraith(delta: float, p: Node2D) -> void:
 				elif r == 4:
 					state = String(SKILL[form])
 					_t = 0.8
+				elif r == 5:
+					state = "wind_ember"
+					_t = 0.7
 				elif r == 3:
 					state = "wind_conjure"
 					_t = 0.8
@@ -611,7 +652,7 @@ func _wraith(delta: float, p: Node2D) -> void:
 				_conjure()
 				state = "hover"
 				_t = 1.4
-		"wind_torch", "wind_veil":
+		"wind_torch", "wind_veil", "wind_ember":
 			velocity = Vector2.ZERO
 			_face(p)
 			if _t <= 0.0:
