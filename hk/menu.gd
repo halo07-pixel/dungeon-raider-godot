@@ -343,6 +343,7 @@ func _draw_pause(v: Control, font: Font, sz: Vector2) -> void:
 	for i in lines.size():
 		v.draw_string(font, Vector2(lx, 156.0 + i * 32.0), String(lines[i]), HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Color(0.9, 0.93, 1))
 	v.draw_string(font, Vector2(rx, 118.0), "Play time  " + STATE.fmt_time(STATE.play_time), HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Color(0.95, 0.9, 0.7))
+	v.draw_string(font, Vector2(rx + 260.0, 118.0), "Mask shards  %d/%d" % [STATE.shards, STATE.SHARDS_PER], HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Color(0.8, 0.95, 1))
 	v.draw_string(font, Vector2(rx, 156.0), "Abilities", HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Color(0.7, 0.75, 0.9))
 	var names: Array = STATE.abilities.map(func(a): return STATE.ABILITIES[a]["name"])
 	for i in names.size():

@@ -148,7 +148,7 @@ func _init() -> void:
 		ck(load("res://hk/lore.gd").secret_note(ar) != "", "có ghi chú hốc cho khu " + ar)
 	var geo0: int = St.geo
 	w._on_interacted("cache", {"key": "cat_3:18:17", "pos": Vector2(18.0 * 32.0 + 16.0, 18.0 * 32.0)})
-	ck(St.geo - geo0 == 75, "rương trong hốc bí mật cho 75 Geo (%d)" % (St.geo - geo0))
+	ck(St.shards == 1 and St.geo == geo0, "rương trong hốc bí mật cho 1 mảnh, không Geo (%d, %d)" % [St.shards, St.geo - geo0])
 	w.load_room("cat_3")
 	await frames(3)
 	ck(w.room.cracks.is_empty() and get_nodes_in_group("hk_crack").is_empty(), "nạp lại phòng: tường vẫn mở")

@@ -40,6 +40,8 @@ const SLOTS: int = 3
 static var play_time: float = 0.0       # giây chơi, cộng ở world._process (đồng hồ speedrun)
 static var boot: String = "continue"   # new | continue | keep | rush — world đọc khi khởi động
 static var rush: bool = false           # đang chơi Boss Rush (world đặt lúc khởi động, không lưu)
+const SHARDS_PER: int = 5   # mảnh mặt nạ từ hốc bí mật (5 hốc) -> +1 mặt nạ tối đa, một lần
+static var shards: int = 0              # mảnh mặt nạ nhặt được (0..SHARDS_PER)
 static var hp_bonus: int = 0            # từ vật phẩm "mặt nạ" mua ở shop
 static var hp: int = BASE_HP
 static var soul: int = 0
@@ -71,6 +73,7 @@ static func vol_db(v: int) -> float:
 
 static func reset() -> void:
 	hp_bonus = 0
+	shards = 0
 	soul = 0
 	geo = 0
 	abilities = []
@@ -95,7 +98,17 @@ static func has_charm(id: String) -> bool:
 	return id in charms_equipped
 
 static func max_hp() -> int:
-	return BASE_HP + hp_bonus + (2 if has_charm("iron_heart") else 0)
+	return BASE_HP + hp_bonus + shards / SHARDS_PER + (2 if has_charm("iron_heart") else 0)
+
+## Nhặt một mảnh; trả true nếu đủ bộ (+1 mặt nạ tối đa, hồi 1 máu). Đã đủ thì không nhận thêm.
+static func add_shard() -> bool:
+	if shards >= SHARDS_PER:
+		return false
+	shards += 1
+	if shards == SHARDS_PER:
+		hp = mini(hp + 1, max_hp())
+		return true
+	return false
 
 static func notches() -> int:
 	return BASE_NOTCHES + notch_bonus
@@ -185,7 +198,7 @@ static func geo_mult() -> float:
 
 # ---- lưu/đọc ----
 static func to_dict() -> Dictionary:
-	return {"v": 1, "hp_bonus": hp_bonus, "soul": soul, "geo": geo, "abilities": abilities, "charms_owned": charms_owned,
+	return {"v": 1, "hp_bonus": hp_bonus, "shards": shards, "soul": soul, "geo": geo, "abilities": abilities, "charms_owned": charms_owned,
 		"charms_equipped": charms_equipped, "notch_bonus": notch_bonus, "flags": flags, "visited": visited,
 		"bench_room": bench_room, "bench_id": bench_id, "benches": benches, "shade": shade, "music_vol": music_vol, "sfx_vol": sfx_vol, "shake_on": shake_on, "zoom_on": zoom_on, "atmosphere_on": atmosphere_on, "pins": pins, "time": play_time}
 
@@ -211,6 +224,7 @@ static func from_dict(d: Dictionary) -> void:
 	atmosphere_on = bool(d.get("atmosphere_on", atmosphere_on)) if d.get("atmosphere_on", true) is bool else atmosphere_on
 	shake_on = bool(d.get("shake_on", shake_on)) if d.get("shake_on", true) is bool else shake_on
 	zoom_on = bool(d.get("zoom_on", zoom_on)) if d.get("zoom_on", true) is bool else zoom_on
+	shards = clampi(_int(d.get("shards"), 0), 0, SHARDS_PER)
 	geo = clampi(_int(d.get("geo"), 0), 0, MAX_GEO)
 	var tm = d.get("time", 0.0)
 	play_time = maxf(0.0, float(tm)) if (tm is float or tm is int) else 0.0

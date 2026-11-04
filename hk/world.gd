@@ -462,10 +462,19 @@ func _on_interacted(kind: String, data: Dictionary) -> void:
 		"cache":
 			STATE.set_flag("cache_" + String(data["key"]))
 			sfx.play("geo")
-			var n: int = 25 * (3 if STATE.flag("secret_" + room.id) else 1)   # rương trong hốc bí mật: gấp ba
+			var hidden: bool = STATE.flag("secret_" + room.id)
+			if hidden and STATE.shards < STATE.SHARDS_PER:   # hốc bí mật: mảnh mặt nạ thay Geo
+				var full: bool = STATE.add_shard()
+				sfx.play("buy")
+				FX.float_text(_content, data["pos"], "+1 Mask Shard", Color(0.8, 0.95, 1))
+				var note: String = "Mask complete: +1 mask" if full else "Mask Shard %d/%d" % [STATE.shards, STATE.SHARDS_PER]
+				hud.banner("Hidden cache", note + "  -  " + LORE.secret_note(String(room.data.get("area", "gate"))))
+				STATE.save()
+				return
+			var n: int = 25 * (3 if hidden else 1)   # hốc khi đã đủ mảnh: Geo gấp ba
 			STATE.geo += n
 			FX.float_text(_content, data["pos"], "+%d Geo" % n, Color(1, 0.9, 0.4))
-			if STATE.flag("secret_" + room.id):
+			if hidden:
 				hud.banner("Hidden cache", LORE.secret_note(String(room.data.get("area", "gate"))))
 		"altar":
 			sfx.play("ability")
