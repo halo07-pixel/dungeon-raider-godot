@@ -1,7 +1,7 @@
 extends Node2D
 ## Vùng nguy hiểm/vật thể tạm do đòn riêng của boss tạo ra (con của boss, top_level => toạ độ thế giới; boss chết thì biến mất).
 ## Gây hại theo hình chữ nhật mỗi khung vật lý (không dùng Area2D nên không dính lỗi "flushing queries").
-## kind: undertow (xoáy nước của Colossus, kéo về pull_x, không sát thương) | spikes (gai nền nứt) | firewave (sóng lửa chạy từ lò) | heat (bục nóng) | water (nước dâng, làm chậm) | pillar (cột rơi rồi thành vật cản) | sweep (sóng đá quét sàn của Warden) | spore | vine
+## kind: geyser (cột nước phun của Colossus, gây hại) | undertow (xoáy nước của Colossus, kéo về pull_x, không sát thương) | spikes (gai nền nứt) | firewave (sóng lửa chạy từ lò) | heat (bục nóng) | water (nước dâng, làm chậm) | pillar (cột rơi rồi thành vật cản) | sweep (sóng đá quét sàn của Warden) | spore | vine
 ## | spore (đám bào tử: cố định theo nhịp period/on_from, hoặc đám nổ từ sporeling) | vine (dây leo trồi lên sàn, như gai) | flame (vệt lửa nằm yên trên sàn do quái cinder để lại; con của room, không phải của boss).
 ## Trước khi có hiệu lực (`delay`) không vẽ vùng nào: tín hiệu là âm thanh + bụi/tia lửa do boss phát ra.
 const SPRITES = preload("res://hk/sprites.gd")
@@ -166,6 +166,9 @@ func _draw() -> void:
 		"heat":   # bục nóng đỏ: vầng sáng trên mặt bục
 			draw_rect(Rect2(r.position.x, r.end.y - 6.0, r.size.x, 6.0), Color(1.0, 0.4, 0.1, flick))
 			draw_rect(Rect2(r.position.x, r.position.y + 12.0, r.size.x, r.size.y - 18.0), Color(1.0, 0.45, 0.15, 0.22 * flick))
+		"geyser":   # cột nước phun: thân xanh, ngọn bọt sáng
+			draw_rect(r, Color(0.35, 0.65, 1.0, 0.75))
+			draw_rect(Rect2(r.position.x - 4.0, r.position.y, r.size.x + 8.0, 8.0), Color(0.85, 0.95, 1.0, 0.9))
 		"undertow":   # xoáy nước: các vòng cung xanh quay quanh tâm
 			var cx3: float = pull_x
 			for k in 4:

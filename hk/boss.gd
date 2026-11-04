@@ -41,12 +41,15 @@ const VINE_GAP: float = 45.0      # pha 2: hàng dây thứ hai lệch nửa bư
 const QUAKE_WAVES: Array = [2, 3]   # số sóng của đòn quake theo pha 1 / pha 2+
 const RUSH_SPEED: float = 560.0
 const P2_REST: float = 0.7        # pha 2: thời gian đi bộ/bay giữa hai đòn nhân hệ số này (nhịp dồn hơn)
-const CHAIN: Dictionary = {"wind_tide": "quake", "wind_heat": "rain"}   # đòn riêng nối thẳng sang đòn thứ hai (colossus: nước rồi dậm đất; lord/sovereign pha 2: bục nóng rồi mưa đá)
+const CHAIN: Dictionary = {"wind_tide": "quake", "wind_volley": "quake", "wind_heat": "rain"}   # đòn riêng nối thẳng sang đòn thứ hai (colossus: nước rồi dậm đất; lord/sovereign pha 2: bục nóng rồi mưa đá)
 const EARLY_P2: Array = ["grove", "brute", "colossus", "hexer"]   # vào pha 2 ở 66% máu (cũ: grove đã vậy; brute/colossus/hexer 50%)
 const TIDE_H: float = 90.0         # nước dâng cao (cũ 80): vẫn thấp hơn mặt bục 96px của arc_5 và nhảy được ra khỏi nước; chỉ khi phòng có bục thì chìm/dòng chảy
 const HURL_SPEEDS: Array = [260.0, 340.0, 420.0]   # brute "Bone Hurl": ba xương bay ngang, tới lệch nhau (nhảy qua từng quả hoặc đỡ để phản lại)
 const UNDERTOW_PULL: float = 220.0   # colossus "Undertow": px/s kéo người chơi về phía boss trong 1.5s (zone.gd kind undertow)
 const EMBER_N: int = 5               # hexer "Ember Rain": số điểm lửa thả xuống sàn quanh người chơi (nằm 2s)
+const CAGE_GAP: Array = [90.0, 45.0]   # brute "Bone Cage": gai trồi cách người chơi 90px hai bên, rồi khép vào 45px
+const GEYSER_N: int = 4               # colossus "Geyser Line": số cột nước phun lần lượt về phía người chơi
+const VOLLEY_N: int = 5               # colossus "Bubble Volley": số bong bóng chậm bắn hình quạt (rồi nối dậm đất)
 const GRAVITY: float = 2400.0
 const STAGGER_CD: float = 6.0   # mỗi boss chỉ choáng được một lần mỗi chừng này giây (đỡ đòn không thành vòng lặp)
 const PERCH_WAIT: float = 1.0   # giây người chơi đứng cao hơn boss trước khi boss nhảy lên
@@ -95,6 +98,7 @@ var _alpha: float = 1.0
 var _was_air: bool = false
 var _perch_t: float = 0.0
 var _prev_state: String = ""
+var _twin: int = 0              # brute "Twin Slam": số lần đập nữa sau lần chạm đất hiện tại
 var _last_pick: String = ""     # đòn lượt trước (không lặp đòn y hệt hai lượt liền)
 var braziers: Array = []     # chân các lò lửa trong phòng (world gán) — nguồn sóng lửa của Hexer
 var platforms: Array = []    # Rect2 các bục một chiều trong phòng (world gán) — Lord làm nóng bục
@@ -227,6 +231,7 @@ func _face(p: Node2D) -> void:
 	dir = 1 if p.global_position.x > global_position.x else -1
 
 func _next() -> void:
+	_twin = 0
 	state = "hover" if form in FLYERS else "walk"
 	_t = (randf_range(1.0, 1.6) if form in FLYERS else randf_range(0.5, 1.0)) * (P2_REST if phase >= 2 else 1.0)
 
@@ -279,8 +284,13 @@ func _ground(delta: float, p: Node2D) -> void:
 				_was_air = true
 			elif _was_air:
 				_shockwave()
-				state = "recover"
-				_t = 0.8
+				if _twin > 0:   # Twin Slam: đập lần hai ngay sau lần đầu
+					_twin -= 1
+					state = "wind_slam"
+					_t = 0.3
+				else:
+					state = "recover"
+					_t = 0.8
 		"wind_bolt":
 			velocity.x = 0.0
 			_face(p)
@@ -326,13 +336,13 @@ func _ground(delta: float, p: Node2D) -> void:
 			if _combo <= 0 or _t <= 0.0:
 				state = "recover"
 				_t = 1.0
-		"wind_pillar", "wind_fissure", "wind_heat", "wind_tide", "wind_torch", "wind_veil", "wind_bloom", "wind_vine", "wind_sweep", "wind_hurl", "wind_undertow":   # torch/veil: chỉ dùng khi Lord echo (boss bay có khối riêng)
+		"wind_pillar", "wind_fissure", "wind_heat", "wind_tide", "wind_torch", "wind_veil", "wind_bloom", "wind_vine", "wind_sweep", "wind_hurl", "wind_undertow", "wind_cage", "wind_geyser", "wind_volley":   # torch/veil: chỉ dùng khi Lord echo (boss bay có khối riêng)
 			velocity.x = 0.0
 			_face(p)
 			if _t <= 0.0:
 				var from: String = state
 				_cast(p)
-				if CHAIN.has(from) and (from == "wind_tide" or phase >= 2) and (from != "wind_heat" or not platforms.is_empty()):
+				if CHAIN.has(from) and (from == "wind_tide" or from == "wind_volley" or phase >= 2) and (from != "wind_heat" or not platforms.is_empty()):
 					_chain(String(CHAIN[from]))
 				else:
 					state = "recover"
@@ -380,7 +390,14 @@ func _pick_attack() -> void:
 	if form == "colossus" or form == "brute":   # brute: dậm đất có sóng cả hai pha
 		opts.append("quake")
 	if form == "brute":
+		if phase == 1 or randf() < 0.5:   # lồng xương (không đỡ được); pha 2 chỉ nửa số lượt để đòn không đỡ được ≤1/3 bộ đòn
+			opts.append("cage")
+		if phase >= 2:
+			opts.append("twin")   # đập đôi (đỡ được)
 		opts.append("hurl")   # ném xương: một trong ~5-7 lựa chọn mỗi lượt (≤1/4)
+	if form == "colossus":
+		opts.append("geyser")   # hàng mạch nước (không đỡ được)
+		opts.append("volley")   # mưa bong bóng chậm rồi dậm đất
 	if form == "colossus" and not platforms.is_empty():
 		opts.append("undertow")   # xoáy nước kéo về phía boss: chỉ khi phòng có bục để thoát lên
 	if form == "warden" and (phase >= 2 or randf() < SWEEP_P1):   # quét sàn: đòn không đỡ được của Warden (nhảy hoặc dash qua); pha 1 chỉ thỉnh thoảng
@@ -429,6 +446,19 @@ func _pick_attack() -> void:
 		"sweep":
 			state = "wind_sweep"
 			_t = 0.8
+		"cage":
+			state = "wind_cage"
+			_t = 0.7
+		"twin":
+			state = "wind_slam"
+			_t = 0.45
+			_twin = 1
+		"geyser":
+			state = "wind_geyser"
+			_t = 0.7
+		"volley":
+			state = "wind_volley"
+			_t = 0.7
 		"hurl":
 			state = "wind_hurl"
 			_t = 0.7
@@ -548,6 +578,34 @@ func _cast(p: Node2D) -> void:
 				get_parent().add_child.call_deferred(s)
 				s.position = Vector2(global_position.x + hs * 40.0, fy - (14.0 if i != 1 else 30.0))
 			shake.emit(1.5)
+		"wind_cage":   # Bone Brute: gai xương trồi hai bên người chơi rồi khép lại; nhảy lên hoặc dash ra ngoài (không đỡ được)
+			for g in CAGE_GAP.size():
+				for sgc in [-1.0, 1.0]:
+					var xc: float = clampf(p.global_position.x + sgc * float(CAGE_GAP[g]), arena.position.x + 60.0, arena.end.x - 60.0)
+					_dust(Vector2(xc, fy))
+					_zone("spikes", Rect2(xc - 20.0, fy - 44.0, 40.0, 44.0), 0.6 + 0.7 * float(g), 2.5)
+			shake.emit(2.0)
+		"wind_geyser":   # Drowned Colossus: cột nước phun lần lượt từ chân boss về phía người chơi (không đỡ được); nhảy qua khe hoặc dash
+			var sgg: float = 1.0 if p.global_position.x >= global_position.x else -1.0
+			for i in GEYSER_N:
+				var xg: float = clampf(global_position.x + sgg * (110.0 + 90.0 * float(i)), arena.position.x + 40.0, arena.end.x - 40.0)
+				_dust(Vector2(xg, fy))
+				_zone("geyser", Rect2(xg - 20.0, fy - 110.0, 40.0, 110.0), 0.3 + 0.25 * float(i), 0.7)
+			shake.emit(1.5)
+		"wind_volley":   # Drowned Colossus: bong bóng chậm bắn quạt (không sát thương, chạm thì chậm 2s), sau đó dậm đất
+			var base: Vector2 = (p.global_position - global_position).normalized()
+			for i in VOLLEY_N:
+				var sb := Area2D.new()
+				sb.set_script(PROJECTILE)
+				sb.friendly = false
+				sb.slows = true
+				sb.radius = 12.0
+				sb.life = 4.0
+				sb.color = Color(0.5, 0.8, 1.0, 0.7)
+				sb.vel = base.rotated((float(i) - float(VOLLEY_N - 1) * 0.5) * 0.22) * 170.0
+				sb.popped.connect(func(): sfx.emit("pop"))
+				get_parent().add_child.call_deferred(sb)
+				sb.position = position
 		"wind_undertow":   # Drowned Colossus: xoáy nước 1.5s quanh boss kéo người chơi vào (không sát thương; chạm boss mới đau); nhảy lên bục hoặc dash ra
 			sfx.emit("rumble")
 			var ut: Node2D = _zone("undertow", Rect2(global_position.x - 260.0, fy - 120.0, 520.0, 120.0), 0.2, 1.5)
