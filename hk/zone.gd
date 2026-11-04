@@ -6,6 +6,9 @@ extends Node2D
 ## Trước khi có hiệu lực (`delay`) không vẽ vùng nào: tín hiệu là âm thanh + bụi/tia lửa do boss phát ra.
 const SPRITES = preload("res://hk/sprites.gd")
 const FX = preload("res://hk/fx.gd")
+const DROWN_TIME: float = 2.0   # ở trong nước chừng này giây thì mất 1 mặt nạ, rồi đếm lại
+const MAX_DROWN: int = 2        # trần số mặt nạ mất vì chìm mỗi đợt nước
+const PULL: float = 80.0        # px/s dòng chảy kéo về phía boss
 var kind: String = "spikes"
 var rect: Rect2 = Rect2()       # vùng có hiệu lực (toạ độ thế giới); water: vùng khi nước dâng đủ cao
 var delay: float = 0.0
@@ -13,12 +16,16 @@ var life: float = 3.0           # thời gian có hiệu lực sau delay
 var vel: Vector2 = Vector2.ZERO # firewave
 var period: float = 0.0         # spore: chu kỳ bật/tắt (0 = luôn bật khi có hiệu lực)
 var on_from: float = 0.0        # spore: trong mỗi chu kỳ, từ giây này mới gây hại (trước đó chỉ là mây mờ báo hiệu)
+var drown: bool = false         # water: ở trong nước quá DROWN_TIME thì mất mặt nạ (chỉ khi phòng có bục để trú)
+var pull_x: float = 0.0         # water (drown): dòng chảy kéo người chơi về phía x này (boss)
 var floor_y: float = 0.0        # pillar: mặt sàn nơi cột đáp xuống
 var fx_parent: Node             # nơi đặt hạt bụi (boss gán: cha của boss, toạ độ thế giới)
 var _t: float = 0.0
 var _landed: bool = false
 var _in_water: bool = false   # water: người chơi đang ở trong nước (để bắn nước khi vào/ra)
 var _ripple: float = 0.0
+var _drown_t: float = 0.0     # giây liên tục ở trong nước; đứng trên nền khô thì về 0, nhảy trong không khí thì đứng yên
+var _drowns: int = 0          # số mặt nạ đã mất vì chìm ở đợt nước này (tối đa MAX_DROWN)
 var _body: StaticBody2D
 
 func _ready() -> void:
@@ -68,6 +75,8 @@ func _physics_process(delta: float) -> void:
 		return
 	var pr := Rect2(p.global_position - p.BODY * 0.5, p.BODY)
 	var inside: bool = pr.intersects(current())
+	if kind == "water" and not inside and p.is_on_floor():   # đứng trên nền khô (bục cao): hết chìm
+		_drown_t = 0.0
 	if kind == "water" and _in_water and not inside:   # ra khỏi nước
 		_splash(p, 8)
 		_in_water = false
@@ -81,6 +90,13 @@ func _physics_process(delta: float) -> void:
 				_ripple = 0.3
 				_splash(p, 2)
 			_in_water = true
+			if drown:
+				p.drift = signf(pull_x - p.global_position.x) * PULL
+				_drown_t += delta
+				if _drown_t >= DROWN_TIME and _drowns < MAX_DROWN:
+					_drown_t = 0.0
+					_drowns += 1
+					p.take_damage(rect.get_center().x, 1, false)   # chìm: không đỡ được
 		elif _spore_on() and not (kind == "spore" and float(p.get("spore_t")) > 0.0):   # Spore Ward: dash miễn nhiễm bào tử
 			p.take_damage(rect.get_center().x, 1, false)   # vùng gây hại: không đỡ được
 	queue_redraw()

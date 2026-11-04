@@ -43,6 +43,7 @@ const RUSH_SPEED: float = 560.0
 const P2_REST: float = 0.7        # pha 2: thời gian đi bộ/bay giữa hai đòn nhân hệ số này (nhịp dồn hơn)
 const CHAIN: Dictionary = {"wind_tide": "quake", "wind_heat": "rain"}   # đòn riêng nối thẳng sang đòn thứ hai (colossus: nước rồi dậm đất; lord/sovereign pha 2: bục nóng rồi mưa đá)
 const EARLY_P2: Array = ["grove", "brute", "colossus", "hexer"]   # vào pha 2 ở 66% máu (cũ: grove đã vậy; brute/colossus/hexer 50%)
+const TIDE_H: float = 90.0         # nước dâng cao (cũ 80): vẫn thấp hơn mặt bục 96px của arc_5 và nhảy được ra khỏi nước; chỉ khi phòng có bục thì chìm/dòng chảy
 const GRAVITY: float = 2400.0
 const STAGGER_CD: float = 6.0   # mỗi boss chỉ choáng được một lần mỗi chừng này giây (đỡ đòn không thành vòng lặp)
 const PERCH_WAIT: float = 1.0   # giây người chơi đứng cao hơn boss trước khi boss nhảy lên
@@ -521,9 +522,15 @@ func _cast(p: Node2D) -> void:
 				var r: Rect2 = pool[i]
 				_dust(Vector2(r.get_center().x, r.position.y))
 				_zone("heat", Rect2(r.position.x, r.position.y - 40.0, r.size.x, 44.0), 0.9, 3.0)
-		"wind_tide":   # Drowned Colossus: nước dâng 80px trong 0.8s, giữ rồi rút; làm chậm người chơi, bục cao thì an toàn
+		"wind_tide":   # Drowned Colossus: nước dâng (TIDE_H, hoặc 80px khi phòng không có bục) trong 0.8s, giữ rồi rút; làm chậm, có bục thì chìm (mất mặt nạ sau 2s) + dòng chảy kéo về phía boss; bục cao thì an toàn
 			sfx.emit("rumble")
-			_zone("water", Rect2(arena.position.x + 32.0, fy - 80.0, arena.size.x - 64.0, 80.0), 0.6, 4.5)
+			var safe: bool = not platforms.is_empty()   # có bục để trú thì nước nguy hiểm (chìm + dòng chảy), không thì như cũ (80px, chỉ làm chậm)
+			var th: float = TIDE_H if safe else 80.0
+			_dust(Vector2(arena.position.x + 48.0, fy))   # sóng dâng từ hai bờ báo trước
+			_dust(Vector2(arena.end.x - 48.0, fy))
+			var zt: Node2D = _zone("water", Rect2(arena.position.x + 32.0, fy - th, arena.size.x - 64.0, th), 0.6, 4.5)
+			zt.drown = safe
+			zt.pull_x = global_position.x
 			shake.emit(1.5)
 
 func _shockwave() -> void:
