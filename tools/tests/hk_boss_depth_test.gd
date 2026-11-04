@@ -170,8 +170,8 @@ func _init() -> void:
 	for c in wd.get_children():
 		if c.get("kind") == "sweep":
 			sw.append(c)
-	ck(sw.size() == 1, "wind_sweep tạo 1 sóng (%d)" % sw.size())
-	if sw.size() == 1:
+	ck(sw.size() == 2, "wind_sweep pha 2 tạo 2 sóng: sóng đầu + sóng hồi (%d)" % sw.size())
+	if sw.size() == 2:
 		var z: Node2D = sw[0]
 		ck(z.vel.x > 0.0 and z.rect.size.y == B.SWEEP_H, "sóng chạy về phía người chơi, cao %d" % int(B.SWEEP_H))
 		var x0: float = z.rect.position.x

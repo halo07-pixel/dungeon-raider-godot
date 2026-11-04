@@ -177,7 +177,7 @@ func _init() -> void:
 	b.state = "wind_bloom"
 	b._t = 0.0
 	await frames(3)
-	ck(zones(b, "spore").size() == 5, "wind_bloom pha 1: 5 cụm bào tử (%d)" % zones(b, "spore").size())
+	ck(zones(b, "spore").size() == 6, "wind_bloom pha 1: 5 cụm + 1 đợt hai (%d)" % zones(b, "spore").size())
 	b.state = "wind_vine"
 	b._t = 0.0
 	await frames(3)
@@ -186,7 +186,7 @@ func _init() -> void:
 	b.state = "wind_bloom"
 	b._t = 0.0
 	await frames(3)
-	ck(zones(b, "spore").size() == 12, "wind_bloom pha 2: thêm 2 cụm (5 + 7 = 12 gồm cụm pha 1 còn lại) (%d)" % zones(b, "spore").size())
+	ck(zones(b, "spore").size() == 19, "wind_bloom pha 2: thêm 13 cụm (7 + 6 đợt hai; cộng 6 cụm pha 1 còn lại) (%d)" % zones(b, "spore").size())
 	for zs in zones(b, "spore"):
 		zs.free()
 	b.phase = 1

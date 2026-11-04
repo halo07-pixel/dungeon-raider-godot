@@ -40,6 +40,9 @@ const SWEEP_P1: float = 0.5       # xác suất sweep nằm trong danh sách đ�
 const VINE_GAP: float = 45.0      # pha 2: hàng dây thứ hai lệch nửa bước so với hàng đầu, lấp các khe
 const QUAKE_WAVES: Array = [2, 3]   # số sóng của đòn quake theo pha 1 / pha 2+
 const RUSH_SPEED: float = 560.0
+const P2_REST: float = 0.7        # pha 2: thời gian đi bộ/bay giữa hai đòn nhân hệ số này (nhịp dồn hơn)
+const CHAIN: Dictionary = {"wind_tide": "quake", "wind_heat": "rain"}   # đòn riêng nối thẳng sang đòn thứ hai (colossus: nước rồi dậm đất; lord/sovereign pha 2: bục nóng rồi mưa đá)
+const EARLY_P2: Array = ["grove", "brute", "colossus", "hexer"]   # vào pha 2 ở 66% máu (cũ: grove đã vậy; brute/colossus/hexer 50%)
 const GRAVITY: float = 2400.0
 const STAGGER_CD: float = 6.0   # mỗi boss chỉ choáng được một lần mỗi chừng này giây (đỡ đòn không thành vòng lặp)
 const PERCH_WAIT: float = 1.0   # giây người chơi đứng cao hơn boss trước khi boss nhảy lên
@@ -88,6 +91,7 @@ var _alpha: float = 1.0
 var _was_air: bool = false
 var _perch_t: float = 0.0
 var _prev_state: String = ""
+var _last_pick: String = ""     # đòn lượt trước (không lặp đòn y hệt hai lượt liền)
 var braziers: Array = []     # chân các lò lửa trong phòng (world gán) — nguồn sóng lửa của Hexer
 var platforms: Array = []    # Rect2 các bục một chiều trong phòng (world gán) — Lord làm nóng bục
 var _dark_t: float = 0.0
@@ -220,7 +224,7 @@ func _face(p: Node2D) -> void:
 
 func _next() -> void:
 	state = "hover" if form in FLYERS else "walk"
-	_t = randf_range(1.0, 1.6) if form in FLYERS else randf_range(0.5, 1.0)
+	_t = (randf_range(1.0, 1.6) if form in FLYERS else randf_range(0.5, 1.0)) * (P2_REST if phase >= 2 else 1.0)
 
 # ------------------------------------------------------------ đi bộ (warden, lord)
 func _ground(delta: float, p: Node2D) -> void:
@@ -322,9 +326,13 @@ func _ground(delta: float, p: Node2D) -> void:
 			velocity.x = 0.0
 			_face(p)
 			if _t <= 0.0:
+				var from: String = state
 				_cast(p)
-				state = "recover"
-				_t = 0.9
+				if CHAIN.has(from) and (from == "wind_tide" or phase >= 2) and (from != "wind_heat" or not platforms.is_empty()):
+					_chain(String(CHAIN[from]))
+				else:
+					state = "recover"
+					_t = 0.9
 		"rain":
 			velocity.x = 0.0
 			_rain_t -= delta
@@ -341,6 +349,16 @@ func _ground(delta: float, p: Node2D) -> void:
 	move_and_slide()
 	global_position.x = clampf(global_position.x, arena.position.x + 50.0, arena.end.x - 50.0)
 
+## Nối đòn: bục nóng -> mưa đá ngắn (2s), nước dâng -> dậm đất.
+func _chain(to: String) -> void:
+	if to == "rain":
+		state = "rain"
+		_t = 2.0
+		_rain_t = 0.1
+	else:
+		state = "wind_quake"
+		_t = 0.6
+
 func _pick_attack() -> void:
 	var opts: Array = ["slash", "slam"]
 	if form == "brute":   # nhiều đập đất hơn chém: đòn chậm, báo trước dài
@@ -355,7 +373,7 @@ func _pick_attack() -> void:
 			opts.append("rain")
 	elif phase >= 2:
 		opts.append("combo")
-	if form == "colossus":
+	if form == "colossus" or form == "brute":   # brute: dậm đất có sóng cả hai pha
 		opts.append("quake")
 	if form == "warden" and (phase >= 2 or randf() < SWEEP_P1):   # quét sàn: đòn không đỡ được của Warden (nhảy hoặc dash qua); pha 1 chỉ thỉnh thoảng
 		opts.append("sweep")
@@ -373,7 +391,11 @@ func _pick_attack() -> void:
 		opts.append("bolt")
 		if form == "sovereign":
 			opts.append("bolt")
-	match String(opts[randi() % opts.size()]):
+	var pick: String = String(opts[randi() % opts.size()])
+	if pick == _last_pick and opts.size() > 1:   # không lặp đòn: bốc lại một lần
+		pick = String(opts[randi() % opts.size()])
+	_last_pick = pick
+	match pick:
 		"slash":
 			state = "wind_slash"
 			_t = 0.5
@@ -444,7 +466,7 @@ func _cast(p: Node2D) -> void:
 			_dust(Vector2(x, arena.position.y + 40.0))
 			_zone("pillar", Rect2(x - 16.0, arena.position.y + 40.0, 32.0, 96.0), 0.7, 6.0).floor_y = fy
 		"wind_fissure":   # Bone Brute: nền nứt, gai xương trồi lên quanh người chơi và tồn tại 3.5s
-			for dx in [-120.0, 0.0, 120.0]:
+			for dx in ([-240.0, -120.0, 0.0, 120.0, 240.0] if phase >= 2 else [-120.0, 0.0, 120.0]):   # pha 2: 5 cụm (cũ 3)
 				var x2: float = clampf(p.global_position.x + dx, arena.position.x + 60.0, arena.end.x - 60.0)
 				_dust(Vector2(x2, fy))
 				_zone("spikes", Rect2(x2 - 20.0, fy - 44.0, 40.0, 44.0), 0.6, 3.5)
@@ -455,6 +477,10 @@ func _cast(p: Node2D) -> void:
 				_dust(Vector2(xb, fy))
 				var zb: Node2D = _zone("spore", Rect2(xb - 40.0, fy - 70.0, 80.0, 70.0), 0.7, 4.0)
 				zb.period = 0.0
+			for dxr in ([-250.0, -150.0, -50.0, 50.0, 150.0, 250.0] if phase >= 2 else [0.0]):   # đợt hai nở muộn (1.9s) lệch chỗ: đứng yên ở chỗ an toàn của đợt một sẽ bị trúng
+				var xr: float = clampf(p.global_position.x + dxr, arena.position.x + 60.0, arena.end.x - 60.0)
+				var zr: Node2D = _zone("spore", Rect2(xr - 40.0, fy - 70.0, 80.0, 70.0), 1.9, 2.5)
+				zr.period = 0.0
 		"wind_vine":   # Rotted Warden: dây leo trồi lên thành hàng từ boss tới người chơi, từng cụm một (không đỡ được); pha 2: hàng thứ hai lấp các khe sau khi hàng đầu tàn (pha 1: chỉ 3 dây đầu)
 			var sgn: float = 1.0 if p.global_position.x >= global_position.x else -1.0
 			for i in 6:
@@ -470,6 +496,8 @@ func _cast(p: Node2D) -> void:
 			var dist: float = absf(edge - global_position.x)
 			_dust(Vector2(global_position.x + sg * 50.0, fy))
 			_zone("sweep", Rect2(global_position.x + sg * 50.0 - 20.0, fy - SWEEP_H, 40.0, SWEEP_H), 0.1, dist / SWEEP_SPEED, Vector2(sg * SWEEP_SPEED, 0.0))
+			if phase >= 2:   # sóng hồi: từ bờ xa quét ngược lại ngay khi sóng đầu tới nơi (nhảy hai lần)
+				_zone("sweep", Rect2(edge - 20.0, fy - SWEEP_H, 40.0, SWEEP_H), dist / SWEEP_SPEED + 0.15, dist / SWEEP_SPEED, Vector2(-sg * SWEEP_SPEED, 0.0))
 			shake.emit(2.0)
 		"wind_torch":   # Ash Hexer: nhóm lửa từ các lò chạy dọc sàn vào giữa phòng
 			var src: Array = braziers if not braziers.is_empty() else [Vector2(arena.position.x + 60.0, fy), Vector2(arena.end.x - 60.0, fy)]
@@ -554,6 +582,7 @@ func _wraith(delta: float, p: Node2D) -> void:
 				if r == 0:
 					state = "wind_bolt"
 					_t = 0.55
+					_combo = 1 if (form == "hexer" and (phase >= 2 or randf() < 0.4)) else 0   # hexer: quạt đôi
 				elif r == 1:
 					state = "wind_dive"
 					_t = 0.75
@@ -588,8 +617,12 @@ func _wraith(delta: float, p: Node2D) -> void:
 			_face(p)
 			if _t <= 0.0:
 				_fire_fan(p)
-				state = "hover"
-				_t = 1.3
+				if _combo > 0:
+					_combo -= 1
+					_t = 0.45   # quạt thứ hai ngay sau quạt đầu (state giữ wind_bolt)
+				else:
+					state = "hover"
+					_t = 1.3
 		"wind_dive":
 			velocity = Vector2.ZERO
 			if _t <= 0.0:
@@ -607,7 +640,7 @@ func _wraith(delta: float, p: Node2D) -> void:
 		"dive_land":
 			velocity = Vector2.ZERO
 			if _t <= 0.0:
-				if phase >= 2 and randf() < 0.5:
+				if randf() < (0.65 if phase >= 2 else 0.25):   # bổ nhào lần hai: pha 1 cũng có (cũ: chỉ pha 2, 0.5)
 					_dive_x = p.global_position.x
 					_markers.append({"x": _dive_x, "t": 0.5})
 					state = "wind_dive"
@@ -711,7 +744,7 @@ func take_hit(dmg: int, _from: Vector2) -> bool:   # luôn true (không có khi�
 	var want: int = phase
 	if kind == "many_faced":   # 3 pha: 66% và 33% máu
 		want = 3 if hp * 3 <= max_hp else (2 if hp * 3 <= max_hp * 2 else 1)
-	elif kind == "grove" and hp * 3 <= max_hp * 2:   # Rotted Warden vào pha 2 sớm hơn (66% thay vì 50%): bản cũ hạ trong ~9s nên gần như không thấy pha 2
+	elif kind in EARLY_P2 and hp * 3 <= max_hp * 2:   # mini-boss hạ trong ~7-9s vào pha 2 sớm hơn (66% thay vì 50%) để thấy pha 2
 		want = 2
 	elif hp <= max_hp / 2:
 		want = 2
