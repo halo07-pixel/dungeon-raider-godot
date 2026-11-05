@@ -5,6 +5,7 @@ const WorldData = preload("res://hk/world_data.gd")
 const InputSetup = preload("res://hk/input.gd")
 const FX = preload("res://hk/fx.gd")
 const LORE = preload("res://hk/lore.gd")
+const ORDEAL = preload("res://hk/ordeal.gd")
 const MUSIC = preload("res://hk/music.gd")
 const ZONE = preload("res://hk/zone.gd")
 const SURFACE: Dictionary = {"gate": "stone", "catacomb": "dirt", "vault": "metal", "archive": "wet", "grove": "dirt"}
@@ -46,6 +47,8 @@ const AMBUSH_EVERY: int = 3       # nightmare: cứ mỗi quái crawler/charger 
 var _rooms_since_rest: int = 0
 var _prev_room: String = ""
 var _stalking: bool = false
+var _seal_t: float = 0.0          # >0: cửa phòng đang khoá tới khi hết quái (hoặc hết giờ)
+var _warned: Dictionary = {}      # rương mimic đã phát âm báo (một lần mỗi rương mỗi lần vào phòng)
 
 func _ready() -> void:
 	InputSetup.ensure()
@@ -196,6 +199,8 @@ func _process(d: float) -> void:
 		atmosphere.set_mood("focus" if player.focusing else ("danger" if player.hp == 1 else ""))
 	menu.enabled = not busy and not shop.is_open() and not player.is_dead()
 	menu.can_travel = menu.enabled and _at_bench()
+	if not STATE.rush and is_instance_valid(room):
+		_ordeal_tick(d)
 
 func _fade_to(a: float, dur: float = 0.2) -> void:
 	var t := create_tween()
@@ -225,9 +230,11 @@ func load_room(id: String) -> void:
 	boss = null
 	hud.boss = null
 	var ambushable: int = 0
+	var n_enemies: int = 0
 	for e in room.entities:
 		match String(e["type"]):
 			"c", "f", "s", "h", "g", "d", "k", "z", "i", "b", "m", "t":
+				n_enemies += 1
 				var amb: bool = false
 				if String(e["type"]) in ["c", "h"] and STATE.is_nightmare() and not data.has("boss"):
 					ambushable += 1
@@ -268,6 +275,7 @@ func load_room(id: String) -> void:
 	music.play(String(MUSIC.AREA_TRACK.get(area, "explore_stone")))
 	music.ambient(area)
 	_stalk_check(id, data)
+	_ordeal(id, data, n_enemies)
 
 ## Nightmare: đếm phòng đã qua từ lần nghỉ cuối; đủ STALK_AFTER thì Stalker đuổi theo qua các phòng (không ở phòng boss/có bench).
 func _stalk_check(id: String, data: Dictionary) -> void:
@@ -285,6 +293,48 @@ func _stalk_check(id: String, data: Dictionary) -> void:
 		st.touched.connect(_on_stalker_touched)
 		_content.add_child(st)
 
+## Nightmare: kiểu phòng theo id (xem ordeal.gd). Mỗi lần nạp phòng đặt lại cả đèn lẫn khoá.
+func _ordeal(id: String, data: Dictionary, n_enemies: int) -> void:
+	_seal_t = 0.0
+	_warned.clear()
+	room.locked = false
+	var safe: bool = false
+	for it in room.interactables:
+		if it["kind"] == "bench" or it["kind"] == "merchant":
+			safe = true
+	var mode: String = ORDEAL.mode_for(id, data, n_enemies, room.hazards.size(), safe)
+	atmosphere.set_dark(mode == "dark")
+	if mode == "silent":
+		music.stop()
+	elif mode == "lock":
+		room.locked = true
+		_seal_t = ORDEAL.SEAL_TIMEOUT
+		hud.banner("The doors seal", "Clear the room")
+		sfx.play("rumble")
+
+func _live_enemies() -> int:
+	var n := 0
+	for e in get_tree().get_nodes_in_group("hk_enemy"):
+		if not e.is_queued_for_deletion() and e.hp > 0 and not e.minion:
+			n += 1
+	return n
+
+## Khoá cửa: mở lại khi hết quái hoặc hết giờ. Rương mimic: lại gần thì có tiếng sột soạt.
+func _ordeal_tick(d: float) -> void:
+	if _seal_t > 0.0:
+		_seal_t -= d
+		if _live_enemies() == 0 or _seal_t <= 0.0:
+			_seal_t = 0.0
+			room.locked = false
+			hud.banner("The doors open")
+			sfx.play("buy")
+	for it in room.interactables:
+		if it["kind"] == "cache" and not _warned.has(it["data"]["key"]) and not STATE.flag("cache_" + String(it["data"]["key"])) \
+				and ORDEAL.is_mimic(String(it["data"]["key"]), STATE.flag("secret_" + room.id)) \
+				and player.global_position.distance_to(it["data"]["pos"]) < ORDEAL.MIMIC_HINT:
+			_warned[it["data"]["key"]] = true
+			sfx.play("rustle")
+
 func _has_bench() -> bool:
 	for it in room.interactables:
 		if it["kind"] == "bench":
@@ -300,7 +350,7 @@ func _reset_stalk() -> void:
 	_rooms_since_rest = 0
 	_prev_room = ""
 
-func _spawn_enemy(ch: String, pos: Vector2, ambush: bool = false) -> void:
+func _spawn_enemy(ch: String, pos: Vector2, ambush: bool = false) -> CharacterBody2D:
 	var kinds: Dictionary = {"c": "crawler", "f": "flyer", "s": "spitter", "h": "charger", "g": "guard", "d": "dropper", "k": "sentry", "z": "reviver", "i": "cinder", "b": "bubbler", "m": "sporeling", "t": "thornshooter"}
 	var e := CharacterBody2D.new()
 	e.set_script(preload("res://hk/enemy.gd"))
@@ -310,6 +360,7 @@ func _spawn_enemy(ch: String, pos: Vector2, ambush: bool = false) -> void:
 	var h: float = e.body_size(e.kind).y
 	e.position = pos - (Vector2(0, h * 0.5) if ch != "f" and ch != "d" else Vector2.ZERO)
 	_content.add_child(e)
+	return e
 
 func _spawn_boss(bid: String, pos: Vector2) -> void:
 	boss = CharacterBody2D.new()
@@ -506,8 +557,15 @@ func _on_interacted(kind: String, data: Dictionary) -> void:
 			shop.open(player, String(room.data.get("area", "gate")))
 		"cache":
 			STATE.set_flag("cache_" + String(data["key"]))
-			sfx.play("geo")
 			var hidden: bool = STATE.flag("secret_" + room.id)
+			if ORDEAL.is_mimic(String(data["key"]), hidden):   # mimic: cắn thay vì cho Geo (đã báo trước bằng tiếng sột soạt)
+				var m: CharacterBody2D = _spawn_enemy("h", data["pos"])
+				m.dir = 1 if player.global_position.x > m.global_position.x else -1
+				m.state = "windup"
+				m._t = 0.35
+				hud.banner("Mimic!")
+				return
+			sfx.play("geo")
 			if hidden and STATE.shards < STATE.SHARDS_PER:   # hốc bí mật: mảnh mặt nạ thay Geo
 				var full: bool = STATE.add_shard()
 				sfx.play("buy")
