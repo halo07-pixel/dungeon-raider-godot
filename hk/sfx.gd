@@ -88,6 +88,9 @@ const DEFS: Dictionary = {
 	"deny": {"total": 0.15, "layers": [{"wave": "square", "freq": 150.0, "vol": 0.2, "dur": 0.12}]},
 	"spit": {"total": 0.15, "layers": [{"wave": "noise", "lp": 0.5, "vol": 0.25, "dur": 0.12}, {"wave": "sine", "freq": 300.0, "slide": -150.0, "vol": 0.15, "dur": 0.1}]},
 	"charge": {"total": 0.25, "layers": [{"wave": "saw", "freq": 120.0, "slide": 160.0, "vol": 0.15, "dur": 0.22, "swell": 0.8}]},
+	"heartbeat": {"total": 0.45, "layers": [{"wave": "sine", "freq": 62.0, "slide": -20.0, "vol": 0.34, "dur": 0.12}, {"wave": "sine", "freq": 52.0, "slide": -16.0, "vol": 0.26, "dur": 0.14, "delay": 0.17}]},
+	"whisper": {"total": 1.0, "layers": [{"wave": "noise", "lp": 0.5, "vol": 0.08, "dur": 0.9, "swell": 0.5}, {"wave": "sine", "freq": 330.0, "slide": -60.0, "vol": 0.03, "dur": 0.8, "swell": 0.5}]},
+	"drip": {"total": 0.25, "layers": [{"wave": "sine", "freq": 1300.0, "slide": -700.0, "vol": 0.1, "dur": 0.12}]},
 	"roar": {"total": 0.8, "layers": [{"wave": "saw", "freq": 90.0, "slide": -30.0, "vol": 0.3, "dur": 0.7, "swell": 0.2}, {"wave": "noise", "lp": 0.12, "vol": 0.3, "dur": 0.7, "swell": 0.2}]},
 	"slam": {"total": 0.4, "layers": [{"wave": "noise", "lp": 0.08, "vol": 0.5, "dur": 0.35}, {"wave": "sine", "freq": 60.0, "slide": -30.0, "vol": 0.4, "dur": 0.35}]},
 	# quái riêng theo khu

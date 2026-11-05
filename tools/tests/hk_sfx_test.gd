@@ -26,6 +26,7 @@ func _init() -> void:
 	var St = load("res://hk/state.gd")
 	St.boot = "keep"
 	St.reset()
+	St.nightmare = false   # rương mimic (nightmare) không cho Geo: test này kiểm âm rương thường
 	St.save_path = "user://hk_sfx_test_save.json"
 	St.give_ability("dash")
 	var SFX = load("res://hk/sfx.gd")
