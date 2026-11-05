@@ -46,8 +46,13 @@ const WINDUP_TINT: Dictionary = {"sentry": Color(0.8, 1.4, 1.9), "cinder": Color
 const SPORE_BURST: float = 2.5   # sporeling chết: đám bào tử nổ tại chỗ (0.5s mây mờ báo hiệu rồi 2s gây hại)
 const REVIVE_AFTER: float = 2.0   # reviver nằm bao lâu rồi đứng dậy
 const FIRE_TRAIL: float = 2.0     # cinder: vệt lửa tồn tại bao lâu
+const AMBUSH_RANGE: Vector2 = Vector2(140.0, 90.0)   # người chơi vào tầm này thì quái phục kích trồi ra
+const EMERGE_TIME: float = 0.45   # trồi ra: chưa gây hại, đánh được
+const MAX_ATTACKERS: int = 2      # nightmare: tối đa chừng này quái xông (windup/lunge) cùng lúc
+const REVIVE_BOOST: float = 0.5   # nightmare: reviver nằm hồi nhanh thêm chừng này khi có quái khác sống gần
 
 var kind: String = "crawler"
+var ambush: bool = false       # nightmare: ẩn tới khi người chơi lại gần (state hidden → emerge)
 var minion: bool = false       # quái do sentry gọi: không rơi Geo (chống cày)
 var _revived: bool = false     # reviver: đã đứng dậy một lần
 var _minion_ref: Node2D        # sentry: con crawler đang sống (tối đa 1)
@@ -93,6 +98,10 @@ func _ready() -> void:
 	_contact.add_child(c2)
 	add_child(_contact)
 	_home = position
+	if ambush:
+		state = "hidden"
+		collision_layer = 0
+		visible = false
 
 func _player() -> Node2D:
 	var ps := get_tree().get_nodes_in_group("hk_player")
@@ -108,6 +117,19 @@ func _physics_process(delta: float) -> void:
 	_t -= delta
 	if _kb_t > 0.0:
 		_kb_t -= delta
+	if state == "hidden" or state == "emerge":   # phục kích: ẩn, rồi trồi ra (sột soạt) — cả hai chưa gây hại
+		var pa := _player()
+		if state == "hidden" and pa and absf(pa.global_position.x - global_position.x) < AMBUSH_RANGE.x and absf(pa.global_position.y - global_position.y) < AMBUSH_RANGE.y:
+			state = "emerge"
+			_t = EMERGE_TIME
+			visible = true
+			set_deferred("collision_layer", 4)
+			sfx.emit("rustle")
+		elif state == "emerge" and _t <= 0.0:
+			state = "idle"
+		if state == "emerge":
+			_gravity_and_move(delta)
+		return
 	if state == "stagger":   # bị đỡ đòn: đứng choáng, không gây hại, hết giờ thì về "idle"
 		velocity = Vector2.ZERO if kind == "flyer" else Vector2(0.0, velocity.y)
 		if kind != "flyer":
@@ -165,7 +187,7 @@ func _charger(delta: float) -> void:
 	match state:
 		"idle":
 			_patrol(50.0, delta)
-			if p and _kb_t <= 0.0 and absf(p.global_position.y - global_position.y) < 60.0 and absf(p.global_position.x - global_position.x) < 340.0 and signf(p.global_position.x - global_position.x) == float(dir):
+			if p and _kb_t <= 0.0 and absf(p.global_position.y - global_position.y) < 60.0 and absf(p.global_position.x - global_position.x) < 340.0 and signf(p.global_position.x - global_position.x) == float(dir) and _slot_free():
 				state = "windup"
 				_t = 0.5
 		"windup":
@@ -192,6 +214,16 @@ func _charger(delta: float) -> void:
 			if _t <= 0.0:
 				state = "idle"
 				dir = -dir if randf() < 0.3 else dir
+
+## Nightmare: không quá MAX_ATTACKERS quái xông cùng lúc (số còn lại giữ khoảng cách, chờ lượt).
+func _slot_free() -> bool:
+	if not STATE.is_nightmare():
+		return true
+	var n := 0
+	for o in get_tree().get_nodes_in_group("hk_enemy"):
+		if o != self and (o.state == "windup" or o.state == "lunge"):
+			n += 1
+	return n < MAX_ATTACKERS
 
 ## Khiên chắn phía trước (hướng `dir`) trừ lúc đang hạ khiên (recover) và khi bị chém từ trên xuống (pogo) hoặc từ sau lưng.
 func _blocks(from_pos: Vector2) -> bool:
@@ -317,12 +349,20 @@ func _reviver(delta: float) -> void:
 	if state == "down":
 		velocity.x = 0.0
 		_gravity_and_move(delta)
+		if STATE.is_nightmare() and _others_alive():   # người chơi đang bận với quái khác: reviver hồi nhanh hơn
+			_t -= delta * REVIVE_BOOST
 		if _t <= 0.0:
 			state = "idle"
 			hp = maxi(1, int(DATA[kind]["hp"]) / 2)
 			sfx.emit("revive")
 		return
 	_patrol(60.0, delta)
+
+func _others_alive() -> bool:
+	for o in get_tree().get_nodes_in_group("hk_enemy"):
+		if o != self and o.hp > 0 and o.state != "down" and o.state != "hidden" and o.global_position.distance_to(global_position) < 320.0:
+			return true
+	return false
 
 ## Vệt lửa của cinder: vùng gây hại nằm trên sàn dưới chân (dùng lại zone.gd), tự tắt sau FIRE_TRAIL giây.
 func _drop_fire() -> void:

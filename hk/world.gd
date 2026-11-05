@@ -40,6 +40,12 @@ var _content: Node2D
 const TRAVEL_FADE: float = 0.45
 var _fade: ColorRect
 var _last_area: String = ""
+const STALKER = preload("res://hk/stalker.gd")
+const STALK_AFTER: int = 4        # nightmare: số phòng đi qua mà chưa nghỉ ở bench thì Stalker xuất hiện
+const AMBUSH_EVERY: int = 3       # nightmare: cứ mỗi quái crawler/charger thứ 3 trong phòng nằm phục kích
+var _rooms_since_rest: int = 0
+var _prev_room: String = ""
+var _stalking: bool = false
 
 func _ready() -> void:
 	InputSetup.ensure()
@@ -161,7 +167,7 @@ func _on_player_parried(from_x: float) -> void:
 	FX.ring(_content, at, Color(1.0, 0.95, 0.7, 0.9), 44.0, 0.25)
 	FX.spark(_content, at, Vector2(float(player.facing), -0.3).normalized(), Color(1, 0.9, 0.6))
 	cam.punch()
-	for n in get_tree().get_nodes_in_group("hk_enemy") + get_tree().get_nodes_in_group("hk_boss"):
+	for n in get_tree().get_nodes_in_group("hk_enemy") + get_tree().get_nodes_in_group("hk_boss") + get_tree().get_nodes_in_group("hk_stalker"):
 		if n.has_method("stagger") and absf(n.global_position.x - from_x) < 140.0 and absf(n.global_position.y - player.global_position.y) < 160.0:
 			n.stagger(0.8 if n.is_in_group("hk_boss") else 0.6)
 
@@ -218,10 +224,15 @@ func load_room(id: String) -> void:
 	player.ward_ready = true   # Oath Ward: mỗi phòng một lần chặn
 	boss = null
 	hud.boss = null
+	var ambushable: int = 0
 	for e in room.entities:
 		match String(e["type"]):
 			"c", "f", "s", "h", "g", "d", "k", "z", "i", "b", "m", "t":
-				_spawn_enemy(String(e["type"]), e["pos"])
+				var amb: bool = false
+				if String(e["type"]) in ["c", "h"] and STATE.is_nightmare() and not data.has("boss"):
+					ambushable += 1
+					amb = ambushable % AMBUSH_EVERY == 0
+				_spawn_enemy(String(e["type"]), e["pos"], amb)
 			"boss":
 				var bid: String = String(data.get("boss", {}).get("id", ""))
 				if bid != "" and not STATE.flag("boss_" + bid):
@@ -256,12 +267,45 @@ func load_room(id: String) -> void:
 	atmosphere.set_room(data, room.interactables)
 	music.play(String(MUSIC.AREA_TRACK.get(area, "explore_stone")))
 	music.ambient(area)
+	_stalk_check(id, data)
 
-func _spawn_enemy(ch: String, pos: Vector2) -> void:
+## Nightmare: đếm phòng đã qua từ lần nghỉ cuối; đủ STALK_AFTER thì Stalker đuổi theo qua các phòng (không ở phòng boss/có bench).
+func _stalk_check(id: String, data: Dictionary) -> void:
+	if _prev_room != "" and id != _prev_room:
+		_rooms_since_rest += 1
+	_prev_room = id
+	if not STATE.is_nightmare() or data.has("boss") or boss != null or _has_bench():
+		return
+	if _stalking or _rooms_since_rest >= STALK_AFTER:
+		_stalking = true
+		var st := CharacterBody2D.new()
+		st.set_script(STALKER)
+		st.arena = room.bounds()
+		st.sfx.connect(sfx.play)
+		st.touched.connect(_on_stalker_touched)
+		_content.add_child(st)
+
+func _has_bench() -> bool:
+	for it in room.interactables:
+		if it["kind"] == "bench":
+			return true
+	return false
+
+func _on_stalker_touched() -> void:
+	_stalking = false
+	_rooms_since_rest = 0
+
+func _reset_stalk() -> void:
+	_stalking = false
+	_rooms_since_rest = 0
+	_prev_room = ""
+
+func _spawn_enemy(ch: String, pos: Vector2, ambush: bool = false) -> void:
 	var kinds: Dictionary = {"c": "crawler", "f": "flyer", "s": "spitter", "h": "charger", "g": "guard", "d": "dropper", "k": "sentry", "z": "reviver", "i": "cinder", "b": "bubbler", "m": "sporeling", "t": "thornshooter"}
 	var e := CharacterBody2D.new()
 	e.set_script(preload("res://hk/enemy.gd"))
 	e.kind = kinds[ch]
+	e.ambush = ambush
 	e.sfx.connect(sfx.play)
 	var h: float = e.body_size(e.kind).y
 	e.position = pos - (Vector2(0, h * 0.5) if ch != "f" and ch != "d" else Vector2.ZERO)
@@ -431,6 +475,7 @@ func _on_player_died() -> void:
 		STATE.shade = {"room": room.id, "x": player.global_position.x, "y": player.global_position.y - 4.0, "geo": STATE.geo}
 		STATE.geo = 0
 	STATE.soul = 0
+	_reset_stalk()
 	load_room(STATE.bench_room)
 	var spawn: Vector2 = room.default_spawn() if STATE.bench_id == "start" else room.bench_spawn()
 	player.respawn_at(spawn, true)
@@ -518,6 +563,7 @@ func _travel(id: String) -> void:
 	STATE.bench_room = id
 	STATE.bench_id = "bench"
 	STATE.save()
+	_reset_stalk()
 	load_room(id)
 	var spawn: Vector2 = room.bench_spawn()
 	player.respawn_at(spawn, true)
@@ -534,6 +580,7 @@ func rest() -> void:
 	STATE.hp = STATE.max_hp()
 	STATE.bench_room = room.id
 	STATE.bench_id = "bench"
+	_reset_stalk()
 	if not (room.id in STATE.benches):
 		STATE.benches.append(room.id)
 	STATE.save()
