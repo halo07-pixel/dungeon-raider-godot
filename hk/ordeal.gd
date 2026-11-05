@@ -3,6 +3,7 @@ extends RefCounted
 ## tối (chỉ nhìn quanh người), im lặng (tắt nhạc/ambient), khoá cửa tới khi hết quái (có giờ chót), rương mimic.
 const STATE = preload("res://hk/state.gd")
 const LOCK_MIN: int = 3          # phòng có từ chừng này quái trở lên mới có thể khoá
+const HIDDEN_GRACE: float = 20.0   # giây sau khi khoá: quái còn nấp thôi không tính
 const SEAL_TIMEOUT: float = 60.0 # khoá tối đa chừng này giây (quái kẹt/không tới được thì cửa vẫn mở lại)
 const MIMIC_EVERY: int = 3       # cứ rương thứ 3 (theo băm khoá rương) là mimic
 const MIMIC_HINT: float = 140.0  # lại gần chừng này thì có âm sột soạt báo trước

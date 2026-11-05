@@ -65,5 +65,33 @@ func _init() -> void:
 		n = await go("gate_2" if i % 2 == 0 else "gate_3")
 	ck(n == 0, "Boss Rush: không có Stalker")
 	St.rush = false
+	# Stalker đứng yên khi world busy (mờ màn/chuyển phòng)
+	St.nightmare = true
+	w._reset_stalk()
+	for i in 5:
+		n = await go("gate_2" if i % 2 == 0 else "gate_3")
+	var sk = get_nodes_in_group("hk_stalker").filter(func(x): return not x.is_queued_for_deletion())[0]
+	sk.state = "chase"
+	var at: Vector2 = sk.global_position
+	w.busy = true
+	for i in 6:
+		await physics_frame
+	ck(sk.global_position == at, "busy: Stalker không di chuyển")
+	w.busy = false
+	for i in 6:
+		await physics_frame
+	ck(sk.global_position != at, "hết busy: Stalker lại đuổi")
+	# phòng khoá: quái còn nấp thôi giữ cửa sau HIDDEN_GRACE
+	w._reset_stalk()
+	await go("gate_2")
+	w._seal_t = w.ORDEAL.SEAL_TIMEOUT
+	w.room.locked = true
+	for e in get_nodes_in_group("hk_enemy"):
+		e.state = "hidden"
+	w._ordeal_tick(1.0)
+	ck(w.room.locked, "mới khoá: quái nấp vẫn giữ cửa")
+	w._seal_t = w.ORDEAL.SEAL_TIMEOUT - w.ORDEAL.HIDDEN_GRACE
+	w._ordeal_tick(1.0)
+	ck(not w.room.locked, "sau HIDDEN_GRACE: quái nấp không giữ cửa")
 	print("DONE fails=", fails)
 	quit(fails)

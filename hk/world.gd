@@ -52,6 +52,7 @@ var _mode: String = ""            # kiểu phòng nightmare hiện tại (dark/s
 var _beat_t: float = 0.0          # nhịp tim kế
 var _whisper_t: float = 6.0       # thì thầm kế (phòng tối)
 var _drip_t: float = 3.0          # nhỏ giọt kế (phòng im lặng)
+var _engage_id: int = 0           # đếm lần vào trận boss: await im lặng chỉ phát nhạc nếu vẫn là lần đó
 var _seal_t: float = 0.0          # >0: cửa phòng đang khoá tới khi hết quái (hoặc hết giờ)
 var _warned: Dictionary = {}      # rương mimic đã phát âm báo (một lần mỗi rương mỗi lần vào phòng)
 
@@ -202,6 +203,8 @@ func _process(d: float) -> void:
 		cam.global_position = player.global_position
 		atmosphere.follow(cam.global_position, player.global_position)
 		atmosphere.set_mood("focus" if player.focusing else ("danger" if player.hp == 1 else ""))
+	for st in get_tree().get_nodes_in_group("hk_stalker"):
+		st.frozen = busy or player.is_dead()   # Stalker đứng yên lúc chuyển phòng/mờ màn/chết
 	menu.enabled = not busy and not shop.is_open() and not player.is_dead()
 	menu.can_travel = menu.enabled and _at_bench()
 	if not STATE.rush and is_instance_valid(room):
@@ -351,10 +354,10 @@ func _dread_tick(d: float) -> void:
 			_drip_t = randf_range(2.0, 4.0)
 			sfx.play("drip")
 
-func _live_enemies() -> int:
+func _live_enemies(skip_hidden: bool = false) -> int:
 	var n := 0
 	for e in get_tree().get_nodes_in_group("hk_enemy"):
-		if not e.is_queued_for_deletion() and e.hp > 0 and not e.minion:
+		if not e.is_queued_for_deletion() and e.hp > 0 and not e.minion and not (skip_hidden and e.state == "hidden"):
 			n += 1
 	return n
 
@@ -362,7 +365,9 @@ func _live_enemies() -> int:
 func _ordeal_tick(d: float) -> void:
 	if _seal_t > 0.0:
 		_seal_t -= d
-		if _live_enemies() == 0 or _seal_t <= 0.0:
+		# quái phục kích chưa trồi lên sau HIDDEN_GRACE giây thì không giữ cửa nữa (người chơi có thể không tới được)
+		var grace: bool = ORDEAL.SEAL_TIMEOUT - _seal_t >= ORDEAL.HIDDEN_GRACE
+		if _live_enemies(grace) == 0 or _seal_t <= 0.0:
 			_seal_t = 0.0
 			room.locked = false
 			hud.banner("The doors open")
@@ -443,6 +448,8 @@ func _on_boss_phase(ph: int) -> void:
 		music.phase(boss.kind, ph)
 
 func _on_boss_engaged() -> void:
+	_engage_id += 1
+	var my_id: int = _engage_id
 	room.locked = true
 	cam.zoom_to(cam.WIDE if boss.kind in WIDE_BOSSES else cam.ENGAGE)
 	sfx.play("roar")
@@ -451,7 +458,7 @@ func _on_boss_engaged() -> void:
 	if STATE.is_nightmare() and STATE.atmosphere_on:   # nhạc cắt đột ngột, im một nhịp rồi nhạc boss mới vào
 		music.stop()
 		await get_tree().create_timer(BOSS_SILENCE).timeout
-		if not is_instance_valid(boss):
+		if not is_instance_valid(boss) or my_id != _engage_id or player.is_dead():
 			return
 	music.play(String(MUSIC.BOSS_TRACK.get(boss.kind, "boss_warden")))
 
