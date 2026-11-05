@@ -47,6 +47,11 @@ const AMBUSH_EVERY: int = 3       # nightmare: cứ mỗi quái crawler/charger 
 var _rooms_since_rest: int = 0
 var _prev_room: String = ""
 var _stalking: bool = false
+const BOSS_SILENCE: float = 0.9   # nightmare: im lặng trước nhạc boss
+var _mode: String = ""            # kiểu phòng nightmare hiện tại (dark/silent/lock/"")
+var _beat_t: float = 0.0          # nhịp tim kế
+var _whisper_t: float = 6.0       # thì thầm kế (phòng tối)
+var _drip_t: float = 3.0          # nhỏ giọt kế (phòng im lặng)
 var _seal_t: float = 0.0          # >0: cửa phòng đang khoá tới khi hết quái (hoặc hết giờ)
 var _warned: Dictionary = {}      # rương mimic đã phát âm báo (một lần mỗi rương mỗi lần vào phòng)
 
@@ -201,6 +206,7 @@ func _process(d: float) -> void:
 	menu.can_travel = menu.enabled and _at_bench()
 	if not STATE.rush and is_instance_valid(room):
 		_ordeal_tick(d)
+		_dread_tick(d)
 
 func _fade_to(a: float, dur: float = 0.2) -> void:
 	var t := create_tween()
@@ -303,6 +309,7 @@ func _ordeal(id: String, data: Dictionary, n_enemies: int) -> void:
 		if it["kind"] == "bench" or it["kind"] == "merchant":
 			safe = true
 	var mode: String = ORDEAL.mode_for(id, data, n_enemies, room.hazards.size(), safe)
+	_mode = mode
 	atmosphere.set_dark(mode == "dark")
 	if mode == "silent":
 		music.stop()
@@ -311,6 +318,38 @@ func _ordeal(id: String, data: Dictionary, n_enemies: int) -> void:
 		_seal_t = ORDEAL.SEAL_TIMEOUT
 		hud.banner("The doors seal", "Clear the room")
 		sfx.play("rumble")
+
+## Lớp rùng rợn (chỉ âm thanh/viền, không đụng vật lý; tắt cùng nút Atmosphere): tim đập khi còn 1 mặt nạ / phòng im lặng / Stalker gần,
+## thì thầm ở phòng tối, nhỏ giọt ở phòng im lặng.
+func _dread_tick(d: float) -> void:
+	hud.dread = STATE.is_nightmare() and STATE.atmosphere_on
+	if not hud.dread or player.is_dead() or busy:
+		return
+	var rate: float = 0.0
+	if player.hp == 1:
+		rate = 0.9
+	elif _mode == "silent":
+		rate = 1.3
+	for st in get_tree().get_nodes_in_group("hk_stalker"):
+		if (st.state == "chase" or st.state == "appear") and st.global_position.distance_to(player.global_position) < 320.0:
+			rate = 0.65
+	_beat_t -= d
+	if rate <= 0.0:
+		_beat_t = minf(_beat_t, 0.3)
+	elif _beat_t <= 0.0:
+		_beat_t = rate
+		sfx.play("heartbeat")
+		hud.beat()
+	if _mode == "dark":
+		_whisper_t -= d
+		if _whisper_t <= 0.0:
+			_whisper_t = randf_range(6.0, 12.0)
+			sfx.play("whisper")
+	elif _mode == "silent":
+		_drip_t -= d
+		if _drip_t <= 0.0:
+			_drip_t = randf_range(2.0, 4.0)
+			sfx.play("drip")
 
 func _live_enemies() -> int:
 	var n := 0
@@ -407,9 +446,14 @@ func _on_boss_engaged() -> void:
 	room.locked = true
 	cam.zoom_to(cam.WIDE if boss.kind in WIDE_BOSSES else cam.ENGAGE)
 	sfx.play("roar")
-	music.play(String(MUSIC.BOSS_TRACK.get(boss.kind, "boss_warden")))
 	music.ambient("")   # đang đánh boss: nhạc boss thôi, không ambient
 	hud.banner(boss.title(), LORE.INTRO_GATEKEEPER if boss.empowered else LORE.line(boss.kind, "intro"))
+	if STATE.is_nightmare() and STATE.atmosphere_on:   # nhạc cắt đột ngột, im một nhịp rồi nhạc boss mới vào
+		music.stop()
+		await get_tree().create_timer(BOSS_SILENCE).timeout
+		if not is_instance_valid(boss):
+			return
+	music.play(String(MUSIC.BOSS_TRACK.get(boss.kind, "boss_warden")))
 
 func _on_boss_defeated(bid: String) -> void:
 	sfx.play("boss_die")

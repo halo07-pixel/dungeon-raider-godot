@@ -20,6 +20,8 @@ var _geo_shown: float = -1.0     # số Geo đang hiện (đếm tăng dần t�
 var _geo_seen: int = -1         # STATE.geo ở khung trước (phát hiện tăng/giảm)
 var _geo_gain: int = 0           # tổng Geo vừa nhận, hiện "+N" rồi mờ
 var _gain_t: float = 0.0
+var dread: bool = false          # nightmare + Atmosphere bật: viền tối khi máu thấp (world đặt mỗi khung)
+var _beat: float = 0.0           # vừa có nhịp tim: viền đập mạnh hơn rồi tắt dần
 var _boss_frac: float = 1.0      # thanh máu boss hiện (trượt mượt tới hp thật)
 const HURT_TIME: float = 0.45
 const POP_TIME: float = 0.3
@@ -45,6 +47,19 @@ func _text(font: Font, pos: Vector2, text: String, fsize: int, color: Color, ali
 	draw_string_outline(font, pos, text, align, width, fsize, maxi(3, fsize / 6), Color(0, 0, 0, color.a * 0.85))
 	draw_string(font, pos, text, align, width, fsize, color)
 
+func beat() -> void:
+	_beat = 1.0
+
+## Viền tối đỏ khi còn 1-2 mặt nạ (nightmare): đập theo nhịp tim. Chỉ vẽ, không che HUD (vẽ sau cùng nhưng viền mỏng ở rìa).
+func _draw_vignette() -> void:
+	if not dread or hp <= 0 or hp > 2:
+		return
+	var strength: float = 1.0 if hp == 1 else 0.45
+	for i in 6:
+		var a: float = 0.22 * strength * (1.0 + 0.8 * _beat) * (1.0 - float(i) / 6.0)
+		var e: float = 16.0 * i + 8.0
+		draw_rect(Rect2(e, e, size.x - 2.0 * e, size.y - 2.0 * e), Color(0.25, 0.0, 0.02, a), false, 16.0)
+
 func banner(text: String, sub: String = "") -> void:
 	banner_text = text
 	banner_sub = sub
@@ -61,6 +76,7 @@ func _process(d: float) -> void:
 	_hurt = maxf(0.0, _hurt - d)
 	_pop = maxf(0.0, _pop - d)
 	_soul_flash = maxf(0.0, _soul_flash - d)
+	_beat = maxf(0.0, _beat - d * 3.0)
 	_gain_t = maxf(0.0, _gain_t - d)
 	if _gain_t <= 0.0:
 		_geo_gain = 0
@@ -81,6 +97,7 @@ func _process(d: float) -> void:
 
 func _draw() -> void:
 	var font: Font = ThemeDB.fallback_font
+	_draw_vignette()
 	# ống soul
 	draw_circle(Vector2(52, 52), 30, Color(0.1, 0.12, 0.2))
 	var fill: float = float(soul) / float(STATE.SOUL_MAX)
