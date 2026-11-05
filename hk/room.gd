@@ -36,7 +36,12 @@ const PROMPTS: Dictionary = {"bench": "Rest", "merchant": "Trade", "altar": "Tak
 var interactables: Array = []   # {rect, kind, data}
 var cracks: Array = []          # Rect2 các ô tường nứt `%` còn nguyên (mỗi phòng tối đa một bí mật: vỡ một ô là vỡ cả cụm)
 const CRACK = preload("res://hk/crack.gd")
-var locked: bool = false        # khoá cửa khi đánh boss
+var locked: bool = false:       # khoá cửa khi đánh boss: tắt tín hiệu cửa VÀ chặn khe cửa bằng tường tạm
+	set(v):
+		locked = v
+		if _door_wall:
+			_door_wall.set_deferred("collision_layer", 1 if v else 0)
+var _door_wall: StaticBody2D
 var _cells: Array = []
 var _pal: Dictionary
 var _player: Node2D
@@ -156,6 +161,16 @@ func _make_bodies() -> void:
 		cs.shape = sh
 		cs.position = r.position + r.size * 0.5
 		body.add_child(cs)
+	_door_wall = StaticBody2D.new()   # tường tạm ở khe cửa, chỉ đặc khi `locked` (không thì người chơi chạy ra ngoài phòng)
+	_door_wall.collision_layer = 1 if locked else 0
+	add_child(_door_wall)
+	for ch in doors:
+		var dcs := CollisionShape2D.new()
+		var dsh := RectangleShape2D.new()
+		dsh.size = doors[ch].size
+		dcs.shape = dsh
+		dcs.position = doors[ch].get_center()
+		_door_wall.add_child(dcs)
 	for cr in cracks:   # tường nứt: đặc (lớp 1) và nhận nhát chém (lớp 4, có take_hit)
 		var cb := StaticBody2D.new()
 		cb.set_script(CRACK)
@@ -252,6 +267,8 @@ func _physics_process(_d: float) -> void:
 		if pr.intersects(r.grow(-2.0)):
 			hazard_touched.emit(r.get_center().x)
 			break
+	if locked and not doors.is_empty() and not bounds().grow(64.0).has_point(_player.global_position):
+		_player.respawn_at(spawn_for_door(String(doors.keys()[0])))   # chốt an toàn: lỡ ra ngoài phòng khi khoá thì đưa về cửa
 	if not locked:
 		var inside: String = ""
 		for ch in doors:
