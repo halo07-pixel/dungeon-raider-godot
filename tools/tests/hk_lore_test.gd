@@ -45,6 +45,9 @@ func _init() -> void:
 	for id in seen:
 		ck(id in boss_rooms, "%s: có phòng boss để nhận ký ức" % id)
 	ck(L.BENCH.size() == L.MEMORIES.size() + 1, "mỗi số ký ức 0..6 có một dòng bench")
+	for m in L.MEMORIES:
+		ck(L.AREA_THEME.has(String(m["area"])) and L.AREA_LINE.has(String(m["area"])), "%s: khu '%s' có từ khoá + dòng banner" % [m["id"], m["area"]])
+	ck(L.AREA_LINE.has("grove") and L.area_line("khu_la") == "", "grove có dòng banner; khu lạ trả rỗng")
 	# đếm theo cờ
 	ck(L.count() == 0 and not L.is_complete(), "mới chơi: 0 ký ức")
 	St.set_flag("boss_warden"); St.set_flag("boss_hexer")
@@ -92,6 +95,11 @@ func _init() -> void:
 	w.set_script(load("res://hk/world.gd"))
 	root.add_child(w)
 	await create_timer(0.3).timeout
+	# đổi khu: banner có tên khu + dòng phụ của khu đó
+	w._last_area = ""
+	w.load_room("cat_1")
+	ck(w.hud.banner_text == "Weeping Catacombs" and w.hud.banner_sub == L.AREA_LINE["catacomb"], "vào khu mới: banner tên khu + dòng phụ (%s / %s)" % [w.hud.banner_text, w.hud.banner_sub])
+	await process_frame
 	w._on_boss_defeated("warden")
 	ck(w.hud.banner_sub == L.memory("warden")["memory"], "hạ boss: banner hiện ký ức")
 	ck(L.count() == 1, "hạ boss: nhận ký ức")
