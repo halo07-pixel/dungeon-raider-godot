@@ -54,6 +54,8 @@ const DEFS: Dictionary = {
 	"tell_torch": {"total": 0.35, "layers": [{"wave": "noise", "lp": 0.4, "vol": 0.25, "dur": 0.3, "swell": 0.4}, {"wave": "saw", "freq": 220.0, "slide": 120.0, "vol": 0.1, "dur": 0.3}]},
 	"tell_heat": {"total": 0.4, "layers": [{"wave": "saw", "freq": 140.0, "slide": 260.0, "vol": 0.14, "dur": 0.38, "swell": 0.8}, {"wave": "noise", "lp": 0.6, "vol": 0.1, "dur": 0.3}]},
 	"tell_tide": {"total": 0.5, "layers": [{"wave": "sine", "freq": 140.0, "slide": 220.0, "vol": 0.22, "dur": 0.45, "swell": 0.7}, {"wave": "noise", "lp": 0.2, "vol": 0.12, "dur": 0.4}]},
+	"rustle": {"total": 0.3, "layers": [{"wave": "noise", "lp": 0.7, "vol": 0.2, "dur": 0.25, "swell": 0.3}]},
+	"stalk": {"total": 1.2, "layers": [{"wave": "sine", "freq": 110.0, "slide": -50.0, "vol": 0.2, "dur": 1.1, "swell": 0.7}, {"wave": "noise", "lp": 0.2, "vol": 0.12, "dur": 1.0, "swell": 0.8}]},
 	"crumble": {"total": 0.5, "layers": [{"wave": "noise", "lp": 0.12, "vol": 0.35, "dur": 0.45, "swell": 0.15}, {"wave": "sine", "freq": 90.0, "slide": 40.0, "vol": 0.25, "dur": 0.3}]},
 	"tell_bloom": {"total": 0.5, "layers": [{"wave": "noise", "lp": 0.2, "vol": 0.2, "dur": 0.45, "swell": 0.8}, {"wave": "sine", "freq": 160.0, "slide": 240.0, "vol": 0.14, "dur": 0.4, "swell": 0.6}]},
 	"tell_vine": {"total": 0.4, "layers": [{"wave": "saw", "freq": 120.0, "slide": 90.0, "vol": 0.14, "dur": 0.35, "swell": 0.7}, {"wave": "noise", "lp": 0.1, "vol": 0.1, "dur": 0.3}]},

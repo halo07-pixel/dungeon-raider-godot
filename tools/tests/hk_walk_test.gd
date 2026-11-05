@@ -26,6 +26,7 @@ func _init() -> void:
 	St.reset()
 	St.save_path = "user://hk_walk_save.json"
 	St.delete_save()
+	St.nightmare = false   # kiểm bố cục cửa/phòng: Stalker (nightmare) đuổi theo qua phòng sẽ chạm người chơi và làm nhiễu phép đo (Stalker có test riêng)
 	for a in ["dash", "double_jump", "wall_cling"]:
 		St.give_ability(a)
 	w = Node2D.new()
