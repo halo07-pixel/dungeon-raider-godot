@@ -51,11 +51,11 @@ func _init() -> void:
 	St.play_time = 9.0
 	St.reset()
 	ck(St.play_time == 0.0, "reset() xoá play_time")
-	# file save hỏng -> ô coi như trống
+	# file save hỏng -> ô "corrupt" (xoá được, không lẫn với ô trống)
 	var f := FileAccess.open(St.slot_path(2), FileAccess.WRITE)
 	f.store_string("không phải json")
 	f.close()
-	ck(St.slot_info(2).is_empty(), "save hỏng -> {}")
+	ck(St.slot_info(2).has("corrupt"), "save hỏng -> corrupt")
 	DirAccess.remove_absolute(St.slot_path(2))
 	# tiêu đề
 	var main: Node = load("res://hk/main.tscn").instantiate()
@@ -88,6 +88,51 @@ func _init() -> void:
 	await tap("hk_jump")
 	await create_timer(0.5, true, false, true).timeout
 	ck(main._world != null and St.save_path == St.slot_path(2) and St.play_time >= t0 + 0.5, "Continue ô 3 nạp lại time")
+	# main: reset_requested -> world mới bắt đầu lại từ đầu, vẫn trong ô đó
+	var w0 = main._world
+	St.visited = ["gate_1", "gate_2", "gate_3"]
+	St.save()
+	w0.reset_requested.emit()
+	await create_timer(0.5, true, false, true).timeout
+	ck(main._world != w0 and (not is_instance_valid(w0) or w0.is_queued_for_deletion()), "reset: world cũ bị thay")
+	ck(St.save_path == St.slot_path(2) and St.visited.size() <= 1, "reset: cùng ô, tiến độ về đầu (%d)" % St.visited.size())
+	ck(not paused, "reset: cây không bị pause")
+	# xoá ô: cả .tmp sót lại; ô hỏng hiện ra để xoá được
+	var p0: String = St.slot_path(0)
+	var fw := FileAccess.open(p0, FileAccess.WRITE)
+	fw.store_string("{hong")
+	fw.close()
+	fw = FileAccess.open(p0 + ".tmp", FileAccess.WRITE)
+	fw.store_string("x")
+	fw.close()
+	ck(St.slot_info(0).has("corrupt"), "save hỏng -> ô corrupt (không phải trống)")
+	St.delete_slot(0)
+	ck(not FileAccess.file_exists(p0) and not FileAccess.file_exists(p0 + ".tmp"), "delete_slot xoá cả .tmp")
+	ck(St.slot_info(0).is_empty(), "xoá xong ô trống")
+	# kỷ lục Boss Rush
+	var Ru = load("res://hk/rush.gd")
+	Ru.record_path = "user://hk_slots_test_rush.json"
+	Ru.erase_records()
+	ck(Ru.submit(50.0) and Ru.best() > 0.0, "ghi kỷ lục")
+	Ru.erase_records()
+	ck(Ru.best() <= 0.0 and not FileAccess.file_exists(Ru.record_path), "erase_records xoá kỷ lục")
+	# Pause > Reset save: bấm Jump hai lần mới phát tín hiệu, đổi dòng thì huỷ
+	var menu = load("res://hk/menu.gd").new()
+	root.add_child(menu)
+	await process_frame
+	var got: Array = [0]
+	menu.reset_save.connect(func(): got[0] += 1)
+	menu.open("pause")
+	await process_frame
+	menu.sel = 6
+	await tap("hk_jump")
+	ck(got[0] == 0 and menu._reset_armed, "Jump lần 1: chưa xoá")
+	await tap("hk_up")
+	await tap("hk_down")
+	ck(not menu._reset_armed, "đổi dòng: huỷ")
+	await tap("hk_jump")
+	await tap("hk_jump")
+	ck(got[0] == 1 and menu.tab == "", "Jump hai lần: phát reset_save và đóng menu (%d)" % got[0])
 	for i in St.SLOTS:
 		DirAccess.remove_absolute(St.slot_path(i))
 	print("DONE fails=", fails)

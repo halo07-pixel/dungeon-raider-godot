@@ -9,6 +9,7 @@ var _music: Node
 var _sfx: Node
 var _world: Node2D
 var _overlay: Node
+var _slot: int = 0
 
 func _ready() -> void:
 	InputSetup.ensure()
@@ -32,15 +33,20 @@ func _show_title() -> void:
 	_overlay = t
 
 func _start_game(mode: String, slot: int, title: Node) -> void:
+	_slot = slot
 	STATE.save_path = STATE.slot_path(slot)   # Boss Rush: world đổi sang save tạm
 	STATE.boot = mode
 	_music.stop()
-	title.queue_free()
+	if title:
+		title.queue_free()
 	_overlay = null
+	if is_instance_valid(_world):
+		_world.queue_free()
 	_world = Node2D.new()
 	_world.set_script(preload("res://hk/world.gd"))
 	_world.ending_reached.connect(_show_ending)
 	_world.rush_finished.connect(_show_rush_result)
+	_world.reset_requested.connect(func(): _start_game("new", _slot, null))
 	add_child(_world)
 
 func _show_ending() -> void:
