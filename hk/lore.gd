@@ -7,13 +7,22 @@ const STATE = preload("res://hk/state.gd")
 
 ## Thứ tự = thứ tự hiện ở tab Memories. intro: câu boss nói khi vào trận; memory: ký ức nhận được khi hạ.
 const MEMORIES: Array = [
-	{"id": "warden", "title": "The Oath", "intro": "None pass.", "memory": "I swore to hold the gate until the last of them was safe."},
-	{"id": "hexer", "title": "The Open Door", "intro": "You remember me, don't you?", "memory": "Someone unbarred the gate from within. I still hear the latch."},
-	{"id": "wraith", "title": "The First Loss", "intro": "You were not here.", "memory": "She asked me to stay. I stood my post instead."},
-	{"id": "brute", "title": "The Left Behind", "intro": "We counted on you.", "memory": "I sealed the lower ranks in. They trusted me to open it again."},
-	{"id": "lord", "title": "The Fire", "intro": "I am the last gatekeeper standing. Go back.", "memory": "I burned the vaults to bury what slept there. The city burned with it."},
-	{"id": "colossus", "title": "The Ledger", "intro": "Every page, in your hand.", "memory": "I wrote it all down, then wrote my own name out of it."},
+	{"id": "warden", "area": "gate", "title": "The Oath", "intro": "None pass.", "memory": "I swore to hold the gate until the last of them was safe."},
+	{"id": "hexer", "area": "gate", "title": "The Open Door", "intro": "You remember me, don't you?", "memory": "Someone unbarred the gate from within. I still hear the latch."},
+	{"id": "wraith", "area": "catacomb", "title": "The First Loss", "intro": "You were not here.", "memory": "She asked me to stay. I stood my post instead."},
+	{"id": "brute", "area": "catacomb", "title": "The Left Behind", "intro": "We counted on you.", "memory": "I sealed the lower ranks in. They trusted me to open it again."},
+	{"id": "lord", "area": "vault", "title": "The Fire", "intro": "I am the last gatekeeper standing. Go back.", "memory": "I burned the vaults to bury what slept there. The city burned with it."},
+	{"id": "colossus", "area": "archive", "title": "The Ledger", "intro": "Every page, in your hand.", "memory": "I wrote it all down, then wrote my own name out of it."},
 ]
+## Mỗi khu = một lần thất bại: từ khoá ngắn (tab Memories) và một dòng phụ trên banner khi vào khu (hiện mỗi lần đổi khu, không lưu gì).
+const AREA_THEME: Dictionary = {"gate": "Oath", "catacomb": "Abandoned", "vault": "Fire", "archive": "Erasure", "grove": "Forgetting"}
+const AREA_LINE: Dictionary = {
+	"gate": "Here an oath was sworn. Here it was broken.",
+	"catacomb": "Those you left behind still wait.",
+	"vault": "Ash remembers every fire you set.",
+	"archive": "Every page, and one name missing.",
+	"grove": "Something grew over what was erased.",
+}
 const BENCH: Array = [   # theo số ký ức đã có (0..6)
 	"The stone is cold. Something is missing.",
 	"A gate. An oath. You were someone who stayed.",
@@ -87,6 +96,9 @@ static func bench_line() -> String:
 
 static func secret_note(area: String) -> String:
 	return String(SECRET_NOTE.get(area, SECRET_NOTE["gate"]))
+
+static func area_line(area: String) -> String:
+	return String(AREA_LINE.get(area, ""))
 
 static func death_line(area: String) -> String:
 	return String(DEATH.get(area, DEATH["gate"]))

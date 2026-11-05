@@ -280,7 +280,7 @@ func load_room(id: String) -> void:
 	var area: String = String(data.get("area", "gate"))
 	if area != _last_area:
 		_last_area = area
-		hud.banner(AREA_NAMES.get(area, area))
+		hud.banner(AREA_NAMES.get(area, area), LORE.area_line(area))
 		backdrop.set_area(area)
 	atmosphere.set_room(data, room.interactables)
 	music.play(String(MUSIC.AREA_TRACK.get(area, "explore_stone")))

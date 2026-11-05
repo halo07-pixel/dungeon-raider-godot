@@ -321,6 +321,7 @@ func _draw_memories(v: Control, font: Font, sz: Vector2) -> void:
 		var got: bool = LORE.has_memory(String(m["id"]))
 		var y: float = 170.0 + i * 62.0
 		v.draw_string(font, Vector2(sz.x * 0.5 - 380, y), String(m["title"]) if got else "???", HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Color(0.95, 0.95, 1) if got else Color(0.4, 0.42, 0.5))
+		v.draw_string(font, Vector2(sz.x * 0.5 + 200, y), String(LORE.AREA_THEME.get(String(m["area"]), "")), HORIZONTAL_ALIGNMENT_LEFT, -1, 17, Color(0.55, 0.6, 0.75))   # khu = lần thất bại nào
 		v.draw_string(font, Vector2(sz.x * 0.5 - 380, y + 28), String(m["memory"]) if got else "A boss still holds this memory.", HORIZONTAL_ALIGNMENT_LEFT, -1, 17, Color(0.75, 0.82, 0.95) if got else Color(0.4, 0.42, 0.5))
 	var by: float = 170.0 + LORE.MEMORIES.size() * 62.0 + 10.0   # mục Bonus: ký ức của boss bí mật/phụ, chỉ hiện khi đã hạ, không tính vào x / 6
 	var shown: bool = false
