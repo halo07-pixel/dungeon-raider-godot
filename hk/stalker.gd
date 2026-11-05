@@ -13,6 +13,7 @@ var hp: int = 1                # để player._on_nail_hit không coi là hạ g
 var _t: float = APPEAR
 var _time: float = 0.0
 var _placed: bool = false
+var frozen: bool = false       # world đặt: không chạy khi chuyển phòng/chết
 
 func _ready() -> void:
 	collision_layer = 4
@@ -31,6 +32,8 @@ func _player() -> Node2D:
 func _physics_process(delta: float) -> void:
 	var p := _player()
 	if p == null:
+		return
+	if frozen:
 		return
 	_time += delta
 	_t -= delta

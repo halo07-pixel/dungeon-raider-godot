@@ -100,6 +100,13 @@ func _init() -> void:
 	ck(w.music.current == "", "nhạc cắt khi boss xuất hiện")
 	await create_timer(w.BOSS_SILENCE + 0.3).timeout
 	ck(w.music.current != "", "rồi nhạc boss vào (%s)" % w.music.current)
+	# lần vào trận mới trong lúc im lặng: await cũ không được phát nhạc
+	w.music.play("explore_stone")
+	w._on_boss_engaged()
+	await process_frame
+	w._engage_id += 1
+	await create_timer(w.BOSS_SILENCE + 0.3).timeout
+	ck(w.music.current == "", "đã vào lần khác: await cũ không phát nhạc (%s)" % w.music.current)
 	St.nightmare = false
 	await go("gate_6")
 	w.music.play("explore_stone")
