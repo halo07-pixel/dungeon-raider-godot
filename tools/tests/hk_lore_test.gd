@@ -55,6 +55,18 @@ func _init() -> void:
 	for m in L.MEMORIES:
 		St.set_flag("boss_" + String(m["id"]))
 	ck(L.is_complete() and L.ending_lines() == L.ENDING_FULL, "đủ 6: ending hoàn chỉnh")
+	# Many-Faced: câu vào trận và màn kết thật có biến thể khi đã hạ boss Grove (chỉ đọc cờ, không thêm save)
+	var intro0: String = L.line("many_faced", "intro")
+	ck(intro0 != "" and intro0 == String(L.SECRET["many_faced"]["intro"]), "chưa hạ Grove: câu vào trận gốc")
+	St.set_flag("boss_many_faced")
+	ck(L.ending_lines() == L.ENDING_TRUE, "ending thật gốc khi chưa hạ Grove")
+	St.set_flag("boss_grove")
+	ck(L.line("many_faced", "intro") != intro0 and L.line("many_faced", "intro").contains("rot"), "đã hạ Grove: câu vào trận nhắc tới Grove")
+	var tl: Array = L.ending_lines()
+	ck(tl.size() == L.ENDING_TRUE.size() and tl[0] == L.ENDING_TRUE[0] and tl[1] == L.ENDING_TRUE_GROVE and tl[2] == L.ENDING_TRUE[2], "ending thật có dòng riêng khi đã hạ Grove, vẫn 3 dòng")
+	ck(L.SEALED != "" and L.ending_lines() != L.ENDING_FULL, "chữ cửa niêm phong có sẵn")
+	St.flags.erase("boss_many_faced")
+	St.flags.erase("boss_grove")
 	for sid in L.SECRET:
 		ck(L.line(String(sid), "title") != "" and L.line(String(sid), "memory") != "", "boss bí mật '%s' có title + memory cho mục Bonus" % sid)
 		St.set_flag("boss_" + String(sid))   # để mục Bonus được vẽ
