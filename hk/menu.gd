@@ -4,6 +4,7 @@ const STATE = preload("res://hk/state.gd")
 const WorldData = preload("res://hk/world_data.gd")
 const LORE = preload("res://hk/lore.gd")
 signal volume_changed
+signal reset_save   # bấm Jump hai lần ở dòng "Reset save": world báo lên main để xoá ô và chơi lại
 signal travel(room_id: String)   # đi nhanh tới bench đã nghỉ (world xử lý)
 const CELL: float = 26.0
 const AREA_COLORS: Dictionary = {"gate": Color(0.35, 0.42, 0.62), "catacomb": Color(0.62, 0.4, 0.45), "vault": Color(0.3, 0.6, 0.65), "archive": Color(0.6, 0.5, 0.8), "grove": Color(0.45, 0.7, 0.35)}
@@ -16,6 +17,7 @@ var current_room: String = ""
 var player_pos: Vector2 = Vector2.ZERO
 var tab: String = ""            # "" = đóng
 var sel: int = 0
+var _reset_armed: bool = false  # đã bấm Jump một lần ở "Reset save"
 var _msg: String = ""           # tab Charms: lý do không đeo được
 var _view: Control
 var _pan: Vector2 = Vector2.ZERO   # kéo bản đồ bằng phím mũi tên
@@ -44,6 +46,7 @@ func open(t: String) -> void:
 
 func close() -> void:
 	tab = ""
+	_reset_armed = false
 	get_tree().paused = false
 	_view.visible = false
 	STATE.save()
@@ -74,9 +77,19 @@ func _process(_d: float) -> void:
 	elif Input.is_action_just_pressed("hk_memories") and tab != "memories":
 		tab = "memories"
 	if tab == "pause":
-		sel = (sel + int(Input.is_action_just_pressed("hk_down")) - int(Input.is_action_just_pressed("hk_up")) + 6) % 6
+		var prev: int = sel
+		sel = (sel + int(Input.is_action_just_pressed("hk_down")) - int(Input.is_action_just_pressed("hk_up")) + 7) % 7
+		if sel != prev:
+			_reset_armed = false
+		if sel == 6 and Input.is_action_just_pressed("hk_jump") and not STATE.rush:
+			if _reset_armed:
+				_reset_armed = false
+				close()
+				reset_save.emit()
+				return
+			_reset_armed = true
 		var step: int = int(Input.is_action_just_pressed("hk_right")) - int(Input.is_action_just_pressed("hk_left"))
-		if step != 0:
+		if step != 0 and sel < 6:
 			if sel == 0:
 				STATE.music_vol = clampi(STATE.music_vol + step, 0, 10)
 			elif sel == 1:
@@ -366,4 +379,9 @@ func _draw_pause(v: Control, font: Font, sz: Vector2) -> void:
 			continue
 		for k in 10:
 			v.draw_rect(Rect2(rx + 170.0 + k * 28.0 * 0.8, y - 18, 18 * 0.8, 20), col if k < int(rows[i][1]) else Color(1, 1, 1, 0.12))
-	v.draw_string(font, Vector2(rx, y0 + 250.0), "Up/Down choose   Left/Right change", HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.6, 0.65, 0.75))
+	var ry: float = y0 + 6 * 40.0
+	var rcol := Color(1, 0.55, 0.5) if sel == 6 else Color(0.6, 0.65, 0.75)
+	if sel == 6:
+		v.draw_rect(Rect2(rx - 10.0, ry - 26, 470, 38), Color(1, 1, 1, 0.1))
+	v.draw_string(font, Vector2(rx, ry), "Reset save" if not _reset_armed else "Press Jump again: erase and restart", HORIZONTAL_ALIGNMENT_LEFT, -1, 20, rcol)
+	v.draw_string(font, Vector2(rx, y0 + 290.0), "Up/Down choose   Left/Right change", HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.6, 0.65, 0.75))

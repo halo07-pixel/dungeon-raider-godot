@@ -83,6 +83,12 @@ static func _load() -> Dictionary:
 				out["bosses"][k] = float(b[k])
 	return out
 
+## Xoá bảng kỷ lục Boss Rush.
+static func erase_records() -> void:
+	for p in [record_path, record_path + ".tmp"]:
+		if FileAccess.file_exists(p):
+			DirAccess.remove_absolute(p)
+
 static func _store(d: Dictionary) -> bool:
 	var f := FileAccess.open(record_path, FileAccess.WRITE)
 	if f == null:

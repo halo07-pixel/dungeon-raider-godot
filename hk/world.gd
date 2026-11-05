@@ -19,6 +19,7 @@ const AREA_NAMES: Dictionary = {"gate": "Gate Ruins", "catacomb": "Weeping Catac
 const ZOOM: float = 1.5
 const WIDE_BOSSES: Array = ["colossus", "lord", "many_faced", "sovereign"]   # boss lớn: zoom ra khi vào trận
 
+signal reset_requested   # Pause > Reset save: main xoá ô và bắt đầu lại
 signal ending_reached   # báo lên main sau khi hạ Dungeon Lord
 signal rush_finished(time: float, deaths: int, record: bool)   # Boss Rush: hạ boss cuối
 
@@ -105,6 +106,7 @@ func _ready() -> void:
 	shop.sfx.connect(sfx.play)
 	menu.volume_changed.connect(_on_volume_changed)
 	menu.travel.connect(_travel)
+	menu.reset_save.connect(func(): reset_requested.emit())
 	hud.set_health(STATE.hp, STATE.max_hp())
 	hud.set_soul(STATE.soul)
 	load_room(STATE.bench_room)

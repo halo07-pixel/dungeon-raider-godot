@@ -11,7 +11,7 @@ const LEAVE_TIME: float = 0.45    # thời gian mờ dần ra đen trước khi 
 var _sel: int = 0
 var _info: Array = []           # tóm tắt từng ô save ({} = trống)
 var _rush_ok: bool = false     # Boss Rush mở sau ending (mục thứ SLOTS+1)
-var _confirm: int = -1          # ô đang chờ bấm P lần nữa để xoá
+var _confirm: int = -1          # ô đang chờ bấm P lần nữa để xoá (STATE.SLOTS = kỷ lục Boss Rush)
 var _view: Control
 var _opened_frame: int = -1
 var _t: float = 0.0                # giây từ lúc mở: logo/phụ đề/menu hiện dần theo đây
@@ -96,10 +96,13 @@ func _process(d: float) -> void:
 		_confirm = -1
 		sfx.emit("tick")
 	elif Input.is_action_just_pressed("hk_pin"):
-		if _sel >= STATE.SLOTS or _info[_sel].is_empty():
+		if _sel == STATE.SLOTS and RUSH.best() <= 0.0 or _sel < STATE.SLOTS and _info[_sel].is_empty():
 			pass
 		elif _confirm == _sel:
-			DirAccess.remove_absolute(STATE.slot_path(_sel))
+			if _sel == STATE.SLOTS:
+				RUSH.erase_records()
+			else:
+				STATE.delete_slot(_sel)
 			_confirm = -1
 			_refresh()
 		else:
@@ -109,7 +112,7 @@ func _process(d: float) -> void:
 			sfx.emit("deny")
 			return
 		sfx.emit("buy")
-		_pending = ["rush", 0] if _sel >= STATE.SLOTS else ["new" if _info[_sel].is_empty() else "continue", _sel]
+		_pending = ["rush", 0] if _sel >= STATE.SLOTS else ["new" if _info[_sel].is_empty() or _info[_sel].has("corrupt") else "continue", _sel]
 		_out = 0.0
 		return
 	_view.queue_redraw()
@@ -149,6 +152,8 @@ func _draw_view() -> void:
 		var txt: String = "Slot %d   Empty" % (i + 1)
 		if _confirm == i:
 			txt = "Slot %d   Press P again to erase" % (i + 1)
+		elif inf.has("corrupt"):
+			txt = "Slot %d   Corrupt save   P erase" % (i + 1)
 		elif not inf.is_empty():
 			txt = "Slot %d   %s   %d rooms%s" % [i + 1, STATE.fmt_time(float(inf["time"])), int(inf["rooms"]), ("   True End" if inf["true_end"] else ("   Complete" if inf["done"] else ""))]
 		var col := Color(0.95, 0.95, 1.0) if not inf.is_empty() else Color(0.6, 0.65, 0.8)
@@ -160,11 +165,13 @@ func _draw_view() -> void:
 	var rtxt: String = "Boss Rush   locked: defeat the Dungeon Lord"
 	if _rush_ok:
 		rtxt = "Boss Rush" + ("   Best %s" % RUSH.fmt(RUSH.best()) if RUSH.best() > 0.0 else "")
+	if _confirm == STATE.SLOTS:
+		rtxt = "Press P again to erase Boss Rush records"
 	if _sel == STATE.SLOTS:
 		v.draw_rect(Rect2(sz.x * 0.5 - 260, ry - 30, 520, 42), Color(1, 1, 1, (0.1 + 0.05 * sin(_t * 4.0)) * a_menu))
 	var rcol := Color(1.0, 0.8, 0.55) if _rush_ok else Color(0.45, 0.48, 0.58)
 	rcol.a = a_menu
 	v.draw_string(font, Vector2(0, ry), rtxt, HORIZONTAL_ALIGNMENT_CENTER, sz.x, 26, rcol)
-	v.draw_string(font, Vector2(0, sz.y - 40), "Up/Down choose   Jump/Enter play   P erase slot", HORIZONTAL_ALIGNMENT_CENTER, sz.x, 16, Color(0.5, 0.55, 0.65, a_menu))
+	v.draw_string(font, Vector2(0, sz.y - 40), "Up/Down choose   Jump/Enter play   P erase slot / records", HORIZONTAL_ALIGNMENT_CENTER, sz.x, 16, Color(0.5, 0.55, 0.65, a_menu))
 	if _out >= 0.0:
 		v.draw_rect(Rect2(Vector2.ZERO, sz), Color(0, 0, 0, clampf(_out, 0.0, 1.0)))

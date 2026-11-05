@@ -294,7 +294,7 @@ static func slot_info(i: int) -> Dictionary:
 		return {}
 	var data = JSON.parse_string(FileAccess.get_file_as_string(p))
 	if not (data is Dictionary):
-		return {}
+		return {"corrupt": true, "time": 0.0, "rooms": 0, "done": false, "true_end": false}   # file hỏng: hiện để xoá được
 	var tm = data.get("time", 0.0)
 	var vis = data.get("visited", [])
 	var fl = data.get("flags", {})
@@ -307,7 +307,14 @@ static func fmt_time(sec: float) -> String:
 	var s: int = int(sec)
 	return "%d:%02d:%02d" % [s / 3600, (s / 60) % 60, s % 60]
 
-static func delete_save() -> void:
-	for p in [save_path, save_path + ".tmp"]:
+static func _remove_with_tmp(path: String) -> void:
+	for p in [path, path + ".tmp"]:
 		if FileAccess.file_exists(p):
 			DirAccess.remove_absolute(p)
+
+static func delete_save() -> void:
+	_remove_with_tmp(save_path)
+
+## Xoá ô save `i` (cả file .tmp còn sót, cả khi file hỏng).
+static func delete_slot(i: int) -> void:
+	_remove_with_tmp(slot_path(i))
