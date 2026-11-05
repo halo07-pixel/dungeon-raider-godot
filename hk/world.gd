@@ -528,7 +528,7 @@ func _on_door(door_id: String) -> void:
 	_refresh_unlocks()
 	var need: String = String(link.get("needs", ""))
 	if need != "" and not STATE.flag(need):
-		hud.banner("Sealed", "The way answers only to one who remembers everything.")
+		hud.banner("Sealed", LORE.SEALED)
 		return
 	await transition(String(link["to"]), String(link["door"]))
 
