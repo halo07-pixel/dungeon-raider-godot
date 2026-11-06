@@ -74,6 +74,19 @@ func _init() -> void:
 		ck(L.line(String(sid), "title") != "" and L.line(String(sid), "memory") != "", "boss bí mật '%s' có title + memory cho mục Bonus" % sid)
 		St.set_flag("boss_" + String(sid))   # để mục Bonus được vẽ
 	ck(L.count() == L.MEMORIES.size(), "boss bí mật không tính vào số ký ức")
+	# bố cục Memories: nhóm theo khu, không tràn màn 720 kể cả khi có đủ 2 mục Bonus
+	var lay: Dictionary = load("res://hk/menu.gd").memory_layout()
+	var heads: int = 0
+	var ys_ok: bool = true
+	var prev_y: float = 0.0
+	for r in lay["rows"]:
+		if String(r["head"]) != "":
+			heads += 1
+		ys_ok = ys_ok and float(r["y"]) > prev_y
+		prev_y = float(r["y"])
+	ck(lay["rows"].size() == L.MEMORIES.size() and heads == 4 and ys_ok, "bố cục Memories: 6 ký ức, 4 tiêu đề khu (%d), y tăng dần" % heads)
+	var last_y: float = float(lay["bonus_y"]) + 28.0 + 50.0 * (L.SECRET.size() - 1)   # mục Bonus cuối (chữ ký ức thấp hơn 24px)
+	ck(last_y + 24.0 < 700.0, "Memories + Bonus đầy đủ nằm trong màn (y cuối %.0f)" % last_y)
 	# tab Memories bằng phím N, đóng bằng N
 	var menu = load("res://hk/menu.gd").new()
 	root.add_child(menu)
