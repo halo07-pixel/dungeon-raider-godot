@@ -54,6 +54,8 @@ var _beat_t: float = 0.0          # nhịp tim kế
 var _whisper_t: float = 6.0       # thì thầm kế (phòng tối)
 var _drip_t: float = 3.0          # nhỏ giọt kế (phòng im lặng)
 var _engage_id: int = 0           # đếm lần vào trận boss: await im lặng chỉ phát nhạc nếu vẫn là lần đó
+var _wave_spawns: Array = []     # {type,pos} quái của phòng, dùng cho đợt 2 của phòng khoá
+var _wave2_done: bool = false
 var _seal_t: float = 0.0          # >0: cửa phòng đang khoá tới khi hết quái (hoặc hết giờ)
 var _warned: Dictionary = {}      # rương mimic đã phát âm báo (một lần mỗi rương mỗi lần vào phòng)
 
@@ -240,12 +242,15 @@ func load_room(id: String) -> void:
 	player.ward_ready = true   # Oath Ward: mỗi phòng một lần chặn
 	boss = null
 	hud.boss = null
+	_wave_spawns.clear()
+	_wave2_done = false
 	var ambushable: int = 0
 	var n_enemies: int = 0
 	for e in room.entities:
 		match String(e["type"]):
 			"c", "f", "s", "h", "g", "d", "k", "z", "i", "b", "m", "t":
 				n_enemies += 1
+				_wave_spawns.append({"type": String(e["type"]), "pos": e["pos"]})
 				var amb: bool = false
 				if String(e["type"]) in ["c", "h"] and STATE.is_nightmare() and not data.has("boss"):
 					ambushable += 1
@@ -369,7 +374,13 @@ func _ordeal_tick(d: float) -> void:
 		_seal_t -= d
 		# quái phục kích chưa trồi lên sau HIDDEN_GRACE giây thì không giữ cửa nữa (người chơi có thể không tới được)
 		var grace: bool = ORDEAL.SEAL_TIMEOUT - _seal_t >= ORDEAL.HIDDEN_GRACE
-		if _live_enemies(grace) == 0 or _seal_t <= 0.0:
+		if ORDEAL.wave2_due(_live_enemies(), _seal_t, _wave2_done):
+			_wave2_done = true
+			for w in ORDEAL.wave2_plan(_wave_spawns, player.global_position):
+				_spawn_enemy(String(w["type"]), w["pos"])
+			hud.banner("Another wave")
+			sfx.play("rustle")
+		elif _live_enemies(grace) == 0 or _seal_t <= 0.0:
 			_seal_t = 0.0
 			room.locked = false
 			hud.banner("The doors open")
