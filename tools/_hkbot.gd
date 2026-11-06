@@ -6,7 +6,8 @@ extends SceneTree
 const ALL: Array = ["crawler", "flyer", "spitter", "charger", "guard", "dropper", "sentry", "reviver", "cinder", "bubbler", "sporeling", "thornshooter", "warden", "brute", "hexer", "wraith", "colossus", "grove", "lord", "many_faced"]
 const HAZARD_LEAD: float = 0.35   # coi vùng là nguy hiểm khi còn ≤ chừng này giây nữa có hiệu lực (người thật nghe âm báo)
 const HAZARD_PAD: float = 60.0    # lề né quanh vùng gây hại
-const DANGER: Array = ["windup", "lunge", "bash", "dive", "shake", "wind_slash", "wind_slam", "wind_dive", "air", "wind_quake", "quake", "wind_rush", "rush"]
+const DANGER: Array = ["windup", "lunge", "bash", "dive", "shake", "wind_slash", "wind_slam", "wind_dive", "air", "wind_quake", "quake", "wind_rush", "rush", "wind_cage", "wind_geyser", "wind_despair"]
+const UNPARRY: Array = ["rush", "wind_cage", "wind_geyser", "wind_despair"]   # đòn không đỡ được: bot né, không bấm đỡ
 const PARRY_REACT: float = 0.15   # độ trễ phản xạ cố định của bot khi đỡ (so sánh công bằng giữa các bản)
 const PARRY_MELEE: float = 130.0
 const PARRY_SHOT: float = 120.0
@@ -28,15 +29,37 @@ func release_pulses() -> void:
 	_pulse.clear()
 
 ## Vùng gây hại (zone.gd) đang hoặc sắp có hiệu lực mà người chơi đứng gần: trả tâm vùng để bot chạy ngược lại, không có thì null.
+var hz_kind: String = ""   # kind của vùng hazard_center vừa trả
+
 func hazard_center(p: Node2D, owners: Array):
 	var body := Rect2(p.global_position - Vector2(12, 22), Vector2(24, 44)).grow(HAZARD_PAD)
 	for o in owners:
 		if not is_instance_valid(o):
 			continue
 		for n in o.get_children():
-			if n.has_method("active") and n.get("kind") != null and n.kind in ["spikes", "firewave", "heat", "flame", "pillar", "spore", "vine", "sweep"]:
+			if n.has_method("active") and n.get("kind") != null and n.kind in ["spikes", "firewave", "heat", "flame", "pillar", "spore", "vine", "sweep", "geyser"]:
 				if (n.active() or n.delay <= HAZARD_LEAD) and body.intersects(n.current()):
+					hz_kind = String(n.kind)
 					return n.current().get_center()
+	return null
+
+## Despair: hàng gai kín chỉ chừa khe. Trả x của chỗ trống gần người chơi nhất (bước 20px) để bot chạy tới, không có thì null.
+func gap_x(p: Node2D, boss: Node):
+	var rects: Array = []
+	for n in boss.get_children():
+		if n.has_method("active") and n.get("kind") == "spikes":
+			rects.append(n.current())
+	for off in range(0, 500, 20):
+		for sg in [-1, 1]:
+			var x: float = p.global_position.x + sg * off
+			var body := Rect2(Vector2(x - 12.0, p.global_position.y - 22.0), Vector2(24, 44)).grow_individual(10, 0, 10, 0)
+			var free := true
+			for r in rects:
+				if body.intersects(r):
+					free = false
+					break
+			if free:
+				return x
 	return null
 
 ## Đạn địch (projectile.gd, không friendly, không phải bong bóng chậm) đang bay về phía người chơi trong tầm đỡ.
@@ -116,6 +139,7 @@ func _init() -> void:
 			var danger_t: float = 0.0
 			var dodge_t: float = 0.0
 			var parry_cd: float = 0.0
+			var feinted: bool = false   # vừa thấy đòn giả: đòn thật theo sau, bot đã nghe âm báo nên đỡ ngay
 			var flee_x: float = 0.0
 			var last_f: int = Engine.get_physics_frames()
 			while is_instance_valid(e) and t < 90.0 and St.hp > 0:
@@ -139,18 +163,27 @@ func _init() -> void:
 					danger_t += dt
 				else:
 					danger_t = 0.0
+				if st == "feint":
+					feinted = true
+				elif not (st in DANGER):
+					feinted = false
 				parry_cd -= dt
-				if use_parry and parry_cd <= 0.0 and p._parry_rec <= 0.0 and st != "rush" and dodge_t <= 0.0:
-					if (danger_t > PARRY_REACT and dist < PARRY_MELEE) or shot_incoming(p):
+				if use_parry and parry_cd <= 0.0 and p._parry_rec <= 0.0 and not (st in UNPARRY) and dodge_t <= 0.0:
+					if (danger_t > (0.0 if feinted else PARRY_REACT) and dist < PARRY_MELEE) or shot_incoming(p):
 						tap("hk_parry")
 						parry_cd = 0.6
 				if dodge_t <= 0.0:
 					var hz = hazard_center(p, [e, root])
-					if hz != null:   # vùng gây hại sắp chạm: nhảy và chạy ngược khỏi vùng
+					var gx = gap_x(p, e) if hz != null and hz_kind == "spikes" else null
+					if gx != null:   # despair: chạy tới khe rồi nhảy, không chạy ngược vào hàng gai
+						dodge_t = 0.45
+						flee_x = 2.0 * p.global_position.x - gx
+						tap("hk_jump")
+					elif hz != null:   # vùng gây hại sắp chạm: nhảy và chạy ngược khỏi vùng
 						dodge_t = 0.45
 						flee_x = hz.x
 						tap("hk_jump")
-					elif danger_t > 0.25 and dist < 260.0 and not (use_parry and dist < PARRY_MELEE and st != "rush"):
+					elif danger_t > 0.25 and dist < 260.0 and not (use_parry and dist < PARRY_MELEE and not (st in UNPARRY)):
 						dodge_t = 0.45
 						flee_x = e.global_position.x
 						tap("hk_jump")
