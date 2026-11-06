@@ -147,8 +147,10 @@ func _init() -> void:
 	for ar in ["gate", "catacomb", "vault", "archive", "grove"]:
 		ck(load("res://hk/lore.gd").secret_note(ar) != "", "có ghi chú hốc cho khu " + ar)
 	var geo0: int = St.geo
-	w._on_interacted("cache", {"key": "cat_3:18:17", "pos": Vector2(18.0 * 32.0 + 16.0, 18.0 * 32.0)})
+	w._on_interacted("cache", {"key": "cat_3:18:25", "pos": Vector2(18.0 * 32.0 + 16.0, 18.0 * 32.0)})
 	ck(St.shards == 1 and St.geo == geo0, "rương trong hốc bí mật cho 1 mảnh, không Geo (%d, %d)" % [St.shards, St.geo - geo0])
+	var ic: Array = Menu.map_icons(rd).filter(func(i): return i["k"] == "taken")
+	ck(ic.size() == 1 and not has_cache.call(Menu.map_icons(rd)), "hốc đã lấy: bản đồ hiện chấm nhạt, không còn rương")
 	w.load_room("cat_3")
 	await frames(3)
 	ck(w.room.cracks.is_empty() and get_nodes_in_group("hk_crack").is_empty(), "nạp lại phòng: tường vẫn mở")

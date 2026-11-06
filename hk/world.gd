@@ -56,6 +56,7 @@ var _drip_t: float = 3.0          # nhỏ giọt kế (phòng im lặng)
 var _engage_id: int = 0           # đếm lần vào trận boss: await im lặng chỉ phát nhạc nếu vẫn là lần đó
 var _wave_spawns: Array = []     # {type,pos} quái của phòng, dùng cho đợt 2 của phòng khoá
 var _wave2_done: bool = false
+var _clock_us: int = Time.get_ticks_usec()   # mốc đồng hồ thật của play_time
 var _seal_t: float = 0.0          # >0: cửa phòng đang khoá tới khi hết quái (hoặc hết giờ)
 var _warned: Dictionary = {}      # rương mimic đã phát âm báo (một lần mỗi rương mỗi lần vào phòng)
 
@@ -197,8 +198,11 @@ func _on_volume_changed() -> void:
 	sfx.play("buy")
 
 func _process(d: float) -> void:
+	var now_us: int = Time.get_ticks_usec()
+	var real_d: float = minf(float(now_us - _clock_us) / 1000000.0, 0.25)   # giây thật: hitstop/time_scale không làm đồng hồ lệch; trần 0.25 bỏ qua lúc tạm dừng
+	_clock_us = now_us
 	if not STATE.rush:
-		STATE.play_time += d
+		STATE.play_time += real_d
 	elif RUSH.idx >= 0 and not busy and not RUSH.cleared:   # Rush: đồng hồ chỉ chạy lúc đang đánh (dừng khi đã hạ boss, đang nghỉ)
 		RUSH.time += d
 	if Input.is_action_just_pressed("hk_debug"):

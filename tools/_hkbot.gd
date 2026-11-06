@@ -2,7 +2,7 @@ extends SceneTree
 ## Bot đo độ khó (không chạy trong run_all; test `hk_bot_test.gd` chỉ kiểm bot chạy được): godot --headless --path . -s tools/_hkbot.gd -- <kind|all> [lần]
 ## kind = crawler|flyer|spitter|charger|guard|dropper|sentry|reviver|cinder|bubbler|warden|wraith|lord|brute|hexer|colossus|many_faced; `all` = lần lượt tất cả rồi in bảng.
 ## Bot "người chơi trung bình": tiến lại, chém khi tới tầm, nhảy né sau ~0.25s khi quái/boss vào thế đánh hoặc khi vùng gây hại (gai, lửa, sóng lửa, bục nóng) sắp chạm,
-## nhảy lên chém khi boss bay ở trên cao. Tham số thứ 3 `parry` bật đỡ: bấm `hk_parry` khi đòn cận chiến đã vào thế đánh được ≥PARRY_REACT giây và còn trong tầm, hoặc đạn địch tới gần (không đỡ `rush`, zone). Không vòng ra sau khiên (guard/sentry bị chặn nhiều hơn người thật). In: số lần bị trúng, thời gian hạ, tỉ lệ hạ được trong 90s.
+## nhảy lên chém khi boss bay ở trên cao. Tham số thứ 3 `parry` bật đỡ: bấm `hk_parry` khi đòn cận chiến đã vào thế đánh được ≥PARRY_REACT giây và còn trong tầm, hoặc đạn địch tới gần (không đỡ `rush`, zone). Guard/sentry: khi khiên chặn thì nhảy lên trên đầu rồi chém xuống (từ trên xuống không bị chặn). In: số lần bị trúng, thời gian hạ, tỉ lệ hạ được trong 90s.
 const ALL: Array = ["crawler", "flyer", "spitter", "charger", "guard", "dropper", "sentry", "reviver", "cinder", "bubbler", "sporeling", "thornshooter", "warden", "brute", "hexer", "wraith", "colossus", "grove", "lord", "many_faced"]
 const HAZARD_LEAD: float = 0.35   # coi vùng là nguy hiểm khi còn ≤ chừng này giây nữa có hiệu lực (người thật nghe âm báo)
 const HAZARD_PAD: float = 60.0    # lề né quanh vùng gây hại
@@ -193,6 +193,17 @@ func _init() -> void:
 					hold("hk_left", not away_right)
 					hold("hk_right", away_right)
 					continue
+				if (kind == "guard" or kind == "sentry") and dist < 120.0 and e._blocks(p.global_position):
+					# khiên chặn chính diện: nhảy lên trên đầu rồi chém xuống (trúng từ trên xuống thì khiên không chặn)
+					hold("hk_down", not p.is_on_floor())
+					hold("hk_left", false)
+					hold("hk_right", false)
+					if p.is_on_floor():
+						tap("hk_jump")
+					else:
+						tap("hk_attack")
+					continue
+				hold("hk_down", false)
 				if dist > reach:
 					hold("hk_left", dir < 0)
 					hold("hk_right", dir > 0)
@@ -211,7 +222,7 @@ func _init() -> void:
 						tap("hk_jump")
 				else:
 					hold("hk_up", false)
-			for a in ["hk_left", "hk_right", "hk_up"]:
+			for a in ["hk_left", "hk_right", "hk_up", "hk_down"]:
 				hold(a, false)
 			release_pulses()
 			var won: bool = not is_instance_valid(e) or (is_boss and e.hp <= 0)

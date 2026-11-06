@@ -170,9 +170,11 @@ func travel_targets() -> Array:
 static func map_icons(room: Dictionary) -> Array:
 	var out: Array = []
 	var grid: Array = room["grid"]
+	var has_crack: bool = false
 	var hidden_secret: bool = false   # hốc bí mật chưa mở: rương trong đó không được lộ trên bản đồ
 	for gl in grid:
 		if String(gl).contains("%"):
+			has_crack = true
 			hidden_secret = not STATE.flag("secret_" + String(room.get("id", "")))
 	for y in grid.size():
 		var line: String = String(grid[y])
@@ -192,8 +194,12 @@ static func map_icons(room: Dictionary) -> Array:
 					if not STATE.flag("boss_" + String(room.get("boss", {}).get("id", ""))):
 						out.append({"k": "boss", "c": c})
 				"$":
-					if not hidden_secret and not STATE.flag("cache_%s:%d:%d" % [String(room.get("id", "")), x, y]):
+					if hidden_secret:
+						pass
+					elif not STATE.flag("cache_%s:%d:%d" % [String(room.get("id", "")), x, y]):
 						out.append({"k": "cache", "c": c})
+					elif has_crack:   # hốc bí mật đã lấy: chấm nhạt (rương thường đã mở thì mất như cũ)
+						out.append({"k": "taken", "c": c})
 	for dch in room["doors"]:
 		if not (String(room["doors"][dch]["to"]) in STATE.visited):
 			for y in grid.size():
@@ -269,6 +275,7 @@ func _draw_icon(v: Control, at: Vector2, kind: String) -> void:
 			v.draw_circle(at, 2, Color(1, 0.3, 0.3))
 		"cache": v.draw_rect(Rect2(at - Vector2(3, 2), Vector2(6, 4)), Color(1, 0.65, 0.2))
 		"exit": v.draw_arc(at, 4, 0, TAU, 12, Color(1, 1, 1, 0.9), 1.5)
+		"taken": v.draw_rect(Rect2(at - Vector2(3, 2), Vector2(6, 4)), Color(1, 0.65, 0.2, 0.3))
 
 func _draw_charms(v: Control, font: Font, sz: Vector2) -> void:
 	v.draw_string(font, Vector2(sz.x * 0.5 - 300, 110), "Notches", HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Color(1, 0.9, 0.6))
@@ -314,28 +321,51 @@ func charm_hint(cid: String) -> String:
 			return "Seen in %s%s." % [String(rooms[rid]["name"]), " (a boss guards it)" if String(c.get("needs", "")) != "" else ""]
 	return "Not found yet." if placed else "Sold by a wandering merchant."
 
-func _draw_memories(v: Control, font: Font, sz: Vector2) -> void:
-	v.draw_string(font, Vector2(sz.x * 0.5 - 380, 118.0), "Memories  %d / %d" % [LORE.count(), LORE.MEMORIES.size()], HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Color(0.95, 0.9, 0.7))
+const MEM_Y0: float = 150.0    # đầu danh sách ký ức
+const MEM_HEAD: float = 24.0   # chiều cao dòng tiêu đề khu
+const MEM_ROW: float = 50.0    # khoảng cách giữa hai ký ức
+
+## Bố cục tab Memories: ký ức nhóm theo khu (tiêu đề khi khu đổi) rồi mục Bonus. Trả {rows: [{i, head, y}], bonus_y}; test đo y để chắc không tràn màn 720.
+static func memory_layout() -> Dictionary:
+	var rows: Array = []
+	var y: float = MEM_Y0
+	var last: String = ""
 	for i in LORE.MEMORIES.size():
-		var m: Dictionary = LORE.MEMORIES[i]
+		var area: String = String(LORE.MEMORIES[i]["area"])
+		var head: String = ""
+		if area != last:
+			head = String(LORE.AREA_THEME.get(area, area))
+			last = area
+			y += MEM_HEAD
+		rows.append({"i": i, "head": head, "y": y})
+		y += MEM_ROW
+	return {"rows": rows, "bonus_y": y + 10.0}
+
+func _draw_memories(v: Control, font: Font, sz: Vector2) -> void:
+	var x: float = sz.x * 0.5 - 380
+	v.draw_string(font, Vector2(x, 118.0), "Memories  %d / %d" % [LORE.count(), LORE.MEMORIES.size()], HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Color(0.95, 0.9, 0.7))
+	var lay: Dictionary = memory_layout()
+	for r in lay["rows"]:
+		var m: Dictionary = LORE.MEMORIES[int(r["i"])]
 		var got: bool = LORE.has_memory(String(m["id"]))
-		var y: float = 170.0 + i * 62.0
-		v.draw_string(font, Vector2(sz.x * 0.5 - 380, y), String(m["title"]) if got else "???", HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Color(0.95, 0.95, 1) if got else Color(0.4, 0.42, 0.5))
-		v.draw_string(font, Vector2(sz.x * 0.5 + 200, y), String(LORE.AREA_THEME.get(String(m["area"]), "")), HORIZONTAL_ALIGNMENT_LEFT, -1, 17, Color(0.55, 0.6, 0.75))   # khu = lần thất bại nào
-		v.draw_string(font, Vector2(sz.x * 0.5 - 380, y + 28), String(m["memory"]) if got else "A boss still holds this memory.", HORIZONTAL_ALIGNMENT_LEFT, -1, 17, Color(0.75, 0.82, 0.95) if got else Color(0.4, 0.42, 0.5))
-	var by: float = 170.0 + LORE.MEMORIES.size() * 62.0 + 10.0   # mục Bonus: ký ức của boss bí mật/phụ, chỉ hiện khi đã hạ, không tính vào x / 6
+		var y: float = float(r["y"])
+		if String(r["head"]) != "":   # khu = lần thất bại nào
+			v.draw_string(font, Vector2(x, y - 26.0), String(r["head"]), HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Color(0.55, 0.6, 0.75))
+		v.draw_string(font, Vector2(x, y), String(m["title"]) if got else "???", HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Color(0.95, 0.95, 1) if got else Color(0.4, 0.42, 0.5))
+		v.draw_string(font, Vector2(x, y + 24), String(m["memory"]) if got else "A boss still holds this memory.", HORIZONTAL_ALIGNMENT_LEFT, -1, 17, Color(0.75, 0.82, 0.95) if got else Color(0.4, 0.42, 0.5))
+	var by: float = float(lay["bonus_y"])   # mục Bonus: ký ức của boss bí mật/phụ, chỉ hiện khi đã hạ, không tính vào x / 6
 	var shown: bool = false
 	for sid in LORE.SECRET:
 		if not LORE.has_memory(String(sid)):
 			continue
 		if not shown:
-			v.draw_string(font, Vector2(sz.x * 0.5 - 380, by), "Bonus", HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Color(0.95, 0.9, 0.7))
+			v.draw_string(font, Vector2(x, by), "Bonus", HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Color(0.95, 0.9, 0.7))
 			shown = true
-			by += 32.0
-		v.draw_string(font, Vector2(sz.x * 0.5 - 380, by), LORE.line(String(sid), "title"), HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Color(0.85, 0.95, 0.85))
-		v.draw_string(font, Vector2(sz.x * 0.5 - 380, by + 26), LORE.line(String(sid), "memory"), HORIZONTAL_ALIGNMENT_LEFT, -1, 17, Color(0.75, 0.88, 0.8))
-		by += 58.0
-	v.draw_string(font, Vector2(sz.x * 0.5 - 380, sz.y - 40), "N or Esc: close", HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.6, 0.65, 0.75))
+			by += 28.0
+		v.draw_string(font, Vector2(x, by), LORE.line(String(sid), "title"), HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Color(0.85, 0.95, 0.85))
+		v.draw_string(font, Vector2(x, by + 24), LORE.line(String(sid), "memory"), HORIZONTAL_ALIGNMENT_LEFT, -1, 17, Color(0.75, 0.88, 0.8))
+		by += MEM_ROW
+	v.draw_string(font, Vector2(x, sz.y - 16), "N or Esc: close", HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.6, 0.65, 0.75))
 
 func _draw_pause(v: Control, font: Font, sz: Vector2) -> void:
 	# cột trái: hướng dẫn phím; cột phải: thời gian, kỹ năng, cài đặt
