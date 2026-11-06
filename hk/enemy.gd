@@ -43,6 +43,12 @@ const DATA: Dictionary = {
 }
 const TELL: Dictionary = {"sentry": "tell_bell", "cinder": "tell_ember"}   # âm báo trước riêng; quái khác dùng "tell"
 const WINDUP_TINT: Dictionary = {"sentry": Color(0.8, 1.4, 1.9), "cinder": Color(2.0, 0.85, 0.3)}   # nhấp nháy lúc windup (mặc định đỏ nhạt)
+const OVERHEAD_X: float = 70.0     # guard/sentry: người chơi ngay trên đầu trong chừng này px ngang thì ngẩng khiên
+const OVERHEAD_H: float = 120.0   # khiên dựng chặn đòn phía trước tới độ cao này so với quái (cao hơn thì không chặn)
+const OVERHEAD_SEE: float = 0.2    # phải ở trên đầu liên tục chừng này giây mới phản ứng
+const OVERHEAD_TELL: float = 0.25  # báo hiệu: khiên CHƯA chặn, vẫn chém trúng được
+const SHIELD_UP: float = 1.0       # rồi khiên chặn cả đòn từ trên xuống chừng này giây
+const SHIELD_CD: float = 1.5       # sau khi hạ khiên, chừng này giây mới ngẩng lại
 const SPORE_BURST: float = 2.5   # sporeling chết: đám bào tử nổ tại chỗ (0.5s mây mờ báo hiệu rồi 2s gây hại)
 const REVIVE_AFTER: float = 2.0   # reviver nằm bao lâu rồi đứng dậy
 const FIRE_TRAIL: float = 2.0     # cinder: vệt lửa tồn tại bao lâu
@@ -75,6 +81,10 @@ var _home: Vector2
 var _size: Vector2
 var _time: float = 0.0
 var _block_flash: float = 0.0
+var _ovh_see: float = 0.0     # đã bị đứng trên đầu bao lâu
+var _ovh_tell: float = 0.0    # đang báo hiệu ngẩng khiên
+var _shield_up_t: float = 0.0 # khiên đang ngẩng (chặn từ trên xuống)
+var _shield_cd: float = 0.0
 
 func _ready() -> void:
 	var d: Dictionary = DATA[kind]
@@ -138,6 +148,8 @@ func _physics_process(delta: float) -> void:
 			state = "idle"
 		queue_redraw()
 		return
+	if kind == "guard" or kind == "sentry":
+		_overhead(delta)
 	match kind:
 		"crawler": _crawler(delta)
 		"sporeling": _patrol(45.0, delta)
@@ -229,16 +241,45 @@ func _slot_free() -> bool:
 func _blocks(from_pos: Vector2) -> bool:
 	if state == "recover":
 		return false
-	if from_pos.y < global_position.y - _size.y * 0.5 - 6.0:
+	var dx: float = from_pos.x - global_position.x
+	var dy: float = from_pos.y - global_position.y
+	if absf(dx) < OVERHEAD_X and dy < -_size.y * 0.5 - 6.0:   # ngay trên đầu (pogo): chỉ chặn khi đã ngẩng khiên (sau báo hiệu)
+		return _shield_up_t > 0.0
+	if dy < -OVERHEAD_H:   # đứng quá cao so với khiên dựng: không chặn
 		return false
-	return signf(from_pos.x - global_position.x) == float(dir)
+	return signf(dx) == float(dir)   # phía trước (kể cả nhảy chém chéo từ xa): chặn
+
+## Người chơi ngay trên đầu (trong OVERHEAD_X ngang, cao hơn đỉnh, không quá 400px).
+func _above(p: Node2D) -> bool:
+	return absf(p.global_position.x - global_position.x) < OVERHEAD_X and p.global_position.y < global_position.y - _size.y * 0.5 - 6.0 and p.global_position.y > global_position.y - 400.0
+
+## Người chơi pogo trên đầu: báo hiệu (OVERHEAD_TELL, chưa chặn) rồi ngẩng khiên SHIELD_UP giây, nghỉ SHIELD_CD giây. Chỉ tính khi quái "idle"/"windup" (recover thì không khiên).
+func _overhead(delta: float) -> void:
+	_shield_up_t = maxf(0.0, _shield_up_t - delta)
+	_shield_cd = maxf(0.0, _shield_cd - delta)
+	if _ovh_tell > 0.0:
+		_ovh_tell -= delta
+		if _ovh_tell <= 0.0:
+			_shield_up_t = SHIELD_UP
+			_shield_cd = SHIELD_UP + SHIELD_CD
+		return
+	var p := _player()
+	var over: bool = p != null and (state == "idle" or state == "windup") and _shield_cd <= 0.0 and _above(p)
+	_ovh_see = _ovh_see + delta if over else 0.0
+	if _ovh_see >= OVERHEAD_SEE:
+		_ovh_see = 0.0
+		_ovh_tell = OVERHEAD_TELL
+		sfx.emit("tell_raise")
 
 func _guard(delta: float) -> void:
 	var p := _player()
 	var near: bool = p != null and absf(p.global_position.y - global_position.y) < 80.0 and absf(p.global_position.x - global_position.x) < 320.0
 	match state:
 		"idle":
-			if near and _kb_t <= 0.0:
+			if p != null and _above(p):   # người chơi trên đầu: húc ngang vô nghĩa, đứng chờ ngẩng khiên
+				velocity.x = 0.0
+				_gravity_and_move(delta)
+			elif near and _kb_t <= 0.0:
 				dir = 1 if p.global_position.x > global_position.x else -1
 				var gap: float = absf(p.global_position.x - global_position.x)
 				if gap < 95.0 and _t <= 0.0:
@@ -517,6 +558,8 @@ func _draw() -> void:
 		tint = Color(3, 3, 3)
 	elif (state == "windup" or state == "shake" or state == "stagger") and int(_time * 30.0) % 2 == 0:
 		tint = WINDUP_TINT.get(kind, Color(1.6, 0.7, 0.7))
+	elif _ovh_tell > 0.0 and int(_time * 30.0) % 2 == 0:   # báo hiệu ngẩng khiên: nhấp nháy vàng
+		tint = Color(1.9, 1.7, 0.6)
 	elif state == "down":   # reviver nằm: xám; nhấp nháy sắp đứng dậy
 		tint = Color(0.45, 0.45, 0.55) if _t > 0.5 or int(_time * 20.0) % 2 == 0 else Color(1.3, 1.3, 1.5)
 	else:
@@ -535,3 +578,7 @@ func _draw() -> void:
 		var sh := Rect2(float(dir) * (_size.x * 0.5 + 2.0) - 3.0, -_size.y * (0.4 if up else 0.05), 6.0, _size.y * (0.8 if up else 0.4))
 		draw_rect(sh, Color(1, 1, 1) if _block_flash > 0.0 else Color(0.62, 0.68, 0.82))
 		draw_rect(sh, Color(0.12, 0.12, 0.2), false, 1.5)
+		if _shield_up_t > 0.0:   # khiên ngẩng: tấm chắn ngang trên đầu
+			var top := Rect2(-_size.x * 0.5 - 6.0, -_size.y * 0.5 - 8.0, _size.x + 12.0, 6.0)
+			draw_rect(top, Color(1, 1, 1) if _block_flash > 0.0 else Color(0.62, 0.68, 0.82))
+			draw_rect(top, Color(0.12, 0.12, 0.2), false, 1.5)

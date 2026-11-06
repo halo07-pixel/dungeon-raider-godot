@@ -95,6 +95,7 @@ const DEFS: Dictionary = {
 	"slam": {"total": 0.4, "layers": [{"wave": "noise", "lp": 0.08, "vol": 0.5, "dur": 0.35}, {"wave": "sine", "freq": 60.0, "slide": -30.0, "vol": 0.4, "dur": 0.35}]},
 	# quái riêng theo khu
 	"tell_bell": {"total": 0.5, "layers": [{"wave": "sine", "freq": 880.0, "vol": 0.2, "dur": 0.45, "decay": 1.6}, {"wave": "sine", "freq": 1320.0, "vol": 0.1, "dur": 0.4, "decay": 1.8, "delay": 0.04}]},
+	"tell_raise": {"total": 0.3, "layers": [{"wave": "saw", "freq": 300.0, "slide": 160.0, "vol": 0.12, "dur": 0.25, "swell": 0.5}, {"wave": "sine", "freq": 1040.0, "vol": 0.08, "dur": 0.2, "decay": 2.0, "delay": 0.05}]},
 	"revive": {"total": 0.35, "layers": [{"wave": "noise", "lp": 0.3, "vol": 0.2, "dur": 0.25}, {"wave": "sine", "freq": 110.0, "slide": 180.0, "vol": 0.25, "dur": 0.3, "swell": 0.5}]},
 	"tell_hurl": {"total": 0.5, "layers": [{"wave": "square", "freq": 180.0, "slide": -100.0, "vol": 0.18, "dur": 0.2}, {"wave": "noise", "lp": 0.3, "vol": 0.14, "dur": 0.3}]},
 	"tell_undertow": {"total": 0.6, "layers": [{"wave": "sine", "freq": 220.0, "slide": -160.0, "vol": 0.22, "dur": 0.55, "swell": 0.6}, {"wave": "noise", "lp": 0.15, "vol": 0.14, "dur": 0.5}]},
