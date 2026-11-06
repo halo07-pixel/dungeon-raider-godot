@@ -86,7 +86,15 @@ func _init() -> void:
 	for e in get_nodes_in_group("hk_enemy"):
 		e.free()
 	w._ordeal_tick(0.1)
-	ck(not w.room.locked, "hết quái: mở cửa")
+	ck(w.room.locked and w._wave2_done, "hết quái đợt 1: sinh đợt 2, vẫn khoá")
+	await process_frame
+	ck(get_nodes_in_group("hk_enemy").size() == O.WAVE2_N, "đợt 2: đúng %d quái" % O.WAVE2_N)
+	for e in get_nodes_in_group("hk_enemy"):
+		e.free()
+	w._ordeal_tick(0.1)
+	ck(not w.room.locked, "hết quái đợt 2: mở cửa")
+	await process_frame
+	ck(get_nodes_in_group("hk_enemy").size() == 0, "đợt 2 chỉ sinh một lần")
 	await go(lk)
 	ck(w.room.locked, "nạp lại: khoá lại")
 	w._ordeal_tick(O.SEAL_TIMEOUT + 1.0)
